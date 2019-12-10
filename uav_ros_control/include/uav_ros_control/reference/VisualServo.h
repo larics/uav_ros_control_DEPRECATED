@@ -98,7 +98,7 @@ namespace uav_reference {
       double _qx, _qy, _qz, _qw;
 
       bool _visualServoEnabled = false,  _compensate_roll_and_pitch = false;
-      bool _x_frozen = false, _y_frozen = false, _yaw_frozen = false;
+      bool _x_frozen = false, _y_frozen = false, _z_frozen = false,  _yaw_frozen = false;
 
       /** Publishers */
       ros::Publisher _pubNewSetpoint;
@@ -109,8 +109,8 @@ namespace uav_reference {
       std_msgs::Bool _boolMsg;
 
       // Topics for direct rotor control
-      ros::Publisher _pubMoveLeft, _pubMoveForward, _pubChangeYaw;
-      std_msgs::Float32 _moveLeftMsg, _moveForwardMsg, _changeYawMsg;
+      ros::Publisher _pubMoveLeft, _pubMoveForward, _pubChangeYaw, _pubMoveUp;
+      std_msgs::Float32 _moveLeftMsg, _moveForwardMsg, _changeYawMsg, _moveUpMsg;
 
       // Topics for debugging
       ros::Publisher _pubUavYawDebug, _pubChangeYawDebug, _pubYawErrorDebug;

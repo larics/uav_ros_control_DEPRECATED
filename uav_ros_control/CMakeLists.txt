@@ -18,6 +18,7 @@ generate_dynamic_reconfigure_options(
 	config/control/DistanceControlParameters.cfg
 	config/reference/VisualServoParameters.cfg
 	config/reference/VisualServoStateMachineParameters.cfg
+	config/reference/VisualServoPursuitParameters.cfg
 )
 
 catkin_package(
@@ -62,6 +63,10 @@ target_link_libraries(visual_servo_node reference_lib)
 # visual servo state machine
 add_executable(visual_servo_sm nodes/reference/VisualServoStateNode.cpp)
 target_link_libraries(visual_servo_sm ${catkin_LIBRARIES} nfilt)
+
+# visual servo state machine
+add_executable(visual_servo_sm_pursuit nodes/reference/VisualServoStatePursuitNode.cpp)
+target_link_libraries(visual_servo_sm_pursuit ${catkin_LIBRARIES} nfilt)
 
 # PID cascade node
 add_executable(pid_cascade_node nodes/control/PositionControlNode.cpp)

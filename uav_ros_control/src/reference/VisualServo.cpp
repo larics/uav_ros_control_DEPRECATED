@@ -67,6 +67,8 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _pubMoveLeft = nh.advertise<std_msgs::Float32>("move_left", 1);
   _pubChangeYaw = nh.advertise<std_msgs::Float32>("change_yaw", 1);
   _pubMoveForward = nh.advertise<std_msgs::Float32>("move_forward", 1);
+  _pubMoveUp = nh.advertise<std_msgs::Float32>("move_up", 1);
+  
   _pubUavYawDebug = nh.advertise<std_msgs::Float32>("debug/Uav_yaw", 1);
   _pubYawErrorDebug = nh.advertise<std_msgs::Float32>("debug/yaw_error", 1);
   _pubChangeYawDebug = nh.advertise<std_msgs::Float32>("debug/yaw_change", 1); // Advertised again for user friendliness
@@ -218,6 +220,7 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
 
   _x_frozen = false;
   _y_frozen = false;
+  _z_frozen = false;
   _yaw_frozen = false;
   response.success = _visualServoEnabled;
   return true;
@@ -341,12 +344,20 @@ void VisualServo::VisualServoProcessValuesCb(const uav_ros_control_msgs::VisualS
         _uavPos[1] = msg.y;
     }
 
+    if (msg.z == 0.0) {
+      _z_frozen = true;
+    }
+    if (!_z_frozen) {
+      _uavPos[2] = msg.z;
+    }
+
     if (msg.yaw == 0.0) {
         _yaw_frozen = true;
     }
     if (!_yaw_frozen) {
         _uavYaw = msg.yaw;
     }
+
     _floatMsg.data = _uavYaw;
     _pubUavYawDebug.publish(_floatMsg);
 
@@ -369,10 +380,12 @@ void VisualServo::updateSetpoint() {
 
   double move_forward = 0.0;
   double move_left = 0.0;
+  double move_up = 0.0;
   double change_yaw = 0.0;
 
   if (!_x_frozen) move_left = _x_axis_PID.compute(_offset_x, _error_x, 1 / _rate);
   if (!_y_frozen) move_forward  = _y_axis_PID.compute(_offset_y, _error_y, 1 / _rate);
+  if (!_z_frozen) move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
   if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
   _floatMsg.data = change_yaw;
   _pubChangeYawDebug.publish(_floatMsg);
@@ -381,18 +394,19 @@ void VisualServo::updateSetpoint() {
   _setpointPosition[0] -= move_left * sin(_uavYaw + _yaw_added_offset);
   _setpointPosition[1] = _uavPos[1] + move_forward * sin(_uavYaw + _yaw_added_offset);
   _setpointPosition[1] += move_left * cos(_uavYaw + _yaw_added_offset);
-  _setpointPosition[2] = _uavPos[2];
+  _setpointPosition[2] = _uavPos[2] + move_up;
 
   _setpointYaw = _uavYaw + change_yaw;
 
   _moveLeftMsg.data = move_left;
   _changeYawMsg.data = change_yaw;
+  _moveUpMsg.data = move_up;
   _moveForwardMsg.data = move_forward;
 
   _pubMoveLeft.publish(_moveLeftMsg);
   _pubChangeYaw.publish(_changeYawMsg);
   _pubMoveForward.publish(_moveForwardMsg);
-
+  _pubMoveUp.publish(_moveUpMsg);
 }
 
 void VisualServo::publishNewSetpoint() {
