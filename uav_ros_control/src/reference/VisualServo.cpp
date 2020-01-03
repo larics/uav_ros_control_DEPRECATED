@@ -63,6 +63,7 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   // Define Publishers
   _pubXError = nh.advertise<std_msgs::Float32>("visual_servo/x_error", 1);
   _pubYError = nh.advertise<std_msgs::Float32>("visual_servo/y_error", 1);
+  _pubZError = nh.advertise<std_msgs::Float32>("visual_servo/z_error", 1);
   _pubIsEnabledTopic = nh.advertise<std_msgs::Bool>("visual_servo/is_enabled", 1);
   _pubMoveLeft = nh.advertise<std_msgs::Float32>("move_left", 1);
   _pubChangeYaw = nh.advertise<std_msgs::Float32>("change_yaw", 1);
@@ -76,6 +77,11 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _pubUavPitchDebug = nh.advertise<std_msgs::Float32>("debug/uav_pitch", 1);
   _pubNewSetpoint =
       nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("position_hold/trajectory", 1);
+
+  // DEBUG
+  _pubXAdd = nh.advertise<std_msgs::Float32>("debug/x_added", 1);
+
+  _pubYAdd = nh.advertise<std_msgs::Float32>("debug/y_added", 1);
 
   // Define Subscribers
   _subOdom =
@@ -261,6 +267,19 @@ void VisualServo::visualServoParamsCb(uav_ros_control::VisualServoParametersConf
     _y_axis_PID.resetIntegrator();
   }
 
+  _z_axis_PID.set_kp(configMsg.k_p_z);
+  _z_axis_PID.set_ki(configMsg.k_i_z);
+  _z_axis_PID.set_kd(configMsg.k_d_z);
+  _z_axis_PID.set_lim_high(configMsg.saturation_z);
+  _z_axis_PID.set_lim_low(-configMsg.saturation_z);
+
+  if (!configMsg.z_armed) {
+    _z_axis_PID.set_kp(0);
+    _z_axis_PID.set_ki(0);
+    _z_axis_PID.set_kd(0);
+    _z_axis_PID.resetIntegrator();
+  }
+
   _yaw_PID.set_kp(configMsg.k_p_yaw);
   _yaw_PID.set_ki(configMsg.k_i_yaw);
   _yaw_PID.set_kd(configMsg.k_d_yaw);
@@ -302,7 +321,8 @@ void VisualServo::xErrorCb(const std_msgs::Float32 &data) {
       _error_x += tan(_uavRoll)/tan(_camera_fov);
   }
 
-  _floatMsg.data = _error_x - _offset_x;
+  // _floatMsg.data = _error_x - _offset_x;
+  _floatMsg.data = _offset_x - _error_x;
   _pubXError.publish(_floatMsg);
 }
 
@@ -320,6 +340,9 @@ void VisualServo::yErrorCb(const std_msgs::Float32 &data) {
 void VisualServo::zErrorCb(const std_msgs::Float32& msg)
 {
   _error_z = msg.data;
+
+  _floatMsg.data = _error_z - _offset_z;
+  _pubZError.publish(_floatMsg);
 }
 
 void VisualServo::yawErrorCb(const std_msgs::Float32 &data) {
@@ -357,11 +380,8 @@ void VisualServo::VisualServoProcessValuesCb(const uav_ros_control_msgs::VisualS
     if (!_yaw_frozen) {
         _uavYaw = msg.yaw;
     }
-
     _floatMsg.data = _uavYaw;
     _pubUavYawDebug.publish(_floatMsg);
-
-    _uavPos[2] = msg.z;
 }
 
 void VisualServo::xOffsetCb(const std_msgs::Float32 &msg) {
@@ -407,6 +427,10 @@ void VisualServo::updateSetpoint() {
   _pubChangeYaw.publish(_changeYawMsg);
   _pubMoveForward.publish(_moveForwardMsg);
   _pubMoveUp.publish(_moveUpMsg);
+  _moveLeftMsg.data = _setpointPosition[0]- _uavPos[0];
+  _pubXAdd.publish(_moveLeftMsg);
+  _moveLeftMsg.data = _setpointPosition[1]- _uavPos[1];
+  _pubYAdd.publish(_moveLeftMsg);
 }
 
 void VisualServo::publishNewSetpoint() {

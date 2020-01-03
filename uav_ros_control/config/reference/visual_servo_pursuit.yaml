@@ -1,0 +1,41 @@
+visual_servo:
+  
+  camera_fov: 90
+  compensate_roll_and_pitch: false
+  yaw_added_offset: 0.0
+
+  pid_x:
+    x_armed:  true
+    kp:  0.1
+    ki:  0
+    kd:  0
+    lim_low: -0.75
+    lim_high: 0.75
+    deadzone_x: 0 
+
+  pid_y:
+    y_armed:  true
+    kp:  2.0
+    ki:  0
+    kd:  0
+    lim_low: -2.0
+    lim_high: 2.0
+    deadzone_y: 0.25
+
+  pid_z:  
+    z_armed: true
+    kp:  1.5
+    ki:  0
+    kd:  0.1  
+    lim_low: -10.0
+    lim_high: 10.0
+    deadzone_z: 0
+
+  pid_yaw:
+    yaw_armed: true
+    kp:  0.4
+    ki:  0.01
+    kd:  0
+    lim_low: -0.5
+    lim_high: 0.5
+    deadzone_yaw: 0
