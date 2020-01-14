@@ -4,7 +4,8 @@ import rospy
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Transform, Quaternion
+from geometry_msgs.msg import Transform, Quaternion, Vector3Stamped
+from math import atan2, cos, sin
 
 class TrajectoryPacker():
     '''
@@ -17,9 +18,10 @@ class TrajectoryPacker():
         self.odom_msg = Odometry()
         rospy.Subscriber('carrot/status', String, self.status_cb)
         self.pub_odom = True
-        self.status = "OFF"
+        self.old_odom = Odometry()
+	    self.status = "OFF"
         self.traj_pub = rospy.Publisher('trajectory', MultiDOFJointTrajectory, queue_size=1)
-
+	
     def ref_sub(self, msg):
         traj = MultiDOFJointTrajectory()
         traj.points = []
@@ -44,6 +46,7 @@ class TrajectoryPacker():
             transform.rotation.w = self.odom_msg.pose.pose.orientation.w
             point.transforms.append(transform)
             traj.points.append(point)
+	    self.traj_pub.publish(traj)
 
     def odom_sub(self, msg):
         self.odom_msg = msg

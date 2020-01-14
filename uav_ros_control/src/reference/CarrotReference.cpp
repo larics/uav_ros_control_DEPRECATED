@@ -40,6 +40,7 @@ uav_reference::CarrotReference::CarrotReference(ros::NodeHandle& nh) :
 			&uav_reference::CarrotReference::posHoldServiceCb,
 			this);
 
+	_intResetClient = nh.serviceClient<std_srvs::Empty>("reset_integrator");
 	initializeParameters();
 
 	// Initialize references
@@ -49,7 +50,7 @@ uav_reference::CarrotReference::CarrotReference(ros::NodeHandle& nh) :
 }
 
 uav_reference::CarrotReference::~CarrotReference()
-{ 
+{
 }
 
 bool uav_reference::CarrotReference::posHoldServiceCb(std_srvs::Empty::Request& request, 
@@ -84,6 +85,19 @@ void uav_reference::CarrotReference::positionRefCb(
 	}
 }
 
+void uav_reference::CarrotReference::resetIntegrators()
+{
+	std_srvs::Empty::Request req;
+	std_srvs::Empty::Response resp;
+	if (!_intResetClient.call(req, resp))
+	{
+		ROS_FATAL("CarrotReference - Unable to reset integrators");
+		return;
+	}
+
+	ROS_INFO("Controller integrators reset.");
+}
+
 void uav_reference::CarrotReference::updateCarrot()
 {
 	// Disable Position hold if carrot inputs exist
@@ -96,12 +110,18 @@ void uav_reference::CarrotReference::updateCarrot()
 	}
 
 	// Update carrot unless in position hold
-	if (!_positionHold)
+	if (!_positionHold && _carrotEnabled)
 	{
 		updateCarrotXY();
 		updateCarrotZ();
 		updateCarrotYaw();
 	}
+	else if (!_positionHold && !_carrotEnabled)
+	{
+		// Map odometry to carrot
+		resetCarrot();
+	}
+
 }
 
 void uav_reference::CarrotReference::resetCarrot()
@@ -239,15 +259,17 @@ void uav_reference::CarrotReference::updateCarrotStatus()
 	{
 		_carrotEnabled = true;
 		ROS_INFO("CarrotReference::updateCarrotStatus - carrot enabled.");
+		resetIntegrators();
 		resetCarrot();
 		return;
 	}
 
-	// Detect enable button - falling edge 
+	// Detect enable button - falling edge
 	if (getJoyButtons()[_carrotEnabledIndex] == (1 - _carrotEnabledValue) && _carrotEnabled)
 	{
 		_carrotEnabled = false;
 		_positionHold = false;
+		resetIntegrators();
 		ROS_INFO("CarrotRefernce::updateCarrotStatus - carrot disabled.\n");
 		return;
 	}
@@ -284,8 +306,7 @@ void uav_reference::runDefault(
 		ros::spinOnce();
 		carrotRefObj.updateCarrotStatus();
 		carrotRefObj.updateCarrot();
-		if (carrotRefObj.isCarrotEnabled() || carrotRefObj.isHoldEnabled())
-			carrotRefObj.publishCarrotSetpoint();
+		carrotRefObj.publishCarrotSetpoint();
 		loopRate.sleep();
 	}
 }

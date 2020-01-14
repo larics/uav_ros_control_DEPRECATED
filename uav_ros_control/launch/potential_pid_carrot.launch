@@ -5,6 +5,11 @@
     <arg name="potfield_out" default="potential_fields/trajectory"/>
     <arg name="pid_in" default="potential_fields/trajectory"/>
     <arg name="odometry" default="msf_core/odometry"/>
+
+    <!-- Velodyne to MPC state -->
+    <node name="state_to_leddar" pkg="tf" type="static_transform_publisher" 
+        args="0.08 0 -0.1578 0. 0.1323284641020683 3.141592653589793 state velodyne 100" />
+            
     <arg name="laser_points" default="/leddar_points"/>
     
     <!-- PID Carrot stack -->
@@ -38,8 +43,4 @@
         <arg name ="r" value = "0.8" />
     </include>
 
-    <!-- Velodyne to MPC state -->
-    <node name="state_to_leddar" pkg="tf" type="static_transform_publisher" 
-        args="0.1 0 0.15 0. 0.1323284641020683 3.141592653589793 state bebop/leddar 100" />
- 
 </launch>

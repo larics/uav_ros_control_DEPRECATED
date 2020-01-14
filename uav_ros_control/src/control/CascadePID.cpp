@@ -37,8 +37,23 @@ uav_controller::CascadePID::CascadePID(ros::NodeHandle& nh) :
 	_posParamCallback = boost::bind(
 		&uav_controller::CascadePID::positionParamsCb, this, _1, _2);
 	_posConfigServer.setCallback(_posParamCallback);
+
+	// Initialize position hold service
+	_serviceResetIntegrators = nh.advertiseService(
+			"reset_integrator",
+			&uav_controller::CascadePID::intResetServiceCb,
+			this);
 }
 
+bool uav_controller::CascadePID::intResetServiceCb(std_srvs::Empty::Request& request, 
+	std_srvs::Empty::Response& response)
+{
+	ROS_WARN("Resetting all PID controllers");
+	resetPositionPID();
+	resetVelocityPID();
+	return true;
+}
+	
 uav_controller::CascadePID::~CascadePID()
 {
 }

@@ -54,6 +54,8 @@ namespace uav_reference
 
 	private:
 
+		void resetIntegrators();
+
 		/** 
 		 * Initialize class parameters.
 		 */
@@ -153,6 +155,9 @@ namespace uav_reference
 
 		/** Define all the services */
 		ros::ServiceServer _servicePoisitionHold;
+
+		/* Reset integrator client */
+		ros::ServiceClient _intResetClient;
 	};
 
 	/**

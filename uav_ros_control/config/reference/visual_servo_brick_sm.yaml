@@ -2,16 +2,12 @@ visual_servo:
   state_machine:
     
     rate: 50
-    min_error: 0.03
+    min_error: 0.5
     min_yaw_error: 0.05
-    touchdown_height: 1
-    touchdown_delta: 0.92
-    touchdown_duration: 1
-    after_touchdown_height: 3
-    descent_speed: 0.6
-
-    offset_x_1: 0
-    offset_x_2: 0
-
-    offset_y_1: 0.2
-    offset_y_2: 0.1
+    touchdown_height: 0.5
+    touchdown_delta: 0.425
+    touchdown_duration: 2
+    after_touchdown_height: 3.1
+    descent_speed: 0.2
+    ascent_speed: 0.5
+    detection_counter: 150

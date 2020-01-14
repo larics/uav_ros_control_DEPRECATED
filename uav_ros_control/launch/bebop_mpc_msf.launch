@@ -6,9 +6,9 @@
     <arg name="model" default="bebop"/>
 
     <!-- MSF odometry callback-->
-    <include file="$(find msf_updates)/launch/msf_bebop.launch">
+    <!--include file="$(find msf_updates)/launch/msf_bebop.launch">
         <arg name="namespace"   value="$(arg namespace)"/>
-    </include>
+    </include-->
     
     <!-- MPC trajectory frame -->
     <node name="trajectory_transform" pkg="tf" type="static_transform_publisher" 
@@ -23,7 +23,7 @@
     <include file="$(find multirotor_transformations)/launch/mpc_to_px4_command.launch">
         <arg name="namespace"   value="$(arg namespace)"/>
         <!-- Thrust max ovdje je u mpc parametrima thrust_max*masa-->
-        <arg name="thrust_max"  value="10" />
+        <arg name="thrust_max"  value="170" />
         <arg name="odometry"    value="$(arg odometry)"/>
     </include>
 

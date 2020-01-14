@@ -49,6 +49,12 @@ namespace uav_controller
 
 	private:
 		
+		/** 
+		 * Reset integrator service callback.OS 
+		 */
+		bool intResetServiceCb(std_srvs::Empty::Request& request, 
+			std_srvs::Empty::Response& response);
+
 		/**
 		 * Yaw reference callback function.
 		 */
@@ -111,6 +117,9 @@ namespace uav_controller
 			Server<uav_ros_control::PositionControlParametersConfig>::CallbackType
 			_posParamCallback;
 		
+		/** Define all the services */
+		ros::ServiceServer _serviceResetIntegrators;
+
 		/** Velocity ref publisher */
 		ros::Publisher _velRefPub;
 		ros::Publisher _velCurrPub;
