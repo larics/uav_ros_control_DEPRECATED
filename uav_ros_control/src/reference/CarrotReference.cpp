@@ -101,8 +101,7 @@ void uav_reference::CarrotReference::resetIntegrators()
 void uav_reference::CarrotReference::updateCarrot()
 {
 	// Disable Position hold if carrot inputs exist
-	if (_positionHold && (abs(getXOffsetManual()) > 0 || abs(getYOffsetManual()) > 0 || 
-		abs(getZOffsetManual()) > 0))
+	if (_positionHold && isJoyActive())
 	{
 		ROS_WARN("Position hold disabled - resetting carrot position");
 		resetCarrot();

@@ -2,6 +2,9 @@
 #include <uav_ros_control/filters/NonlinearFilters.h>
 #include <math.h>
 
+/** Minimum value for joy to be considered active. */
+#define MIN_ACTIVE_VALUE 0.01
+
 uav_reference::JoyControlInput::JoyControlInput(ros::NodeHandle& nh) :
 	_controlIndices (new joy_struct::ControlIndices),
 	_attitudeScales (new joy_struct::ScaleWeights),

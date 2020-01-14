@@ -10,9 +10,6 @@
 
 namespace uav_reference
 {
-	/** Minimum value for joy to be considered active. */
-	#define MIN_ACTIVE_VALUE 0.1
-
 	/**
 	 * This class is used for getting control inputs from ROS Joy messages.
 	 * It will initialize all index and scaling parameters. It provides control 
