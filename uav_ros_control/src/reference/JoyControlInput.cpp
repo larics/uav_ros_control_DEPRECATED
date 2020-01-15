@@ -79,7 +79,8 @@ bool uav_reference::JoyControlInput::isJoyActive()
 {
 	return abs(_joyMsg.axes[_controlIndices->AXIS_LINEAR_X]) > MIN_ACTIVE_VALUE ||
 		abs(_joyMsg.axes[_controlIndices->AXIS_LINEAR_Y]) > MIN_ACTIVE_VALUE ||
-		abs(_joyMsg.axes[_controlIndices->AXIS_LINEAR_Y]) > MIN_ACTIVE_VALUE;
+		abs(_joyMsg.axes[_controlIndices->AXIS_LINEAR_Z]) > MIN_ACTIVE_VALUE ||
+		abs(_joyMsg.axes[_controlIndices->AXIS_ANGULAR_YAW]) > MIN_ACTIVE_VALUE;
 }
 
 void uav_reference::JoyControlInput::initializeParameters(ros::NodeHandle& nh)
