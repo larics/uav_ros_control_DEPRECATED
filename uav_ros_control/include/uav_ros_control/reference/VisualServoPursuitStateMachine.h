@@ -136,8 +136,9 @@ void ballConfidentCb(const std_msgs::Bool msg)
 
 bool pursuitServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::Response& response)
 {
-    if (!_isDetectionActive) // TODO: Handle case when pursuit should not turn on
+    if (!request.data |!_isDetectionActive) // TODO: Handle case when pursuit should not turn on
     {
+        ROS_FATAL("PursuitSM::pursuitServiceCb - Pursuit is deactivated.");
         turnOffVisualServo();
         _pursuitActivated = false;
         response.success = false;
@@ -291,7 +292,11 @@ void updateState()
     // If detection is not confident anymore or visual servo is deactivated or detection node is inactive, turn off UAV following.
     if (_currentState == PursuitState::UAV_FOLLOWING && (!_start_following_uav || !_pursuitActivated || !_isDetectionActive))
     {
-        ROS_WARN("PursuitSM::updateStatus - UAV tracking not confident anymore.");
+        ROS_WARN("PursuitSM::updateStatus - exiting UAV_FOLLOWING mode.");
+        ROS_WARN_COND(!_start_following_uav, "PursuitSM::condition - UAV following not confident anymore.");
+        ROS_WARN_COND(!_pursuitActivated, "PursuitSM::condition - service Pursuit is not active anymore.");
+        ROS_WARN_COND(!_isDetectionActive, "PursuitSM::condition - detection is inactive.");
+
         turnOffVisualServo();
         _currentState = PursuitState::OFF;
         ROS_WARN("PursuitSM::updateStatus - OFF State activated.");
@@ -331,7 +336,7 @@ bool isRelativeDistancePositive()
 
 void checkDetection(){
     double dt = (ros::Time::now() - _time_last_detection_msg).toSec();
-    if (dt > 0.1)
+    if (dt > 0.4)
         _isDetectionActive = false;
 }
 
@@ -351,9 +356,9 @@ void publishVisualServoSetpoint(double dt)
             break;
         
         case PursuitState::UAV_FOLLOWING : 
-            _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
-            _currVisualServoFeed.y = _currOdom.pose.pose.position.y;
-            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
+            _currVisualServoFeed.x = 0; //_currOdom.pose.pose.position.x;
+            _currVisualServoFeed.y = 0; // _currOdom.pose.pose.position.y;
+            _currVisualServoFeed.z = 0; //_currOdom.pose.pose.position.z;
             _currVisualServoFeed.yaw = util::calculateYaw(
                 _currOdom.pose.pose.orientation.x,
                 _currOdom.pose.pose.orientation.y,
