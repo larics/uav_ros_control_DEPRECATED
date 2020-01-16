@@ -272,8 +272,13 @@ void updateState()
         _currentState = PursuitState::UAV_FOLLOWING;
         turnOnVisualServo();
 
-        _currDistanceReference = _relativeUAVDistance;
-        _currHeightReference = _relativeUAVHeight;
+        // Comment this out for testing pursposes
+        //_currDistanceReference = _relativeUAVDistance;
+        //_currHeightReference = _relativeUAVHeight;
+        _currDistanceReference = _uav_distance_offset;
+        _currHeightReference = 0;
+        
+
         _currYawReference = _relativeUAVYaw;
 
         if (isRelativeDistanceNan()){
@@ -305,8 +310,12 @@ void updateState()
 
     if (_currentState == PursuitState::UAV_FOLLOWING && _pursuitActivated)
     {
-        _currDistanceReference = _relativeUAVDistance;
-        _currHeightReference = _relativeUAVHeight;
+        // Comment this out for testing pursposes
+        //_currDistanceReference = _relativeUAVDistance;
+        //_currHeightReference = _relativeUAVHeight;
+        _currDistanceReference = _uav_distance_offset;
+        _currHeightReference = 0;
+        
         _currYawReference = _relativeUAVYaw;
 
         if (isRelativeDistanceNan()){
