@@ -5,7 +5,7 @@ visual_servo:
   yaw_added_offset: 0.0
 
   pid_x:
-    x_armed:  true
+    x_armed:  false
     kp:  0.1
     ki:  0
     kd:  0
@@ -15,20 +15,20 @@ visual_servo:
 
   pid_y:
     y_armed:  true
-    kp:  2.0
+    kp:  1.0
     ki:  0
     kd:  0
-    lim_low: -2.0
-    lim_high: 2.0
-    deadzone_y: 0.25
+    lim_low: -0.5
+    lim_high: 0.5
+    deadzone_y: 0
 
   pid_z:  
     z_armed: true
-    kp:  1.5
+    kp:  2.5
     ki:  0
-    kd:  0.1  
-    lim_low: -10.0
-    lim_high: 10.0
+    kd:  0  
+    lim_low: -2.0
+    lim_high: 2.0
     deadzone_z: 0
 
   pid_yaw:

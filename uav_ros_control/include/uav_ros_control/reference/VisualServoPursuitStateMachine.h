@@ -273,10 +273,10 @@ void updateState()
         turnOnVisualServo();
 
         // Comment this out for testing pursposes
-        //_currDistanceReference = _relativeUAVDistance;
-        //_currHeightReference = _relativeUAVHeight;
-        _currDistanceReference = _uav_distance_offset;
-        _currHeightReference = 0;
+        //_currHeightReference = 0;
+        //_currDistanceReference = _uav_distance_offset;
+        _currDistanceReference = _relativeUAVDistance;
+        _currHeightReference = _relativeUAVHeight;
         
 
         _currYawReference = _relativeUAVYaw;
@@ -311,10 +311,11 @@ void updateState()
     if (_currentState == PursuitState::UAV_FOLLOWING && _pursuitActivated)
     {
         // Comment this out for testing pursposes
-        //_currDistanceReference = _relativeUAVDistance;
-        //_currHeightReference = _relativeUAVHeight;
-        _currDistanceReference = _uav_distance_offset;
-        _currHeightReference = 0;
+        //_currHeightReference = 0;
+        //_currDistanceReference = _uav_distance_offset;
+
+        _currDistanceReference = _relativeUAVDistance;
+        _currHeightReference = _relativeUAVHeight;
         
         _currYawReference = _relativeUAVYaw;
 
@@ -365,9 +366,9 @@ void publishVisualServoSetpoint(double dt)
             break;
         
         case PursuitState::UAV_FOLLOWING : 
-            _currVisualServoFeed.x = 0; //_currOdom.pose.pose.position.x;
-            _currVisualServoFeed.y = 0; // _currOdom.pose.pose.position.y;
-            _currVisualServoFeed.z = 0; //_currOdom.pose.pose.position.z;
+            _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
+            _currVisualServoFeed.y = _currOdom.pose.pose.position.y;
+            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
             _currVisualServoFeed.yaw = util::calculateYaw(
                 _currOdom.pose.pose.orientation.x,
                 _currOdom.pose.pose.orientation.y,
