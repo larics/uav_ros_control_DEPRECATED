@@ -4,3 +4,4 @@ pursuit:
     rate: 50
     uav_distance_offset: 10.0
     ball_distance_offset: 5.0
+    z_offset: 0.0

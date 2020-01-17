@@ -4,6 +4,7 @@
 
     <arg name="x_offset"    default="visual_servo/offset_x"/>
     <arg name="y_offset"    default="visual_servo/offset_y"/>
+    <arg name="z_offset"    default="visual_servo/offset_z"/>
     <arg name="x_target_error" default="visual_servo/target_error_x"/>
     <arg name="y_target_error" default="visual_servo/target_error_y"/>
     <arg name="z_target_error" default="visual_servo/target_error_z"/>
@@ -48,6 +49,7 @@
             <!-- State machine topics -->
             <remap from="x_offset" to="$(arg x_offset)"/>
             <remap from="y_offset" to="$(arg y_offset)"/>
+            <remap from="z_offset" to="$(arg z_offset)"/>
             <remap from="visual_servo/x_error" to="$(arg x_target_error)"/>
             <remap from="visual_servo/y_error" to="$(arg y_target_error)"/>
             <remap from="visual_servo/z_error" to="$(arg z_target_error)"/>

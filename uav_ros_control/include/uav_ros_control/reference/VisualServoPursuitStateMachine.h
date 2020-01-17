@@ -32,6 +32,7 @@ typedef uav_ros_control::VisualServoPursuitParametersConfig pursuit_param_t;
 #define PARAM_UAV_DISTANCE_OFFSET       "pursuit/state_machine/uav_distance_offset"
 #define PARAM_BALL_DISTANCE_OFFSET      "pursuit/state_machine/ball_distance_offset"
 #define INVALID_DISTANCE -1
+#define PARAM_Z_OFFSET                  "pursuit/state_machine/z_offset"
 
 enum PursuitState {
     OFF,
@@ -49,6 +50,7 @@ PursuitStateMachine(ros::NodeHandle& nh)
     // Define Publishers
     _pubVisualServoFeed = nh.advertise<uav_ros_control_msgs::VisualServoProcessValues>("visual_servo/process_value", 1);
     _pubOffsetY = nh.advertise<std_msgs::Float32>("visual_servo/offset_y", 1);
+    _pubOffsetZ = nh.advertise<std_msgs::Float32>("visual_servo/offset_z", 1);
     _pubVssmState = nh.advertise<std_msgs::Int32>("visual_servo_sm/state", 1);
     _pubXError = nh.advertise<std_msgs::Float32>("sm_pursuit/x_err", 1);
     _pubYError = nh.advertise<std_msgs::Float32>("sm_pursuit/y_err", 1);
@@ -174,6 +176,7 @@ void pursuitParamCb(pursuit_param_t& configMsg,uint32_t level)
     // TODO: Change internal parameter here from dyn_reconf configMsg
     _uav_distance_offset = configMsg.UAV_distance_offset;
     _ball_distance_offset = configMsg.BALL_distance_offset;
+    _uav_z_offset = configMsg.UAV_z_offset;
 }
 
 void setPursuitParameters(pursuit_param_t& config)
@@ -181,6 +184,7 @@ void setPursuitParameters(pursuit_param_t& config)
     // TODO: Set initial reconfigure paramters here
     config.UAV_distance_offset = _uav_distance_offset;
     config.BALL_distance_offset = _ball_distance_offset;
+    config.UAV_z_offset = _uav_z_offset;
 }
 
 void initializeParameters(ros::NodeHandle& nh)
@@ -390,8 +394,12 @@ void publishOffsets()
 {
     if (_currentState == PursuitState::UAV_FOLLOWING){
         std_msgs::Float32 offsetYMsg;
-        offsetYMsg.data = -1 * _uav_distance_offset; // TODO: Put some value here // dynm reconf param
-        _pubOffsetY.publish(offsetYMsg);  
+        offsetYMsg.data = -1 * _uav_distance_offset;
+        _pubOffsetY.publish(offsetYMsg);
+
+        std_msgs::Float32 offsetZMsg;
+        offsetZMsg.data = _uav_z_offset;
+        _pubOffsetZ.publish(offsetZMsg);  
     }
     // later for ball
     // if (_currentState == PursuitState::BALL_FOLLOWING){
@@ -463,7 +471,7 @@ private:
     ros::ServiceClient _vsClienCaller;
 
     /* Offset subscriber and publisher */
-    ros::Publisher _pubVssmState, _pubOffsetY;
+    ros::Publisher _pubVssmState, _pubOffsetY, _pubOffsetZ;
 
     /* Error publishers */
     ros::Publisher _pubXError, _pubYError, _pubZError, _pubYawError;
@@ -490,6 +498,7 @@ private:
     double _currDistanceReference, _currHeightReference, _currYawReference;
     bool _start_following_uav = false, _isDetectionActive = false;
     float _uav_distance_offset, _ball_distance_offset;
+    float _uav_z_offset;
     ros::Time _time_last_detection_msg;
     float _maxDistanceReference = 15.0;
 
