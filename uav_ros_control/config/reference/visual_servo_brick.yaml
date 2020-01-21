@@ -3,6 +3,7 @@ visual_servo:
   compensate_roll_and_pitch: true
   compensate_camera_nonlinearity: true
   yaw_added_offset: 1.57
+  filter_k: 0.05
 
   camera:
     position:

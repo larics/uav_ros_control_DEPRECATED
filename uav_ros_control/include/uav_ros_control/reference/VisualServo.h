@@ -100,6 +100,10 @@ namespace uav_reference {
       bool _visualServoEnabled = false,  _compensate_roll_and_pitch = false;
       bool _x_frozen = false, _y_frozen = false, _z_frozen = false,  _yaw_frozen = false;
 
+      // Filter
+      float k = 0.0;
+      double move_forward_old = 0.0;
+
       /** Publishers */
       ros::Publisher _pubNewSetpoint;
       trajectory_msgs::MultiDOFJointTrajectoryPoint _new_point;

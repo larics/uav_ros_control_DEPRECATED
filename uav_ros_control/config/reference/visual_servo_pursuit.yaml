@@ -3,6 +3,7 @@ visual_servo:
   camera_fov: 90
   compensate_roll_and_pitch: false
   yaw_added_offset: 0.0
+  filter_k: 0.05
 
   pid_x:
     x_armed:  false
@@ -24,11 +25,11 @@ visual_servo:
 
   pid_z:  
     z_armed: true
-    kp:  2.5
+    kp:  1.0
     ki:  0
     kd:  0  
-    lim_low: -2.0
-    lim_high: 2.0
+    lim_low: -1.0
+    lim_high: 1.0
     deadzone_z: 0
 
   pid_yaw:
