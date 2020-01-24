@@ -64,12 +64,12 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _subUAVHeightError = nh.subscribe("/uav_object_tracking/uav/height_error_filtered", 1, &uav_reference::PursuitStateMachine::uavHeightCb, this);
     _subUAVYawError = nh.subscribe("/uav_object_tracking/uav/yaw_error_filtered", 1, &uav_reference::PursuitStateMachine::uavYawCb, this);
     _subUAVPursuitConfident = nh.subscribe("/YOLODetection/uav_following_confident", 1, &uav_reference::PursuitStateMachine::uavConfidentCb, this);
+    _subUAVDistanceConfident = nh.subscribe("/YOLODetection/kf_distance_active", 1, &uav_reference::PursuitStateMachine::uavDistanceConfidentCb, this);
     /* BALL vision based errors */
     _subBALLDist = nh.subscribe("/uav_object_tracking/ball/distance", 1, &uav_reference::PursuitStateMachine::ballDistCb, this);
     _subBALLHeightError = nh.subscribe("/uav_object_tracking/ball/height_error", 1, &uav_reference::PursuitStateMachine::ballHeightCb, this);
     _subBALLYawError = nh.subscribe("/uav_object_tracking/ball/yaw_error", 1, &uav_reference::PursuitStateMachine::ballYawCb, this);
     _subBALLPursuitConfident = nh.subscribe("/red_ball/confident", 1, &uav_reference::PursuitStateMachine::ballConfidentCb, this);
-  
     // Setup dynamic reconfigure server
 	pursuit_param_t  pursuitConfig;
 	setPursuitParameters(pursuitConfig);
@@ -133,6 +133,10 @@ void uavConfidentCb(const std_msgs::Bool msg)
 void ballConfidentCb(const std_msgs::Bool msg)
 {
     // TO DO
+}
+
+void uavDistanceConfidentCb(const std_msgs::Bool msg){
+    _kf_distance_active = msg.data;
 }
 
 
@@ -280,9 +284,8 @@ void updateState()
         //_currHeightReference = 0;
         //_currDistanceReference = _uav_distance_offset;
         _currDistanceReference = _relativeUAVDistance;
-        _currHeightReference = _relativeUAVHeight;
-        
 
+        _currHeightReference = _relativeUAVHeight;
         _currYawReference = _relativeUAVYaw;
 
         if (isRelativeDistanceNan()){
@@ -330,7 +333,7 @@ void updateState()
         else if (!isRelativeDistancePositive()) {
             // pass
             ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative.");
-            _currDistanceReference = _uav_distance_offset; // 5.0 ?
+            _currDistanceReference = _uav_distance_offset;
 
         }
 
@@ -350,7 +353,7 @@ bool isRelativeDistancePositive()
 
 void checkDetection(){
     double dt = (ros::Time::now() - _time_last_detection_msg).toSec();
-    if (dt > 0.4)
+    if (dt > 0.5)
         _isDetectionActive = false;
 }
 
@@ -485,6 +488,7 @@ private:
 
     /* Confidence subscribers */
     ros::Subscriber _subUAVPursuitConfident, _subBALLPursuitConfident;
+    ros::Subscriber _subUAVDistanceConfident;
 
     /* Pose publisher */
     ros::Publisher _pubVisualServoFeed;
@@ -496,7 +500,7 @@ private:
 
     /* Parameters */
     double _currDistanceReference, _currHeightReference, _currYawReference;
-    bool _start_following_uav = false, _isDetectionActive = false;
+    bool _start_following_uav = false, _isDetectionActive = false, _kf_distance_active = false;
     float _uav_distance_offset, _ball_distance_offset;
     float _uav_z_offset;
     ros::Time _time_last_detection_msg;
