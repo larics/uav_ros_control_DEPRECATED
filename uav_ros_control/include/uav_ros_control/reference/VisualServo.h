@@ -26,6 +26,8 @@
 #include <uav_ros_control/control/PID.h>
 #include <uav_ros_control/filters/NonlinearFilters.h>
 #include <uav_ros_control_msgs/VisualServoProcessValues.h>
+#include <uav_ros_control/reference/RateLimiter.h>
+
 
 namespace uav_reference {
 /**
@@ -137,6 +139,13 @@ namespace uav_reference {
       std_srvs::SetBool::Request _setBoolRequest;
       std_srvs::SetBool::Response _setBoolResponse;
 
+      // RateLimiter
+      RateLimiter MoveForwardRateLimiter;
+      float _RateLimiter_R = 1.0;
+      ros::Publisher _pubMoveForwardRateLimiter;
+      std_msgs::Float32 RateLimiterMsg;
+
+
       void visualServoParamsCb(
           uav_ros_control::VisualServoParametersConfig& configMsg, uint32_t level);
 
@@ -154,3 +163,4 @@ namespace uav_reference {
 }
 
 #endif //UAV_ROS_CONTROL_VISUALSERVO_H
+

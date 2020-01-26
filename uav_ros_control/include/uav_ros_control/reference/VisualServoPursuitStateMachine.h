@@ -293,13 +293,13 @@ void updateState()
         //_currHeightReference = 0;
         //_currDistanceReference = _uav_distance_offset;
 
-        // _currDistanceReference = _relativeUAVDistance;
+        _currDistanceReference = _relativeUAVDistance;
 
         // Initialize Rate Limiter
-        UAVDistanceRateLimiter.initialCondition(_relativeUAVDistance, _uav_distance_offset);
-        _currDistanceReference = UAVDistanceRateLimiter.getData();
-        rl_msg.data = _currDistanceReference;
-        _pubDistanceRL.publish(rl_msg);
+        // UAVDistanceRateLimiter.initialCondition(_relativeUAVDistance, _uav_distance_offset);
+        // _currDistanceReference = UAVDistanceRateLimiter.getData();
+        // rl_msg.data = _currDistanceReference;
+        // _pubDistanceRL.publish(rl_msg);
 
         _currHeightReference = _relativeUAVHeight;
         _currYawReference = _relativeUAVYaw;
@@ -338,12 +338,12 @@ void updateState()
         //_currHeightReference = 0;
         //_currDistanceReference = _uav_distance_offset;
 
-        // _currDistanceReference = _relativeUAVDistance;
+        _currDistanceReference = _relativeUAVDistance;
 
         // Get data from rate Limiter
-        _currDistanceReference = UAVDistanceRateLimiter.getData();
-        rl_msg.data = _currDistanceReference;
-        _pubDistanceRL.publish(rl_msg);
+        // _currDistanceReference = UAVDistanceRateLimiter.getData();
+        // rl_msg.data = _currDistanceReference;
+        // _pubDistanceRL.publish(rl_msg);
 
         _currHeightReference = _relativeUAVHeight;
         _currYawReference = _relativeUAVYaw;
@@ -545,3 +545,4 @@ private:
 }
 
 #endif /* VISUAL_SERVO_PURSUIT_STATE_MACHINE_H*/
+

@@ -83,6 +83,9 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
 
   _pubYAdd = nh.advertise<std_msgs::Float32>("debug/y_added", 1);
 
+  // RATE LIMITER
+  _pubMoveForwardRateLimiter = nh.advertise<std_msgs::Float32>("visual_servo/move_forward_rl", 1);
+
   // Define Subscribers
   _subOdom =
       nh.subscribe("odometry", 1, &uav_reference::VisualServo::odomCb, this);
@@ -116,6 +119,10 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _new_point.transforms = std::vector<geometry_msgs::Transform>(1);
   _new_point.velocities = std::vector<geometry_msgs::Twist>(1);
   _new_point.accelerations = std::vector<geometry_msgs::Twist>(1);
+
+  //
+  MoveForwardRateLimiter.init(1.0/_rate, _RateLimiter_R, -_RateLimiter_R, 0.0);
+
 }
 
 VisualServo::~VisualServo() {}
@@ -156,7 +163,7 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     if (!initialized)
     {
       ROS_FATAL("VisualServo::initalizeParameters() - failed to initialize parameters");
-		  throw std::runtime_error("VisualServo parameters not properly initialized.");
+      throw std::runtime_error("VisualServo parameters not properly initialized.");
     }
 
   uav_ros_control::VisualServoParametersConfig cfg;
@@ -420,11 +427,23 @@ void VisualServo::updateSetpoint() {
   double change_yaw = 0.0;
 
   if (!_x_frozen) move_left = _x_axis_PID.compute(_offset_x, _error_x, 1 / _rate);
+  // PT1
+  // if (!_y_frozen){
+  //   move_forward  = _y_axis_PID.compute(_offset_y, _error_y, 1 / _rate);
+  //   move_forward_filtered = k * move_forward + (1 - k) * move_forward_old;
+  //   move_forward_old = move_forward_filtered;
+  // } 
+  // Rate Limiter
   if (!_y_frozen){
     move_forward  = _y_axis_PID.compute(_offset_y, _error_y, 1 / _rate);
-    move_forward_filtered = k * move_forward + (1 - k) * move_forward_old;
-    move_forward_old = move_forward_filtered;
+
+    MoveForwardRateLimiter.setInput(move_forward);
+    move_forward_filtered = MoveForwardRateLimiter.getData();
+    RateLimiterMsg.data = move_forward_filtered;
+    _pubMoveForwardRateLimiter.publish(RateLimiterMsg);
   } 
+
+
   if (!_z_frozen) move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
   if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
   _floatMsg.data = change_yaw;
