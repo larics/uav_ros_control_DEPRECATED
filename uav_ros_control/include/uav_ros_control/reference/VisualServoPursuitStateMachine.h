@@ -22,6 +22,7 @@
 #include <uav_ros_control/VisualServoPursuitParametersConfig.h>
 #include <uav_ros_control_msgs/VisualServoProcessValues.h>
 #include <uav_ros_control/filters/NonlinearFilters.h>
+#include <uav_ros_control/reference/RateLimiter.h>
 
 namespace uav_reference 
 {
@@ -33,7 +34,7 @@ typedef uav_ros_control::VisualServoPursuitParametersConfig pursuit_param_t;
 #define PARAM_BALL_DISTANCE_OFFSET      "pursuit/state_machine/ball_distance_offset"
 #define INVALID_DISTANCE -1
 #define PARAM_Z_OFFSET                  "pursuit/state_machine/z_offset"
-
+#define PARAM_RATE_LIMITER_R            "pursuit/state_machine/RL_r"
 enum PursuitState {
     OFF,
     UAV_FOLLOWING
@@ -56,6 +57,7 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _pubYError = nh.advertise<std_msgs::Float32>("sm_pursuit/y_err", 1);
     _pubZError = nh.advertise<std_msgs::Float32>("sm_pursuit/z_err", 1);
     _pubYawError = nh.advertise<std_msgs::Float32>("sm_pursuit/yaw_err", 1);
+    _pubDistanceRL = nh.advertise<std_msgs::Float32>("sm_pursuit/distance_rl",1);
 
     // Define Subscribers
     _subOdom = nh.subscribe("odometry", 1, &uav_reference::PursuitStateMachine::odomCb, this);
@@ -86,6 +88,9 @@ PursuitStateMachine(ros::NodeHandle& nh)
 
     //ros::Duration(2.0).sleep();
 
+    // Set Rate Limiter for distance
+    UAVDistanceRateLimiter.init(1.0/_rate, _RateLimiter_R, -_RateLimiter_R, 0.0);
+
 }
 
 ~PursuitStateMachine()
@@ -94,6 +99,7 @@ PursuitStateMachine(ros::NodeHandle& nh)
 void uavDistCb(const std_msgs::Float32ConstPtr& msg)
 {
     _relativeUAVDistance = msg->data;
+    UAVDistanceRateLimiter.setInput(_relativeUAVDistance);
 }
 
 void ballDistCb(const std_msgs::Float32ConstPtr& msg)
@@ -181,6 +187,7 @@ void pursuitParamCb(pursuit_param_t& configMsg,uint32_t level)
     _uav_distance_offset = configMsg.UAV_distance_offset;
     _ball_distance_offset = configMsg.BALL_distance_offset;
     _uav_z_offset = configMsg.UAV_z_offset;
+    _RateLimiter_R = configMsg.RateLimiter_R;
 }
 
 void setPursuitParameters(pursuit_param_t& config)
@@ -189,6 +196,7 @@ void setPursuitParameters(pursuit_param_t& config)
     config.UAV_distance_offset = _uav_distance_offset;
     config.BALL_distance_offset = _ball_distance_offset;
     config.UAV_z_offset = _uav_z_offset;
+    config.RateLimiter_R = _RateLimiter_R;
 }
 
 void initializeParameters(ros::NodeHandle& nh)
@@ -196,7 +204,8 @@ void initializeParameters(ros::NodeHandle& nh)
     ROS_INFO("PursuitStateMachine::initializeParameters()");
     bool initialized = nh.getParam(PARAM_RATE, _rate)
     && nh.getParam(PARAM_UAV_DISTANCE_OFFSET, _uav_distance_offset)
-    && nh.getParam(PARAM_BALL_DISTANCE_OFFSET, _ball_distance_offset);
+    && nh.getParam(PARAM_BALL_DISTANCE_OFFSET, _ball_distance_offset)
+    && nh.getParam(PARAM_RATE_LIMITER_R, _RateLimiter_R);
     // TODO: Load all the yaml parameters here 
     // Tip: Define parameter name at the top of the file
 
@@ -283,7 +292,14 @@ void updateState()
         // Comment this out for testing pursposes
         //_currHeightReference = 0;
         //_currDistanceReference = _uav_distance_offset;
-        _currDistanceReference = _relativeUAVDistance;
+
+        // _currDistanceReference = _relativeUAVDistance;
+
+        // Initialize Rate Limiter
+        UAVDistanceRateLimiter.initialCondition(_relativeUAVDistance, _uav_distance_offset);
+        _currDistanceReference = UAVDistanceRateLimiter.getData();
+        rl_msg.data = _currDistanceReference;
+        _pubDistanceRL.publish(rl_msg);
 
         _currHeightReference = _relativeUAVHeight;
         _currYawReference = _relativeUAVYaw;
@@ -309,6 +325,7 @@ void updateState()
         ROS_WARN_COND(!_pursuitActivated, "PursuitSM::condition - service Pursuit is not active anymore.");
         ROS_WARN_COND(!_isDetectionActive, "PursuitSM::condition - detection is inactive.");
 
+        UAVDistanceRateLimiter.reset();
         turnOffVisualServo();
         _currentState = PursuitState::OFF;
         ROS_WARN("PursuitSM::updateStatus - OFF State activated.");
@@ -321,9 +338,14 @@ void updateState()
         //_currHeightReference = 0;
         //_currDistanceReference = _uav_distance_offset;
 
-        _currDistanceReference = _relativeUAVDistance;
+        // _currDistanceReference = _relativeUAVDistance;
+
+        // Get data from rate Limiter
+        _currDistanceReference = UAVDistanceRateLimiter.getData();
+        rl_msg.data = _currDistanceReference;
+        _pubDistanceRL.publish(rl_msg);
+
         _currHeightReference = _relativeUAVHeight;
-        
         _currYawReference = _relativeUAVYaw;
 
         if (isRelativeDistanceNan()){
@@ -453,6 +475,8 @@ void run()
 	{
 		ros::spinOnce();
         checkDetection();
+        UAVDistanceRateLimiter.setR(_RateLimiter_R);
+        UAVDistanceRateLimiter.setF(-_RateLimiter_R);
         updateState();
         publishOffsets();
         publishErrors();
@@ -505,6 +529,12 @@ private:
     float _uav_z_offset;
     ros::Time _time_last_detection_msg;
     float _maxDistanceReference = 15.0;
+    std_msgs::Float32 rl_msg;
+
+    /* Rate Limiters */
+    RateLimiter UAVDistanceRateLimiter;
+    ros::Publisher _pubDistanceRL;
+    float _RateLimiter_R;
 
     /* Define Dynamic Reconfigure parameters */
     boost::recursive_mutex _pursuitConfigMutex;

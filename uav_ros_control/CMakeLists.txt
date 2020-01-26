@@ -64,9 +64,9 @@ target_link_libraries(visual_servo_node reference_lib)
 add_executable(visual_servo_sm nodes/reference/VisualServoStateNode.cpp)
 target_link_libraries(visual_servo_sm ${catkin_LIBRARIES} nfilt)
 
-# visual servo state machine
+# visual servo PURSUIT state machine
 add_executable(visual_servo_sm_pursuit nodes/reference/VisualServoStatePursuitNode.cpp)
-target_link_libraries(visual_servo_sm_pursuit ${catkin_LIBRARIES} nfilt)
+target_link_libraries(visual_servo_sm_pursuit ${catkin_LIBRARIES} nfilt reference_lib)
 
 # PID cascade node
 add_executable(pid_cascade_node nodes/control/PositionControlNode.cpp)

@@ -16,7 +16,7 @@ visual_servo:
 
   pid_y:
     y_armed:  true
-    kp:  1.0
+    kp:  0.4
     ki:  0
     kd:  0
     lim_low: -0.5
@@ -34,8 +34,8 @@ visual_servo:
 
   pid_yaw:
     yaw_armed: true
-    kp:  0.4
-    ki:  0.01
+    kp:  0.2
+    ki:  0.005
     kd:  0
     lim_low: -0.5
     lim_high: 0.5
