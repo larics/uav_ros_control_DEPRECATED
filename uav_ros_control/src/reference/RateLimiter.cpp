@@ -17,7 +17,8 @@ void RateLimiter::init(float t_sampleTime, float t_R, float t_F, float t_input)
 	m_sampleTime = t_sampleTime;
 	m_R = t_R;
 	m_F = t_F;
-	m_input = t_input;	
+	m_input = t_input;
+	m_lastOutput = 0.0;	
 }
 
 void RateLimiter::reset(){

@@ -121,7 +121,7 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _new_point.accelerations = std::vector<geometry_msgs::Twist>(1);
 
   //
-  MoveForwardRateLimiter.init(1.0/_rate, _RateLimiter_R, -_RateLimiter_R, 0.0);
+  MoveForwardRateLimiter.init(_RateLimiter_T, _RateLimiter_R, -_RateLimiter_R, 0.0);
 
 }
 
@@ -143,7 +143,9 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     nh.getParam("visual_servo/pid_z/deadzone_z", _deadzone_z) &&
     nh.getParam("visual_servo/pid_yaw/deadzone_yaw", _deadzone_yaw) &&
     nh.getParam("visual_servo/yaw_added_offset", _yaw_added_offset) &&
-    nh.getParam("visual_servo/filter_k", k);
+    nh.getParam("visual_servo/filter_k", k) &&
+    nh.getParam("visual_servo/rate_limiter_R", _RateLimiter_R) &&
+    nh.getParam("visual_servo/rate_limiter_T", _RateLimiter_T);
   
   ROS_INFO_COND(_compensate_roll_and_pitch, "VS - Roll and pitch compensation is active");
   ROS_INFO("VS - camera FOV %.2f", _camera_fov);
@@ -213,6 +215,8 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
   cfg.compensate_roll_and_pitch = _compensate_roll_and_pitch;
   cfg.yaw_added_offset = _yaw_added_offset;
   cfg.filter_k = k;
+  cfg.rate_limiter_R = _RateLimiter_R;
+  cfg.rate_limiter_T = _RateLimiter_T;
   _VSConfigServer.updateConfig(cfg);
 }
 
@@ -306,6 +310,8 @@ void VisualServo::visualServoParamsCb(uav_ros_control::VisualServoParametersConf
   _camera_fov = configMsg.camera_fov * M_PI / 180.0;
   _yaw_added_offset = configMsg.yaw_added_offset;
   k = configMsg.filter_k;
+  _RateLimiter_R = configMsg.rate_limiter_R;
+  _RateLimiter_T = configMsg.rate_limiter_T;
 }
 
 void VisualServo::odomCb(const nav_msgs::OdometryConstPtr& odom) {
@@ -420,6 +426,11 @@ void VisualServo::zOffsetCb(const std_msgs::Float32 &msg){
 
 void VisualServo::updateSetpoint() {
 
+    // RATE LIMITER
+  MoveForwardRateLimiter.setR(_RateLimiter_R);
+  MoveForwardRateLimiter.setF(- _RateLimiter_R);
+  MoveForwardRateLimiter.setSampleTime(_RateLimiter_T);
+
   double move_forward = 0.0;
   double move_forward_filtered = 0.0;
   double move_left = 0.0;
@@ -460,7 +471,7 @@ void VisualServo::updateSetpoint() {
   _moveLeftMsg.data = move_left;
   _changeYawMsg.data = change_yaw;
   _moveUpMsg.data = move_up;
-  _moveForwardMsg.data = move_forward_filtered;
+  _moveForwardMsg.data = move_forward;
 
   _pubMoveLeft.publish(_moveLeftMsg);
   _pubChangeYaw.publish(_changeYawMsg);
@@ -470,6 +481,7 @@ void VisualServo::updateSetpoint() {
   _pubXAdd.publish(_moveLeftMsg);
   _moveLeftMsg.data = _setpointPosition[1]- _uavPos[1];
   _pubYAdd.publish(_moveLeftMsg);
+
 }
 
 void VisualServo::publishNewSetpoint() {

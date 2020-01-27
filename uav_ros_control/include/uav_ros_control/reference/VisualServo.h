@@ -141,7 +141,7 @@ namespace uav_reference {
 
       // RateLimiter
       RateLimiter MoveForwardRateLimiter;
-      float _RateLimiter_R = 1.0;
+      float _RateLimiter_R, _RateLimiter_T;
       ros::Publisher _pubMoveForwardRateLimiter;
       std_msgs::Float32 RateLimiterMsg;
 

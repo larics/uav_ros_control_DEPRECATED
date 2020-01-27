@@ -4,6 +4,8 @@ visual_servo:
   compensate_roll_and_pitch: false
   yaw_added_offset: 0.0
   filter_k: 0.05
+  rate_limiter_R: 0.05
+  rate_limiter_T: 0.1
 
   pid_x:
     x_armed:  false
