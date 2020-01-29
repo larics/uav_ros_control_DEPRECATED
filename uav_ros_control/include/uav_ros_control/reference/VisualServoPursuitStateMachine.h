@@ -63,8 +63,8 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _subOdom = nh.subscribe("odometry", 1, &uav_reference::PursuitStateMachine::odomCb, this);
     /* UAV vision based errors */
     _subUAVDist = nh.subscribe("/uav_object_tracking/uav/distance_kf", 1, &uav_reference::PursuitStateMachine::uavDistCb, this);
-    _subUAVHeightError = nh.subscribe("/uav_object_tracking/uav/height_error_filtered", 1, &uav_reference::PursuitStateMachine::uavHeightCb, this);
-    _subUAVYawError = nh.subscribe("/uav_object_tracking/uav/yaw_error_filtered", 1, &uav_reference::PursuitStateMachine::uavYawCb, this);
+    _subUAVHeightError = nh.subscribe("/uav_object_tracking/uav/height_kf", 1, &uav_reference::PursuitStateMachine::uavHeightCb, this);
+    _subUAVYawError = nh.subscribe("/uav_object_tracking/uav/yaw_kf", 1, &uav_reference::PursuitStateMachine::uavYawCb, this);
     _subUAVPursuitConfident = nh.subscribe("/YOLODetection/uav_following_confident", 1, &uav_reference::PursuitStateMachine::uavConfidentCb, this);
     _subUAVDistanceConfident = nh.subscribe("/YOLODetection/kf_distance_active", 1, &uav_reference::PursuitStateMachine::uavDistanceConfidentCb, this);
     /* BALL vision based errors */

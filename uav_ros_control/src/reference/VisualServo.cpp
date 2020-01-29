@@ -84,7 +84,9 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _pubYAdd = nh.advertise<std_msgs::Float32>("debug/y_added", 1);
 
   // RATE LIMITER
-  _pubMoveForwardRateLimiter = nh.advertise<std_msgs::Float32>("visual_servo/move_forward_rl", 1);
+  _pubMoveForwardLimited = nh.advertise<std_msgs::Float32>("visual_servo/move_forward_limited", 1);
+  _pubMoveUpLimited = nh.advertise<std_msgs::Float32>("visual_servo/move_up_limited", 1);
+  _pubChangeYawLimited = nh.advertise<std_msgs::Float32>("visual_servo/change_yaw_limited", 1);
 
   // Define Subscribers
   _subOdom =
@@ -121,7 +123,8 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _new_point.accelerations = std::vector<geometry_msgs::Twist>(1);
 
   //
-  MoveForwardRateLimiter.init(_RateLimiter_T, _RateLimiter_R, -_RateLimiter_R, 0.0);
+  // MoveForwardRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
+  // ROS_FATAL("Initializing rate limiter");
 
 }
 
@@ -144,8 +147,12 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     nh.getParam("visual_servo/pid_yaw/deadzone_yaw", _deadzone_yaw) &&
     nh.getParam("visual_servo/yaw_added_offset", _yaw_added_offset) &&
     nh.getParam("visual_servo/filter_k", k) &&
-    nh.getParam("visual_servo/rate_limiter_R", _RateLimiter_R) &&
-    nh.getParam("visual_servo/rate_limiter_T", _RateLimiter_T);
+    nh.getParam("visual_servo/rate_limiters/distance/rate_limiter_R", _DistanceRateLimiter_R) &&
+    nh.getParam("visual_servo/rate_limiters/distance/rate_limiter_T", _DistanceRateLimiter_T) &&
+    nh.getParam("visual_servo/rate_limiters/height/rate_limiter_R", _HeightRateLimiter_R) &&
+    nh.getParam("visual_servo/rate_limiters/height/rate_limiter_T", _HeightRateLimiter_T) &&
+    nh.getParam("visual_servo/rate_limiters/yaw/rate_limiter_R", _YawRateLimiter_R) &&
+    nh.getParam("visual_servo/rate_limiters/yaw/rate_limiter_T", _YawRateLimiter_T);
   
   ROS_INFO_COND(_compensate_roll_and_pitch, "VS - Roll and pitch compensation is active");
   ROS_INFO("VS - camera FOV %.2f", _camera_fov);
@@ -211,12 +218,17 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     cfg.deadzone_yaw = _deadzone_yaw;
   }
 
+  cfg.distance_R = _DistanceRateLimiter_R;
+  cfg.distance_T = _DistanceRateLimiter_T;
+  cfg.height_R = _HeightRateLimiter_R;
+  cfg.height_T = _HeightRateLimiter_T;
+  cfg.yaw_R = _YawRateLimiter_R;
+  cfg.yaw_T = _YawRateLimiter_T;
+
   cfg.camera_fov = _camera_fov;
   cfg.compensate_roll_and_pitch = _compensate_roll_and_pitch;
   cfg.yaw_added_offset = _yaw_added_offset;
   cfg.filter_k = k;
-  cfg.rate_limiter_R = _RateLimiter_R;
-  cfg.rate_limiter_T = _RateLimiter_T;
   _VSConfigServer.updateConfig(cfg);
 }
 
@@ -236,6 +248,12 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
     _y_axis_PID.resetIntegrator();
     response.message = "Visual servo disabled.";
   }
+
+  MoveForwardRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
+  MoveUpRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
+  ChangeYawRateLimiter.init(_YawRateLimiter_T, _YawRateLimiter_R, -_YawRateLimiter_R, 0.0);
+
+  ROS_FATAL("Initializing rate limiters");
 
   _x_frozen = false;
   _y_frozen = false;
@@ -310,8 +328,13 @@ void VisualServo::visualServoParamsCb(uav_ros_control::VisualServoParametersConf
   _camera_fov = configMsg.camera_fov * M_PI / 180.0;
   _yaw_added_offset = configMsg.yaw_added_offset;
   k = configMsg.filter_k;
-  _RateLimiter_R = configMsg.rate_limiter_R;
-  _RateLimiter_T = configMsg.rate_limiter_T;
+
+  _DistanceRateLimiter_R = configMsg.distance_R;
+  _DistanceRateLimiter_T = configMsg.distance_T;
+  _HeightRateLimiter_R = configMsg.height_R;
+  _HeightRateLimiter_T = configMsg.height_T;
+  _YawRateLimiter_R = configMsg.yaw_R;
+  _YawRateLimiter_T = configMsg.yaw_T;
 }
 
 void VisualServo::odomCb(const nav_msgs::OdometryConstPtr& odom) {
@@ -424,18 +447,28 @@ void VisualServo::zOffsetCb(const std_msgs::Float32 &msg){
     _offset_z = msg.data;
 }
 
+void VisualServo::updateRateLimiters(){
+  MoveForwardRateLimiter.setR(_DistanceRateLimiter_R);
+  MoveForwardRateLimiter.setF(- _DistanceRateLimiter_R);
+  MoveForwardRateLimiter.setSampleTime(_DistanceRateLimiter_T);
+
+  MoveUpRateLimiter.setR(_HeightRateLimiter_R);
+  MoveUpRateLimiter.setF(- _HeightRateLimiter_R);
+  MoveUpRateLimiter.setSampleTime(_HeightRateLimiter_T);
+
+  ChangeYawRateLimiter.setR(_YawRateLimiter_R);
+  ChangeYawRateLimiter.setF(- _YawRateLimiter_R);
+  ChangeYawRateLimiter.setSampleTime(_YawRateLimiter_T);
+}
+
 void VisualServo::updateSetpoint() {
-
-    // RATE LIMITER
-  MoveForwardRateLimiter.setR(_RateLimiter_R);
-  MoveForwardRateLimiter.setF(- _RateLimiter_R);
-  MoveForwardRateLimiter.setSampleTime(_RateLimiter_T);
-
   double move_forward = 0.0;
-  double move_forward_filtered = 0.0;
+  double move_forward_limited = 0.0;
   double move_left = 0.0;
   double move_up = 0.0;
+  double move_up_limited = 0.0;
   double change_yaw = 0.0;
+  double change_yaw_limited = 0.0;
 
   if (!_x_frozen) move_left = _x_axis_PID.compute(_offset_x, _error_x, 1 / _rate);
   // PT1
@@ -449,30 +482,50 @@ void VisualServo::updateSetpoint() {
     move_forward  = _y_axis_PID.compute(_offset_y, _error_y, 1 / _rate);
 
     MoveForwardRateLimiter.setInput(move_forward);
-    move_forward_filtered = MoveForwardRateLimiter.getData();
-    RateLimiterMsg.data = move_forward_filtered;
-    _pubMoveForwardRateLimiter.publish(RateLimiterMsg);
+    move_forward_limited = MoveForwardRateLimiter.getData();
   } 
 
+  // if (!_z_frozen) move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
 
-  if (!_z_frozen) move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
-  if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
+  if (!_z_frozen){
+    move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
+
+    MoveUpRateLimiter.setInput(move_up);
+    move_up_limited = MoveUpRateLimiter.getData();
+  } 
+
+  // if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
+
+  if (!_yaw_frozen) {
+    change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
+
+    ChangeYawRateLimiter.setInput(change_yaw);
+    change_yaw_limited = ChangeYawRateLimiter.getData();
+
+  } 
+
   _floatMsg.data = change_yaw;
   _pubChangeYawDebug.publish(_floatMsg);
 
-  _setpointPosition[0] = _uavPos[0] + move_forward_filtered * cos(_uavYaw + _yaw_added_offset);
+  _setpointPosition[0] = _uavPos[0] + move_forward_limited * cos(_uavYaw + _yaw_added_offset);
   _setpointPosition[0] -= move_left * sin(_uavYaw + _yaw_added_offset);
-  _setpointPosition[1] = _uavPos[1] + move_forward_filtered * sin(_uavYaw + _yaw_added_offset);
+  _setpointPosition[1] = _uavPos[1] + move_forward_limited * sin(_uavYaw + _yaw_added_offset);
   _setpointPosition[1] += move_left * cos(_uavYaw + _yaw_added_offset);
-  _setpointPosition[2] = _uavPos[2] + move_up;
+  _setpointPosition[2] = _uavPos[2] + move_up_limited;
 
-  _setpointYaw = _uavYaw + change_yaw;
+  _setpointYaw = _uavYaw + change_yaw_limited;
 
+  // MSGS
   _moveLeftMsg.data = move_left;
   _changeYawMsg.data = change_yaw;
   _moveUpMsg.data = move_up;
   _moveForwardMsg.data = move_forward;
 
+  _moveForwardLimitedMsg.data = move_forward_limited;
+  _moveUpLimitedMsg.data = move_up_limited;
+  _changeYawLimitedMsg.data = change_yaw_limited;
+
+  // PUB
   _pubMoveLeft.publish(_moveLeftMsg);
   _pubChangeYaw.publish(_changeYawMsg);
   _pubMoveForward.publish(_moveForwardMsg);
@@ -481,6 +534,11 @@ void VisualServo::updateSetpoint() {
   _pubXAdd.publish(_moveLeftMsg);
   _moveLeftMsg.data = _setpointPosition[1]- _uavPos[1];
   _pubYAdd.publish(_moveLeftMsg);
+
+  _pubMoveForwardLimited.publish(_moveForwardLimitedMsg);
+  _pubMoveUpLimited.publish(_moveUpLimitedMsg);
+  _pubChangeYawLimited.publish(_changeYawLimitedMsg);
+
 
 }
 
@@ -516,6 +574,7 @@ void runDefault(VisualServo& visualServoRefObj, ros::NodeHandle& nh) {
 
   while (ros::ok()) {
     ros::spinOnce();
+    visualServoRefObj.updateRateLimiters();
     visualServoRefObj.updateSetpoint();
     if (visualServoRefObj.isVisualServoEnabled()) {
       visualServoRefObj.publishNewSetpoint();

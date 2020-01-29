@@ -53,6 +53,11 @@ namespace uav_reference {
      void updateSetpoint();
 
      /**
+      * Update Rate Limiters.
+      */
+     void updateRateLimiters();
+
+     /**
       * Publish new setpoint as MultiDOFJointTrajectoryPoint
       */
      void publishNewSetpoint();
@@ -141,9 +146,18 @@ namespace uav_reference {
 
       // RateLimiter
       RateLimiter MoveForwardRateLimiter;
-      float _RateLimiter_R, _RateLimiter_T;
-      ros::Publisher _pubMoveForwardRateLimiter;
-      std_msgs::Float32 RateLimiterMsg;
+      float _DistanceRateLimiter_R, _DistanceRateLimiter_T;
+      ros::Publisher _pubMoveForwardLimited;
+
+      RateLimiter MoveUpRateLimiter;
+      float _HeightRateLimiter_R, _HeightRateLimiter_T;
+      ros::Publisher _pubMoveUpLimited;
+
+      RateLimiter ChangeYawRateLimiter;
+      float _YawRateLimiter_R, _YawRateLimiter_T;
+      ros::Publisher _pubChangeYawLimited;
+
+      std_msgs::Float32 _moveForwardLimitedMsg, _moveUpLimitedMsg, _changeYawLimitedMsg;
 
 
       void visualServoParamsCb(
