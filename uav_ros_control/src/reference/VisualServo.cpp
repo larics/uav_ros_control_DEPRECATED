@@ -149,6 +149,7 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     nh.getParam("visual_servo/filter_k", k) &&
     nh.getParam("visual_servo/rate_limiters/distance/rate_limiter_R", _DistanceRateLimiter_R) &&
     nh.getParam("visual_servo/rate_limiters/distance/rate_limiter_T", _DistanceRateLimiter_T) &&
+    nh.getParam("visual_servo/rate_limiters/distance/rate_limiter_F", _DistanceRateLimiter_F) &&
     nh.getParam("visual_servo/rate_limiters/height/rate_limiter_R", _HeightRateLimiter_R) &&
     nh.getParam("visual_servo/rate_limiters/height/rate_limiter_T", _HeightRateLimiter_T) &&
     nh.getParam("visual_servo/rate_limiters/yaw/rate_limiter_R", _YawRateLimiter_R) &&
@@ -220,6 +221,7 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
 
   cfg.distance_R = _DistanceRateLimiter_R;
   cfg.distance_T = _DistanceRateLimiter_T;
+  cfg.distance_F = _DistanceRateLimiter_F;
   cfg.height_R = _HeightRateLimiter_R;
   cfg.height_T = _HeightRateLimiter_T;
   cfg.yaw_R = _YawRateLimiter_R;
@@ -249,7 +251,7 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
     response.message = "Visual servo disabled.";
   }
 
-  MoveForwardRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
+  MoveForwardRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, _DistanceRateLimiter_F, 0.0);
   MoveUpRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
   ChangeYawRateLimiter.init(_YawRateLimiter_T, _YawRateLimiter_R, -_YawRateLimiter_R, 0.0);
 
@@ -331,6 +333,7 @@ void VisualServo::visualServoParamsCb(uav_ros_control::VisualServoParametersConf
 
   _DistanceRateLimiter_R = configMsg.distance_R;
   _DistanceRateLimiter_T = configMsg.distance_T;
+  _DistanceRateLimiter_F - configMsg.distance_F;
   _HeightRateLimiter_R = configMsg.height_R;
   _HeightRateLimiter_T = configMsg.height_T;
   _YawRateLimiter_R = configMsg.yaw_R;
@@ -449,7 +452,7 @@ void VisualServo::zOffsetCb(const std_msgs::Float32 &msg){
 
 void VisualServo::updateRateLimiters(){
   MoveForwardRateLimiter.setR(_DistanceRateLimiter_R);
-  MoveForwardRateLimiter.setF(- _DistanceRateLimiter_R);
+  MoveForwardRateLimiter.setF(_DistanceRateLimiter_F);
   MoveForwardRateLimiter.setSampleTime(_DistanceRateLimiter_T);
 
   MoveUpRateLimiter.setR(_HeightRateLimiter_R);
