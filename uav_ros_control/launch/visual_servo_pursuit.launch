@@ -1,6 +1,6 @@
 <launch>
-    <arg name="namespace"   default="red"/>
-    <arg name="odom"        default="/mavros/global_position/local"/>
+    <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
+    <arg name="odom"        default="mavros/global_position/local"/>
 
     <arg name="x_offset"    default="visual_servo/offset_x"/>
     <arg name="y_offset"    default="visual_servo/offset_y"/>
@@ -44,7 +44,7 @@
             <remap from="z_error" to="sm_pursuit/z_err"/>
             <remap from="yaw_error" to="sm_pursuit/yaw_err"/>
             <remap from="odometry" to="$(arg odom)"/>
-            <remap from="imu" to="/mavros/imu/data"/>
+            <remap from="imu" to="mavros/imu/data"/>
 
             <!-- State machine topics -->
             <remap from="x_offset" to="$(arg x_offset)"/>
