@@ -70,6 +70,23 @@ class Tfm_Aprox():
         self.publish_goal_setpoint = False
         self.goal_setpoint = PoseStamped()
 
+        self.goal_x_l = 0.0
+        self.goal_y_l = 0.0
+        self.goal_z_l = 0.0
+
+        self.goal_x_g = 0.0
+        self.goal_y_g = 0.0
+        self.goal_z_g = 0.0
+
+        self.target_x_l = 0.0
+        self.target_y_l = 0.0
+        self.target_z_l = 0.0
+
+        self.target_x_g = 0.0
+        self.target_y_g = 0.0
+        self.target_z_g = 0.0
+
+
     def distance_callback(self, data):
         self.new_distance_data = True
         self.distance_data = data
@@ -179,6 +196,24 @@ class Tfm_Aprox():
 
         return rotationTranslationMatrix
 
+    def euler2quaternion(self, euler):
+        quaternion = [1.0, 0.0, 0.0, 0.0]
+
+        cy = cos(euler[2] * 0.5)
+        sy = sin(euler[2] * 0.5)
+        cr = cos(euler[0] * 0.5)
+        sr = sin(euler[0] * 0.5)
+        cp = cos(euler[1] * 0.5)
+        sp = sin(euler[1] * 0.5)
+
+        quaternion[0] = cy * cr * cp + sy * sr * sp; #w
+        quaternion[1] = cy * sr * cp - sy * cr * sp; #x
+        quaternion[2] = cy * cr * sp + sy * sr * cp; #y
+        quaternion[3] = sy * cr * cp - cy * sr * sp; #z
+
+        return quaternion
+
+
     def run(self, rate):
         r = rospy.Rate(rate)
 
@@ -228,7 +263,8 @@ class Tfm_Aprox():
                 uav_position.point.y = Tworld_uav1[1,3]
                 uav_position.point.z = Tworld_uav1[2,3]
 
-                self.estimatefigure8(uav_position)
+                if (not self.publish_goal_setpoint):
+                    self.estimatefigure8(uav_position)
 
                 if (self.hausdorff_counter > self.num_of_pts_hausdorff):
                     p_reconstructed = np.asarray(self.p_reconstructed)#, dtype=None, order=None)
@@ -239,16 +275,58 @@ class Tfm_Aprox():
 
 
                     if (self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.publish_goal_setpoint):
+                        #gledamo s 1/4 pi prema 3/4 pi
+                        self.goal_x_l = 0.0
+                        self.goal_y_l = 0.0
+                        self.goal_z_l = 0.0
+
+                        self.target_x_l = 0.0
+                        self.target_y_l = 0.0
+                        self.target_z_l = 0.0
+
+                        t = 1.0 * pi / 4.0
+
+                        self.goal_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
+                        self.goal_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
+
+                        t = 3.0 * pi / 4.0
+                        self.target_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
+                        self.target_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
+
+                        pp = np.asarray(self.p)
+                        T = self.get_transform(pp)
+
+                        p_in = np.asarray([[self.goal_x_l], [self.goal_y_l], [self.goal_z_l], [1]])
+                        p_out = np.dot(T, p_in)
+                        self.goal_x_g = p_out[0]
+                        self.goal_y_g = p_out[1]
+                        self.goal_z_g = p_out[2]
+
+                        p_in = np.asarray([[self.target_x_l], [self.target_y_l], [self.target_z_l], [1]])
+                        p_out = np.dot(T, p_in)
+                        self.target_x_g = p_out[0]
+                        self.target_y_g = p_out[1]
+                        self.target_z_g = p_out[2]
+
                         self.publish_goal_setpoint = True
                         self.goal_setpoint.header.stamp = rospy.get_rostime()
-                        self.goal_setpoint.pose.position.x = 0.0
-                        self.goal_setpoint.pose.position.y = 0.0
-                        self.goal_setpoint.pose.position.z = 2.0 + self.z_offset
+                        self.goal_setpoint.pose.position.x = self.goal_x_g
+                        self.goal_setpoint.pose.position.y = self.goal_y_g
+                        self.goal_setpoint.pose.position.z = self.goal_z_g + self.z_offset
 
-                        self.goal_setpoint.pose.orientation.x = 0.0
-                        self.goal_setpoint.pose.orientation.y = 0.0
-                        self.goal_setpoint.pose.orientation.z = 0.0
-                        self.goal_setpoint.pose.orientation.w = 1.0
+                        dx = self.target_x_g - self.goal_x_g
+                        dy = self.target_y_g - self.goal_y_g
+                        yaw = math.atan2(dy, dx)
+
+                        euler = [0.0, 0.0, yaw]
+                        quaternion = self.euler2quaternion(euler)
+
+                        print yaw
+
+                        self.goal_setpoint.pose.orientation.x = quaternion[1]
+                        self.goal_setpoint.pose.orientation.y = quaternion[2]
+                        self.goal_setpoint.pose.orientation.z = quaternion[3]
+                        self.goal_setpoint.pose.orientation.w = quaternion[0]
                         
 
                 self.uav_position_publisher.publish(uav_position)
@@ -320,6 +398,8 @@ class Tfm_Aprox():
         plt3d.scatter(self.x_l, self.y_l, self.z_l, color='r', marker="_") #2d estimirano
         plt3d.scatter(self.x_g, self.y_g, self.z_g, color='g', marker="_") #3d estimirano
         plt3d.scatter(self.xcoord, self.ycoord, self.zcoord, color='r', marker="_") #3d stvarno
+        plt3d.scatter(self.goal_x_g, self.goal_y_g, self.goal_z_g, color='c', marker="+", s=1000) #3d stvarno
+        plt3d.scatter(self.target_x_g, self.target_y_g, self.target_z_g, color='r', marker="+", s=1000) #3d stvarno
 
         plt.show()
 
