@@ -65,10 +65,10 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _pubYError = nh.advertise<std_msgs::Float32>("visual_servo/y_error", 1);
   _pubZError = nh.advertise<std_msgs::Float32>("visual_servo/z_error", 1);
   _pubIsEnabledTopic = nh.advertise<std_msgs::Bool>("visual_servo/is_enabled", 1);
-  _pubMoveLeft = nh.advertise<std_msgs::Float32>("move_left", 1);
-  _pubChangeYaw = nh.advertise<std_msgs::Float32>("change_yaw", 1);
-  _pubMoveForward = nh.advertise<std_msgs::Float32>("move_forward", 1);
-  _pubMoveUp = nh.advertise<std_msgs::Float32>("move_up", 1);
+  _pubMoveLeft = nh.advertise<std_msgs::Float32>("visual_servo/move_left", 1);
+  _pubChangeYaw = nh.advertise<std_msgs::Float32>("visual_servo/change_yaw", 1);
+  _pubMoveForward = nh.advertise<std_msgs::Float32>("visual_servo/move_forward", 1);
+  _pubMoveUp = nh.advertise<std_msgs::Float32>("visual_servo/move_up", 1);
   
   _pubUavYawDebug = nh.advertise<std_msgs::Float32>("debug/Uav_yaw", 1);
   _pubYawErrorDebug = nh.advertise<std_msgs::Float32>("debug/yaw_error", 1);
@@ -255,7 +255,7 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
   MoveUpRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
   ChangeYawRateLimiter.init(_YawRateLimiter_T, _YawRateLimiter_R, -_YawRateLimiter_R, 0.0);
 
-  ROS_FATAL("Initializing rate limiters");
+  ROS_INFO("Initializing rate limiters");
 
   _x_frozen = false;
   _y_frozen = false;
