@@ -17,9 +17,15 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
+  <build_depend>message_generation</build_depend>
   <build_depend>uav_ros_control_msgs</build_depend>
+  <build_depend>topp_ros</build_depend>
 
   <run_depend>uav_ros_control_msgs</run_depend>
+  <run_depend>topp_ros</run_depend>
+  <run_depend>message_runtime</run_depend>
+
+
   
   <!-- The export tag contains other, unspecified, tags -->
   <export>

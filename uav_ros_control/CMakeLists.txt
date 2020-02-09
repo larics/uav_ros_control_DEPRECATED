@@ -4,11 +4,14 @@ project(uav_ros_control)
 find_package(catkin REQUIRED COMPONENTS
 	roscpp
 	uav_ros_control_msgs
+	topp_ros
 	rospy
     std_msgs
     dynamic_reconfigure
     sensor_msgs
 	mav_msgs
+	trajectory_msgs
+	message_generation
 	tf)
 
 find_package(cmake_modules REQUIRED)
@@ -21,10 +24,17 @@ generate_dynamic_reconfigure_options(
 	config/reference/VisualServoPursuitParameters.cfg
 )
 
+add_service_files(
+  FILES
+  GenerateSearch.srv
+)
+
+generate_messages(DEPENDENCIES std_msgs)
+
 catkin_package(
 	INCLUDE_DIRS include
 	LIBRARIES pid nfilt kalman
-	CATKIN_DEPENDS uav_ros_control_msgs)
+	CATKIN_DEPENDS uav_ros_control_msgs topp_ros)
 
 include_directories(
 	include
