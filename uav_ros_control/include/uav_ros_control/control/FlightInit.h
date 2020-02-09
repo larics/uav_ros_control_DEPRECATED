@@ -318,14 +318,17 @@ bool startInitFlight()
 void generateWaypoints(
 	std::vector<geometry_msgs::Point> &m_vectorWaypoints)
 {
-	ROS_INFO("Generating waypoints");
+	// ROS_INFO("Generating waypoints");
 	geometry_msgs::Point m_point;
-	double m_points_num = 10;
+	double m_circumference = 2 * m_radiusInit * PI;
+	// Define segment on circle (10 points, 5 m radius)
+	double m_k = PI;
+	double m_points_num = m_circumference / m_k;
 	double m_segment = 360 / m_points_num;
 	// Current UAV position
 	geometry_msgs::Point m_current_position = m_currentOdom.pose.pose.position;
 	// CIRCLE around UAV
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < (int)round(m_points_num); i++)
 	{
 		m_point.x = m_current_position.x + 
 			(m_radiusInit * cos(i * m_segment * DEGTORAD));
