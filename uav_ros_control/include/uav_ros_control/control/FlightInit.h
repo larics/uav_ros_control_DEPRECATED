@@ -35,13 +35,20 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 // Service for path/trajectory flags
-#include <frontier_exploration_3d/FlagArray.h>
-
 #include <dynamic_reconfigure/server.h>
 #include <uav_ros_control/FlightInitParametersConfig.h>
 #include <uav_ros_control/filters/NonlinearFilters.h>
 #include <uav_ros_control_msgs/TakeOff.h>
 #include <tf2/LinearMath/Quaternion.h>
+
+#include <trajectory_msgs/MultiDOFJointTrajectory.h>
+#include <trajectory_msgs/MultiDOFJointTrajectory.h>
+#include <trajectory_msgs/JointTrajectory.h>
+#include <trajectory_msgs/JointTrajectoryPoint.h>
+
+#include <larics_motion_planning/MultiDofTrajectory.h>
+#include <larics_motion_planning/MultiDofTrajectoryRequest.h>
+#include <larics_motion_planning/MultiDofTrajectoryResponse.h>
 
 namespace flight_init 
 {
@@ -81,31 +88,30 @@ public:
 		m_subGlobalPosition = nh.subscribe<sensor_msgs::NavSatFix>(
 			"mavros/global_position/global", 10, 
 			&flight_init::FlightInit::globalPositionCb, this);
-		m_subPointReached = nh.subscribe("exploration_sm/point_reached", 1,
-			&flight_init::FlightInit::pointReachedCb, this);
 		// m_subCartographerPose = nh.subscribe ("uav/cartographer/pose", 1,
 		// 	&flight_init::FlightInit::cartographerPosecb, this);
 
-		m_pubGoal = nh.advertise<geometry_msgs::PoseStamped>("exploration_sm/goal", 1);
-
 		m_pubGoalsMarker = nh.advertise<visualization_msgs::MarkerArray>(
 			"flight_init/goals_marker", 20);
+		m_pubTrajectory = nh.advertise<trajectory_msgs::JointTrajectory> (
+			"joint_trajectory", 1);
+	
 		// Services
     	m_serviceTakeOff = nh.advertiseService(
 			"arm_and_takeoff", &flight_init::FlightInit::takeOffCb, this);
 		m_serviceStartFlight = nh.advertiseService(
 			"start_flight", &flight_init::FlightInit::startFlightCb, this);
-		
+	
 		m_armingClient = nh.serviceClient<mavros_msgs::CommandBool>
             ("mavros/cmd/arming");
     	m_setModeClient = nh.serviceClient<mavros_msgs::SetMode>
             ("mavros/set_mode");
 		m_takeoffClient = nh.serviceClient<uav_ros_control_msgs::TakeOff>
 			("takeoff");
-		m_setTrajectoryFlagsClient = nh.serviceClient<frontier_exploration_3d::FlagArray>
-			("exploration_sm/set_flags"); 
 		m_startFlightClient = nh.serviceClient<std_srvs::SetBool> (
 			"start_flight");
+		m_planTrajectoryClient = nh.serviceClient<larics_motion_planning::MultiDofTrajectory> (
+			"multi_dof_trajectory");
 		// Setup dynamic reconfigure server
 		fi_param_t  fiConfig;
 		setReconfigureParameters(fiConfig);
@@ -288,31 +294,6 @@ bool takeOffUAV()
 	return false;
 }
 
-bool setFlags()
-{
-	// Call service to start init flight without path planner
-	frontier_exploration_3d::FlagArray flag_array;
-	// [plan_path, plan_trajectory]
-	flag_array.request.flags.clear();
-	flag_array.request.flags.push_back(0);
-	flag_array.request.flags.push_back(1);
-
-	// Call exploration_sm/set_flags
-	if (m_setTrajectoryFlagsClient.call(flag_array))
-	{
-		ros::Duration(0.2).sleep();
-		if (flag_array.response.success)
-		{
-			ROS_INFO("Service set_flags called.");
-			return true;
-		}
-		ROS_FATAL("Calling set_flags failed.");
-		return false;
-	}
-	ROS_FATAL("Calling set_flags failed.");
-	return false;
-}
-
 bool startInitFlight()
 {
 	// Call service for init flight
@@ -396,55 +377,86 @@ void visualizeGeneratedWaypoints(
   }	
 }
 
-void publishCurrGoal (
+double quaternion2Yaw(geometry_msgs::Quaternion quaternion)
+{
+	double q0 = quaternion.w;
+    double q1 = quaternion.x;
+    double q2 = quaternion.y;
+    double q3 = quaternion.z;
+    return atan2(2.0 * (q0 * q3 + q1 * q2), 1.0 - 2.0 * (q2 * q2 + q3 * q3));
+}
+
+void publishTrajectory (
 	std::vector<geometry_msgs::Point> &m_vectorOfPoints)	
 {
+	ROS_INFO("enter publish trajectory");
+	larics_motion_planning::MultiDofTrajectory m_srv;
 	// Save home position to calculate orientation
 	geometry_msgs::Point m_home_position;
 	m_home_position.x = m_homeOdom.pose.pose.position.x;
 	m_home_position.y = m_homeOdom.pose.pose.position.y;
 	m_home_position.z = m_homeOdom.pose.pose.position.z;
 
-	geometry_msgs::Point m_goal;
-	geometry_msgs::PoseStamped m_pose_goal;
-	m_pose_goal.header.stamp = ros::Time::now();
-	m_pose_goal.header.frame_id = m_mapFrame;
+	trajectory_msgs::JointTrajectoryPoint m_trajectory_point;
+	// Create start point from the current position information
+	std::vector<double> m_points_arr {
+		m_currentOdom.pose.pose.position.x,
+		m_currentOdom.pose.pose.position.y, 
+		m_currentOdom.pose.pose.position.z,
+		quaternion2Yaw(m_currentOdom.pose.pose.orientation)};
+	m_trajectory_point.positions.clear();
+	m_trajectory_point.positions = m_points_arr;
+	m_srv.request.waypoints.points.push_back(m_trajectory_point);
 
-	// Publish points
-	if (m_isPointReached && position_in_vector <  m_vectorOfPoints.size())
-	{
-		m_isPointReached = false;
-		m_goal =  m_vectorOfPoints[position_in_vector];
-		m_pose_goal.pose.position.x = m_goal.x;
-		m_pose_goal.pose.position.y = m_goal.y;
-		m_pose_goal.pose.position.z = m_goal.z;
-		// Orientation to the ceneter of the building
-		double yaw = atan2(
-			(m_home_position.y - m_pose_goal.pose.position.y),
-			(m_home_position.x - m_pose_goal.pose.position.x));
-		tf2::Quaternion q;
-		q.setRPY(0, 0, yaw);
-		m_pose_goal.pose.orientation.x = q.x();
-		m_pose_goal.pose.orientation.y = q.y();
-		m_pose_goal.pose.orientation.z = q.z();
-		m_pose_goal.pose.orientation.w = q.w();
-		position_in_vector ++;
-		
-		// Set path and trajectory flags
-		bool set_flags = setFlags();
-		if (set_flags)
-		{
-			// Publish current goal
-			ros::Duration(0.2).sleep();
-			m_pubGoal.publish(m_pose_goal);
-		}		
+	// Create another points from generated vector of points
+	for (int i = 0; i < m_vectorOfPoints.size() - 1; i++)
+	{	
+		m_points_arr = {
+			m_vectorOfPoints[i].x,
+			m_vectorOfPoints[i].y, 
+			m_vectorOfPoints[i].z,
+			atan2(( m_vectorOfPoints[i+1].y - m_vectorOfPoints[i].y),
+			( m_vectorOfPoints[i+1].x - m_vectorOfPoints[i].x))};
+		m_trajectory_point.positions.clear();
+		m_trajectory_point.positions = m_points_arr;
+		m_srv.request.waypoints.points.push_back(m_trajectory_point);
 	}
-	else if (position_in_vector == m_vectorOfPoints.size())
+	
+	// Append last point with orientation from the first point
+	m_points_arr = {
+		m_vectorOfPoints[m_vectorOfPoints.size()-1].x,
+		m_vectorOfPoints[m_vectorOfPoints.size()-1].y, 
+		m_vectorOfPoints[m_vectorOfPoints.size()-1].z,
+		atan2(( m_vectorOfPoints[1].y - m_vectorOfPoints[0].y),
+		( m_vectorOfPoints[1].x - m_vectorOfPoints[0].x))};
+	m_trajectory_point.positions.clear();
+	m_trajectory_point.positions = m_points_arr;
+	m_srv.request.waypoints.points.push_back(m_trajectory_point);
+	
+	m_srv.request.publish_path = false;
+	m_srv.request.publish_trajectory = false;
+	m_srv.request.plan_path = false;
+	m_srv.request.plan_trajectory = true;
+	
+	// Call the service
+	bool m_service_succes = m_planTrajectoryClient.call(m_srv);
+	
+	if (m_service_succes && m_srv.response.success)
 	{
-		// When all points are published
-		ROS_INFO("Every point is reached");
-		position_in_vector = 0;
-		m_publishedAllPointsFlag = true;
+		ROS_INFO("MultiDOFTrajectory service successfully called.");
+		trajectory_msgs::JointTrajectory m_generated_trajectory = 
+			m_srv.response.trajectory; 
+		// Publish trajectory
+		ROS_WARN("Publish trajectory.");
+		m_pubTrajectory.publish(m_generated_trajectory);
+		m_serviceStartFlightCalledFlag = false;
+		
+	}
+	else
+	{
+		ROS_FATAL("MultiDOFTrajectory service call failed.");
+		//TODO: edit 
+		//m_serviceStartFlightCalledFlag = true;
 	}
 }
 
@@ -505,10 +517,10 @@ void run()
 		
 		}
 		// Call start flight 	
-		if (m_takeoffFlag && m_serviceStartFlightCalledFlag && !m_publishedAllPointsFlag)
+		if (m_takeoffFlag && m_serviceStartFlightCalledFlag)
 		{
 			// Init flight start
-			publishCurrGoal(m_vectorWaypoints);
+			publishTrajectory(m_vectorWaypoints);
 		}
 
         loopRate.sleep();
@@ -528,20 +540,20 @@ geometry_msgs::Point m_currGoal;
 geometry_msgs::PoseStamped m_cartographerPose;
 nav_msgs::Odometry m_currentOdom, m_homeOdom;
 ros::Subscriber m_subState, m_subGlobalPosition, m_subOdometry, m_subPointReached, m_subCartographerPose;
-ros::Publisher m_pubGoal, m_pubGoalsMarker;
+ros::Publisher m_pubGoalsMarker, m_pubTrajectory;
 ros::Time m_timer;
 bool m_serviceTakeoffCalledFlag = false;
 bool m_takeoffFlag = false;
 bool m_serviceStartFlightCalledFlag = false;
 bool m_isPointReached = true;
-bool m_publishedAllPointsFlag = false;
+bool m_publishedTrajectory = false;
 bool m_firstOdomFlag = true;
 std::string m_mapFrame;
 std::vector<geometry_msgs::Point> m_vectorWaypoints = {};
 std::vector<geometry_msgs::Point> m_vectorWaypointsInit = {};
 ros::ServiceServer m_serviceTakeOff, m_serviceStartFlight;
 ros::ServiceClient m_armingClient, m_setModeClient, m_takeoffClient,
-m_setTrajectoryFlagsClient, m_startFlightClient;
+m_setTrajectoryFlagsClient, m_startFlightClient,m_planTrajectoryClient;
 /* Define Dynamic Reconfigure parameters */
 boost::recursive_mutex m_fiConfigMutex;
 dynamic_reconfigure::Server<fi_param_t>

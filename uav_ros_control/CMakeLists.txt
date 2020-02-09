@@ -10,7 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
 	sensor_msgs
 	mav_msgs
 	tf
-	frontier_exploration_3d)
+	larics_motion_planning)
 
 find_package(cmake_modules REQUIRED)
 
