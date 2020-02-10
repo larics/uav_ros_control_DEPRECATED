@@ -1,5 +1,5 @@
 <launch>
-    <arg name="namespace" default="red"/>
+    <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
     <arg name="carrot_out" default="carrot/trajectory"/>
     <arg name="potfield_in" default="carrot/trajectory"/>
     <arg name="potfield_out" default="potential_fields/trajectory"/>

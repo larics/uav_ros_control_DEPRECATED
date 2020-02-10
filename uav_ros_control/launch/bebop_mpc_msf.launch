@@ -1,5 +1,5 @@
 <launch>
-    <arg name="namespace" default="red"/>
+    <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
     <arg name="carrot_out" default="carrot/trajectory"/>
     <arg name="mpc_in" default="carrot/trajectory"/>
     <arg name="odometry" default="msf_core/odometry"/>

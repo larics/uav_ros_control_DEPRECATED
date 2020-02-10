@@ -22,7 +22,7 @@
 #include <uav_ros_control/VisualServoPursuitParametersConfig.h>
 #include <uav_ros_control_msgs/VisualServoProcessValues.h>
 #include <uav_ros_control/filters/NonlinearFilters.h>
-#include <uav_ros_control/reference/RateLimiter.h>
+#include <uav_ros_control/GenerateSearch.h>
 
 namespace uav_reference 
 {
@@ -34,9 +34,17 @@ typedef uav_ros_control::VisualServoPursuitParametersConfig pursuit_param_t;
 #define PARAM_BALL_DISTANCE_OFFSET      "pursuit/state_machine/ball_distance_offset"
 #define INVALID_DISTANCE -1
 #define PARAM_Z_OFFSET                  "pursuit/state_machine/z_offset"
-#define PARAM_RATE_LIMITER_R            "pursuit/state_machine/RL_r"
+#define PARAM_ARENA_X_SIZE              "pursuit/state_machine/search/x_size"
+#define PARAM_ARENA_Y_SIZE              "pursuit/state_machine/search/y_size"
+#define PARAM_ARENA_X_OFFSET            "pursuit/state_machine/search/x_offset"
+#define PARAM_ARENA_Y_OFFSET            "pursuit/state_machine/search/y_offset"
+#define PARAM_SEARCH_HEIGHT             "pursuit/state_machine/search/desired_height"
+#define PARAM_X_TAKEOFF                 "pursuit/state_machine/search/x_takeOff"
+#define PARAM_Y_TAKEOFF                 "pursuit/state_machine/search/y_takeOff"
+
 enum PursuitState {
     OFF,
+    SEARCH,
     UAV_FOLLOWING
 };
 
@@ -57,7 +65,7 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _pubYError = nh.advertise<std_msgs::Float32>("sm_pursuit/y_err", 1);
     _pubZError = nh.advertise<std_msgs::Float32>("sm_pursuit/z_err", 1);
     _pubYawError = nh.advertise<std_msgs::Float32>("sm_pursuit/yaw_err", 1);
-    _pubDistanceRL = nh.advertise<std_msgs::Float32>("sm_pursuit/distance_rl",1);
+    _pubSearchTrajectoryFlag = nh.advertise<std_msgs::Bool>("/topp/trajectory_flag", 1);
 
     // Define Subscribers
     _subOdom = nh.subscribe("odometry", 1, &uav_reference::PursuitStateMachine::odomCb, this);
@@ -86,10 +94,8 @@ PursuitStateMachine(ros::NodeHandle& nh)
     // Initialize visual servo client caller
     _vsClienCaller = nh.serviceClient<std_srvs::SetBool::Request, std_srvs::SetBool::Response>("visual_servo");
 
-    //ros::Duration(2.0).sleep();
-
-    // Set Rate Limiter for distance
-    UAVDistanceRateLimiter.init(1.0/_rate, _RateLimiter_R, -_RateLimiter_R, 0.0);
+    // Initialize search trajectory caller
+    _searchTrajectoryClientCaller = nh.serviceClient<uav_ros_control::GenerateSearch>("generate_search");
 
 }
 
@@ -99,7 +105,6 @@ PursuitStateMachine(ros::NodeHandle& nh)
 void uavDistCb(const std_msgs::Float32ConstPtr& msg)
 {
     _relativeUAVDistance = msg->data;
-    UAVDistanceRateLimiter.setInput(_relativeUAVDistance);
 }
 
 void ballDistCb(const std_msgs::Float32ConstPtr& msg)
@@ -148,13 +153,14 @@ void uavDistanceConfidentCb(const std_msgs::Bool msg){
 
 bool pursuitServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::Response& response)
 {
-    if (!request.data |!_isDetectionActive) // TODO: Handle case when pursuit should not turn on
+    if (!request.data) // TODO: Handle case when pursuit should not turn on
     {
         ROS_FATAL("PursuitSM::pursuitServiceCb - Pursuit is deactivated.");
         turnOffVisualServo();
         _pursuitActivated = false;
         response.success = false;
         response.message = "Pursuit and visual servo deactivated";
+        _searchTrajectoryFlag.data = false;
         return true;
     }
 
@@ -172,11 +178,6 @@ bool pursuitServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::Re
     response.message = "Pursuit activated.";
     _pursuitActivated = true;
 
-    // ROS_WARN("PursuitSM::pursuitServiceCb - unable to activate brick pickup.");
-    // response.success = false;
-    // response.message = "Visual servo failed to start - brick pickup inactive.";
-    // _pursuitActivated = false;
-
     return true;
 }
 
@@ -187,7 +188,13 @@ void pursuitParamCb(pursuit_param_t& configMsg,uint32_t level)
     _uav_distance_offset = configMsg.UAV_distance_offset;
     _ball_distance_offset = configMsg.BALL_distance_offset;
     _uav_z_offset = configMsg.UAV_z_offset;
-    _RateLimiter_R = configMsg.RateLimiter_R;
+    _arena_x_size = configMsg.arena_x_size;
+    _arena_y_size = configMsg.arena_y_size;
+    _arena_x_offset = configMsg.arena_x_offset;
+    _arena_y_offset = configMsg.arena_y_offset;
+    _x_takeOff = configMsg.x_takeOff;
+    _y_takeOff = configMsg.y_takeOff;
+    _search_height = configMsg.desired_height;
 }
 
 void setPursuitParameters(pursuit_param_t& config)
@@ -196,7 +203,13 @@ void setPursuitParameters(pursuit_param_t& config)
     config.UAV_distance_offset = _uav_distance_offset;
     config.BALL_distance_offset = _ball_distance_offset;
     config.UAV_z_offset = _uav_z_offset;
-    config.RateLimiter_R = _RateLimiter_R;
+    config.arena_x_size = _arena_x_size;
+    config.arena_y_size = _arena_y_size;
+    config.arena_x_offset = _arena_x_offset;
+    config.arena_y_offset = _arena_y_offset;
+    config.x_takeOff = _x_takeOff;
+    config.y_takeOff = _y_takeOff;
+    config.desired_height = _search_height;
 }
 
 void initializeParameters(ros::NodeHandle& nh)
@@ -205,7 +218,13 @@ void initializeParameters(ros::NodeHandle& nh)
     bool initialized = nh.getParam(PARAM_RATE, _rate)
     && nh.getParam(PARAM_UAV_DISTANCE_OFFSET, _uav_distance_offset)
     && nh.getParam(PARAM_BALL_DISTANCE_OFFSET, _ball_distance_offset)
-    && nh.getParam(PARAM_RATE_LIMITER_R, _RateLimiter_R);
+    && nh.getParam(PARAM_ARENA_X_SIZE, _arena_x_size)
+    && nh.getParam(PARAM_ARENA_Y_SIZE, _arena_y_size)
+    && nh.getParam(PARAM_ARENA_X_OFFSET, _arena_x_offset)
+    && nh.getParam(PARAM_ARENA_X_OFFSET, _arena_y_offset)
+    && nh.getParam(PARAM_X_TAKEOFF, _x_takeOff)
+    && nh.getParam(PARAM_Y_TAKEOFF, _y_takeOff)
+    && nh.getParam(PARAM_SEARCH_HEIGHT, _search_height);
     // TODO: Load all the yaml parameters here 
     // Tip: Define parameter name at the top of the file
 
@@ -215,6 +234,28 @@ void initializeParameters(ros::NodeHandle& nh)
 		ROS_FATAL("PursuitStateMachine::initializeParameters() - failed to initialize parameters");
 		throw std::runtime_error("PursuitStateMachine parameters not properly initialized.");
 	}
+}
+
+void requestSearchTrajectory(){
+    ROS_INFO("PursuitSM::update status - requesting search trajectory.");
+    uav_ros_control::GenerateSearch srv;
+    srv.request.desired_height = _search_height;
+    srv.request.x_size = _arena_x_size;
+    srv.request.y_size = _arena_y_size;
+    srv.request.x_offset = _arena_x_offset;
+    srv.request.y_offset = _arena_y_offset;
+    srv.request.x_takeOff = _x_takeOff;
+    srv.request.y_takeOff = _y_takeOff;
+
+    if(!_searchTrajectoryClientCaller.call(srv)){
+        ROS_FATAL("PursuitSM::updateStatus - search trajectory not generated.");
+        _currentState = PursuitState::OFF;
+        return;
+    }
+
+    if (srv.response.success){
+        ROS_INFO("PursuitSM::updateStatus - search trajectory successfully generated.");
+    }
 }
 
 void turnOnVisualServo(){
@@ -279,14 +320,25 @@ void updateState()
         ROS_WARN("PursuitSM::updateStatus - Visual servo is inactive.");
         _currentState = PursuitState::OFF;
         turnOffVisualServo();
+        _searchTrajectoryFlag.data = false;
+        // requestSearchTrajectory();
         ROS_WARN("PursuitSM::updateStatus - OFF State activated.");
         return;
     }
+    // Request search trajectory
+    if (_currentState == PursuitState::OFF && (!_start_following_uav | !_isDetectionActive) && _pursuitActivated){
+        ROS_WARN("PursuitSM::updateStatus - SEARCH state activated.");
+        turnOffVisualServo();
+        _currentState = PursuitState::SEARCH;
+        _searchTrajectoryFlag.data = true;
+        requestSearchTrajectory();
+    }
     // Activate Pursuit algorithm when detection is confident.
-    if (_currentState == PursuitState::OFF && _start_following_uav && _pursuitActivated && _isDetectionActive)
+    if ((_currentState == PursuitState::OFF | _currentState == PursuitState::SEARCH )&& _start_following_uav && _isDetectionActive && _pursuitActivated)
     {
         ROS_INFO("PursuitSM::updateStatus - Starting visual servo for UAV following.");
         _currentState = PursuitState::UAV_FOLLOWING;
+        _searchTrajectoryFlag.data = false;
         turnOnVisualServo();
 
         // Comment this out for testing pursposes
@@ -294,12 +346,6 @@ void updateState()
         //_currDistanceReference = _uav_distance_offset;
 
         _currDistanceReference = _relativeUAVDistance;
-
-        // Initialize Rate Limiter
-        // UAVDistanceRateLimiter.initialCondition(_relativeUAVDistance, _uav_distance_offset);
-        // _currDistanceReference = UAVDistanceRateLimiter.getData();
-        // rl_msg.data = _currDistanceReference;
-        // _pubDistanceRL.publish(rl_msg);
 
         _currHeightReference = _relativeUAVHeight;
         _currYawReference = _relativeUAVYaw;
@@ -325,9 +371,9 @@ void updateState()
         ROS_WARN_COND(!_pursuitActivated, "PursuitSM::condition - service Pursuit is not active anymore.");
         ROS_WARN_COND(!_isDetectionActive, "PursuitSM::condition - detection is inactive.");
 
-        UAVDistanceRateLimiter.reset();
         turnOffVisualServo();
         _currentState = PursuitState::OFF;
+        //requestSearchTrajectory();
         ROS_WARN("PursuitSM::updateStatus - OFF State activated.");
         return;
     }
@@ -340,11 +386,6 @@ void updateState()
 
         _currDistanceReference = _relativeUAVDistance;
 
-        // Get data from rate Limiter
-        // _currDistanceReference = UAVDistanceRateLimiter.getData();
-        // rl_msg.data = _currDistanceReference;
-        // _pubDistanceRL.publish(rl_msg);
-
         _currHeightReference = _relativeUAVHeight;
         _currYawReference = _relativeUAVYaw;
 
@@ -356,7 +397,6 @@ void updateState()
             // pass
             ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative.");
             _currDistanceReference = _uav_distance_offset;
-
         }
 
         return;
@@ -475,9 +515,8 @@ void run()
 	{
 		ros::spinOnce();
         checkDetection();
-        UAVDistanceRateLimiter.setR(_RateLimiter_R);
-        UAVDistanceRateLimiter.setF(-_RateLimiter_R);
         updateState();
+        _pubSearchTrajectoryFlag.publish(_searchTrajectoryFlag);
         publishOffsets();
         publishErrors();
         publishVisualServoSetpoint(dt);
@@ -494,11 +533,15 @@ private:
     bool _pursuitActivated = false;
     PursuitState _currentState = PursuitState::OFF;
     
-    /* Client for calling visual servo */
-    ros::ServiceClient _vsClienCaller;
+    /* Client for calling visual servo and search trajectory */
+    ros::ServiceClient _vsClienCaller, _searchTrajectoryClientCaller;
 
     /* Offset subscriber and publisher */
     ros::Publisher _pubVssmState, _pubOffsetY, _pubOffsetZ;
+
+    /* Trajectory */
+    ros::Publisher _pubSearchTrajectoryFlag;
+    std_msgs::Bool _searchTrajectoryFlag;
 
     /* Error publishers */
     ros::Publisher _pubXError, _pubYError, _pubZError, _pubYawError;
@@ -529,12 +572,8 @@ private:
     float _uav_z_offset;
     ros::Time _time_last_detection_msg;
     float _maxDistanceReference = 15.0;
-    std_msgs::Float32 rl_msg;
-
-    /* Rate Limiters */
-    RateLimiter UAVDistanceRateLimiter;
-    ros::Publisher _pubDistanceRL;
-    float _RateLimiter_R;
+    float _arena_x_size, _arena_y_size, _arena_x_offset, _arena_y_offset;
+    double _x_takeOff, _y_takeOff, _search_height;
 
     /* Define Dynamic Reconfigure parameters */
     boost::recursive_mutex _pursuitConfigMutex;

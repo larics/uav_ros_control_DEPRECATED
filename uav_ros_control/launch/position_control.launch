@@ -1,6 +1,6 @@
 <launch>
-    <arg name="namespace"   default="red"/>
-    <arg name="odom"        default="/mavros/global_position/local"/>
+    <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
+    <arg name="odom"        default="mavros/global_position/local"/>
     <arg name="traj_ref"    default="uav/trajectory"/>
     <arg name="msf_callback_enable"     default="false"/>
 
@@ -26,7 +26,7 @@
             <!-- Topic remapping -->
             <remap from="odometry"                  to="$(arg odom)" />
             <remap from="uav/trajectory_point"      to="$(arg traj_ref)" />
-            <remap from="uav/attitude_target"       to="/mavros/setpoint_raw/attitude" />
+            <remap from="uav/attitude_target"       to="mavros/setpoint_raw/attitude" />
             <remap from="uav/euler_setpoint"        to="uav/euler_setpoint" />
         </node>
     </group>
