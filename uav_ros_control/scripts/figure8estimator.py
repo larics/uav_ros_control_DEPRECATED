@@ -338,8 +338,6 @@ class Tfm_Aprox():
 
             r.sleep()
 
-        self.plot()
-
     def get_line(self, B, x):
         return B[0]*x + B[1]
 
@@ -454,6 +452,9 @@ class Tfm_Aprox():
         self.hausdorff = -1.0
         self.publish_goal_setpoint = False
 
+    def plot_callback(self, req):
+        self.plot()
+
 
     def estimatefigure8(self, data): #data je pointstamped
 
@@ -548,6 +549,7 @@ if __name__ == '__main__':
     rospy.Subscriber('/mavros/global_position/local', Odometry, figure8.odometry_callback)
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
+    rospy.Service('plot', Empty, figure8.plot_callback)
 
     uav_position = rospy.Publisher('uav/position_estimated', PointStamped, queue_size=1)
     uav_setpoint = rospy.Publisher('uav/setpoint_estimated', PoseStamped, queue_size=1)
