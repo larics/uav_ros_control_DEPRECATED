@@ -7,7 +7,7 @@ pursuit:
     z_offset: 0.0
 
     search:
-      desired_height: 10.0
+      desired_height: 3.0
       x_size: 100.0
       y_size: 40.0
       x_offset: 0.0

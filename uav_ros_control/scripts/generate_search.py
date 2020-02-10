@@ -36,7 +36,7 @@ class RequestSearchTrajectory():
         self.odom_flag = False
 
         # Define height
-        self.z_default = 10.0
+        self.z_default = 3.0
 
         # Define arena dimensions
         self.x_size = 100.0
