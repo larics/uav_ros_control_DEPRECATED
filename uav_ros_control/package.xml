@@ -18,10 +18,12 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <build_depend>uav_ros_control_msgs</build_depend>
-  <build_depend>frontier_exploration_3d</build_depend>
+  <build_depend>larics_motion_planning</build_depend>
+  <build_depend>sensor_fusion_comm</build_depend>
 
   <run_depend>uav_ros_control_msgs</run_depend>
-  <run_depend>frontier_exploration_3d</run_depend>
+  <run_depend>larics_motion_planning</run_depend>
+  <run_depend>sensor_fusion_comm</run_depend>
   
   
   <!-- The export tag contains other, unspecified, tags -->

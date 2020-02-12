@@ -111,6 +111,9 @@ namespace uav_reference
 		bool takeoffServiceCb(uav_ros_control_msgs::TakeOff::Request& request, 
 			uav_ros_control_msgs::TakeOff::Response& response);
 
+		bool landServiceCb(std_srvs::Empty::Request& request,
+			std_srvs::Empty::Response& response);
+
 		/**
 		 * Callback function for Position reference. Works only during position hold mode.
 		 */
@@ -163,10 +166,10 @@ namespace uav_reference
 		ros_util::TopicHandler<mavros_msgs::State> m_handlerState;
 
 		/** Define all the services */
-		ros::ServiceServer _servicePoisitionHold, _serviceTakeoff;
+		ros::ServiceServer _servicePoisitionHold, _serviceTakeoff, _serviceLand;
 
 		/* Reset integrator client */
-		ros::ServiceClient _intResetClient;
+		ros::ServiceClient _intResetClient, _setModeToLandClient;
 	};
 
 	/**

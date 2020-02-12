@@ -6,6 +6,7 @@
 #include <std_msgs/Bool.h>
 #include <std_msgs/String.h>
 #include <tf2/LinearMath/Quaternion.h>
+#include <mavros_msgs/SetMode.h>
 #include <math.h>
 
 #define CARROT_OFF 			"OFF"
@@ -48,6 +49,14 @@ uav_reference::CarrotReference::CarrotReference(ros::NodeHandle& nh) :
 		this
 	);
 
+	_serviceLand = nh.advertiseService(
+		"land",
+		&uav_reference::CarrotReference::landServiceCb,
+		this
+	);
+
+	_setModeToLandClient = nh.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
+
 	_intResetClient = nh.serviceClient<std_srvs::Empty>("reset_integrator");
 	initializeParameters();
 
@@ -86,6 +95,45 @@ bool uav_reference::CarrotReference::posHoldServiceCb(std_srvs::Empty::Request& 
 		resetCarrot();
 	}
 
+	return true;
+}
+
+bool uav_reference::CarrotReference::landServiceCb(std_srvs::Empty::Request& request,
+			std_srvs::Empty::Response& response)
+{
+	if (_manualTakeoffEnabled) {
+		ROS_FATAL("CarrotReference::landServiceCb - unable to land, in MANUAL_TAKEOFF.");
+		return true;
+	}
+
+	if (m_handlerState.getData().mode != "GUIDED_NOGPS") {
+		ROS_FATAL("CarrotReference::landServiceCb - unable to land, not in GUIDED_NOGPS mode");
+		return true;
+	}
+
+	if (!_carrotEnabled) {
+		ROS_FATAL("CarrotReference::landServiceCb - unable to land, CARROT disabled");
+		return true;
+	}
+
+	if (_carrotOnLand || !_takeoffHappened) {
+		ROS_FATAL("CarrotReference::landServiceCb - unable to land, UAV on land");
+		return true;
+	}
+
+	// TODO: land here
+	mavros_msgs::SetMode::Request landMode_req;
+	mavros_msgs::SetMode::Response landMode_resp;
+	landMode_req.custom_mode = "LAND";
+	
+	if (!_setModeToLandClient.call(landMode_req, landMode_resp)) {
+		ROS_FATAL("CarrotReference::landServiceCb - unable to set LAND mode");
+		return true;
+	}
+
+	_takeoffHappened = false;
+	_carrotOnLand = true;
+	ROS_INFO("Carrotreference::landServiceCb - land initialized");
 	return true;
 }
 
