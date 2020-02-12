@@ -532,20 +532,20 @@ void startMission()
 			startInitFlight();
 			ROS_WARN("START MISSION: publishing trajectory called.");
 				}
-		if (m_mapInitializedFlag && !m_msfInitializedHeightFlag)
-		{
+		//if (m_mapInitializedFlag && !m_msfInitializedHeightFlag)
+		//{
 			// Map is initialized and octomap server is called
-			msfInitializeHeight();
-			ros::Duration(2.0).sleep();
-			if (!m_msfInitializedScaleFlag)
-				{
-				msfInitializeScale();
-				}
+		//	msfInitializeHeight();
+		//	ros::Duration(2.0).sleep();
+		//	if (!m_msfInitializedScaleFlag)
+		//		{
+		//		msfInitializeScale();
+		//		}
 			}
-		if (m_msfOdometryFlag)
+		//if (m_msfOdometryFlag)
 			{
-			ROS_INFO("START MISSION: msf odometry publishing.");
-			}
+		//	ROS_INFO("START MISSION: msf odometry publishing.");
+		//	}
 		}
 		}
 
