@@ -156,11 +156,10 @@ bool subscribedTopicsActive()
     
     static constexpr double MAX_DT = 0.1;
     ROS_FATAL_COND(dt_odom > MAX_DT,        	"FI - odometry timeout reached.");
-    ROS_FATAL_COND(dt_state > MAX_DT,     		"FI - mavros state timeout reached.");
+   //ROS_FATAL_COND(dt_state > MAX_DT,     		"FI - mavros state timeout reached.");
     ROS_FATAL_COND(dt_cartographer > MAX_DT,  "FI - cartographer pose timeout reached.");
     
     return dt_odom < MAX_DT 
-        && dt_state < MAX_DT 
         && dt_cartographer < MAX_DT;
 }
 
