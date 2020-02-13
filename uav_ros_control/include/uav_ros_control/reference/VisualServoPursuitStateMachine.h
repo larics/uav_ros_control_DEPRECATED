@@ -296,6 +296,7 @@ void requestInterceptionTrajectory(){
 
     if(!_interceptionTrajectoryClientCaller.call(srv)){
         ROS_FATAL("PursuitSM::updateStatus - interception trajectory not generated.");
+        ROS_INFO("PursuitSM::updateStatus - OFF state activated.");
         _currentState = PursuitState::OFF;
         return;
     }
@@ -384,7 +385,7 @@ void updateState()
         return;
     }
     // Activate Pursuit algorithm when detection is confident.
-    if ((_currentState == PursuitState::OFF | _currentState == PursuitState::SEARCH )&& _start_following_uav && _isDetectionActive && _pursuitActivated)
+    if ((_currentState == PursuitState::OFF | _currentState == PursuitState::SEARCH ) && _start_following_uav && _isDetectionActive && _pursuitActivated)
     {
         ROS_INFO("PursuitSM::updateStatus - Starting visual servo for UAV following.");
         _currentState = PursuitState::UAV_FOLLOWING;

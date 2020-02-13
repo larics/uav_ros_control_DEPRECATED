@@ -329,7 +329,7 @@ class Tfm_Aprox():
                         self.goal_setpoint.pose.orientation.z = quaternion[3]
                         self.goal_setpoint.pose.orientation.w = quaternion[0]
                         
-                        self.plot()
+                        #self.plot()
 
                 self.uav_position_publisher.publish(uav_position)
 
