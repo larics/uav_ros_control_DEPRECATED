@@ -2,10 +2,11 @@
 
 import rospy
 
-from geometry_msgs.msg import PointStamped, PoseStamped
+from geometry_msgs.msg import PointStamped, PoseStamped, PoseArray, Pose
 from uav_object_tracking.msg import object
 from sensor_msgs.msg import CameraInfo
-from nav_msgs.msg import Odometry
+from std_msgs.msg import Header
+from nav_msgs.msg import Odometry, Path
 import math
 import numpy as np
 from numpy.linalg import inv
@@ -55,16 +56,20 @@ class Tfm_Aprox():
         self.y_g = []
         self.z_g = []
 
+        self.path_g = Path()
+
         self.xcoord = []
         self.ycoord = []
         self.zcoord = []
+
+        self.path_coord = Path()
 
         self.hausdorff_counter = 0
 
         self.hausdorff = -1.0
         self.num_of_pts_hausdorff = 100
 
-        self.hausdorff_threshold = 0.35
+        self.hausdorff_threshold = 0.25
 
         self.z_offset = 0.0
         self.publish_goal_setpoint = False
@@ -115,6 +120,9 @@ class Tfm_Aprox():
 
     def set_uav_setpoint_publisher(self, publisher):
         self.uav_setpoint_publisher = publisher
+
+    def set_path_g_publisher(self, publisher):
+        self.path_g_publisher = publisher
 
     def find_min_time_diff_data(self, data, time_s):
         min_value = 0.0
@@ -338,6 +346,26 @@ class Tfm_Aprox():
             if (self.publish_goal_setpoint):
                     self.uav_setpoint_publisher.publish(self.goal_setpoint)
 
+            # plot publish
+            self.path_g = Path()
+            for i in range(len(self.x_g)):
+                temp_pose = PoseStamped()
+                temp_pose.pose.position.x = self.x_g[i]
+                temp_pose.pose.position.y = self.y_g[i]
+                temp_pose.pose.position.z = self.z_g[i]
+
+                temp_header = Header()
+                temp_header.stamp = rospy.Time.now()
+                temp_header.frame_id = "world"
+
+                temp_pose.header = temp_header
+
+                self.path_g.poses.append(temp_pose)
+
+            self.path_g.header.frame_id = "world"
+
+            self.path_g_publisher.publish(self.path_g)
+
             r.sleep()
 
     def get_line(self, B, x):
@@ -548,6 +576,7 @@ if __name__ == '__main__':
     rospy.Subscriber('/uav_object_tracking/uav/distance_kf_header', PointStamped, figure8.distance_callback)
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
     rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
+
     rospy.Subscriber('/red/mavros/global_position/local', Odometry, figure8.odometry_callback)
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
@@ -556,7 +585,11 @@ if __name__ == '__main__':
     uav_position = rospy.Publisher('/red/target_uav/position_estimated', PointStamped, queue_size=1)
     uav_setpoint = rospy.Publisher('/red/target_uav/setpoint_estimated', PoseStamped, queue_size=1)
 
+    estimated_figure_pub = rospy.Publisher('/red/figure8_estimated', Path, queue_size=1)
+
+
     figure8.set_uav_position_publisher(uav_position)
     figure8.set_uav_setpoint_publisher(uav_setpoint)
+    figure8.set_path_g_publisher(estimated_figure_pub)
 
     figure8.run(50)
