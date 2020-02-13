@@ -98,43 +98,56 @@ bool uav_reference::CarrotReference::posHoldServiceCb(std_srvs::Empty::Request& 
 	return true;
 }
 
-bool uav_reference::CarrotReference::landServiceCb(std_srvs::Empty::Request& request,
-			std_srvs::Empty::Response& response)
+bool uav_reference::CarrotReference::landServiceCb(std_srvs::SetBool::Request& request,
+			std_srvs::SetBool::Response& response)
 {
+	const auto set_response = [&response] (bool success) { response.success = success; };
+
 	if (_manualTakeoffEnabled) {
 		ROS_FATAL("CarrotReference::landServiceCb - unable to land, in MANUAL_TAKEOFF.");
+		set_response(false);
 		return true;
 	}
 
 	if (m_handlerState.getData().mode != "GUIDED_NOGPS") {
 		ROS_FATAL("CarrotReference::landServiceCb - unable to land, not in GUIDED_NOGPS mode");
+		set_response(false);
 		return true;
 	}
 
 	if (!_carrotEnabled) {
 		ROS_FATAL("CarrotReference::landServiceCb - unable to land, CARROT disabled");
+		set_response(false);
 		return true;
 	}
 
 	if (_carrotOnLand || !_takeoffHappened) {
 		ROS_FATAL("CarrotReference::landServiceCb - unable to land, UAV on land");
+		set_response(false);
 		return true;
 	}
 
-	// TODO: land here
+	if (!request.data) {
+		ROS_FATAL("CarrotReference::landServiceCb - request to not land recieved.");
+		set_response(false);
+		return true;
+	}
+
+	// Assume we want to land at this point
 	mavros_msgs::SetMode::Request landMode_req;
 	mavros_msgs::SetMode::Response landMode_resp;
 	landMode_req.custom_mode = "LAND";
 	
 	if (!_setModeToLandClient.call(landMode_req, landMode_resp)) {
 		ROS_FATAL("CarrotReference::landServiceCb - unable to set LAND mode");
+		set_response(false);
 		return true;
 	}
 
 	_positionHold = false;
-	_takeoffHappened = false;
 	_carrotOnLand = true;
-	ROS_INFO("Carrotreference::landServiceCb - land initialized");
+	ROS_INFO("Carrotreference::landServiceCb - LAND finished");
+	set_response(true);
 	return true;
 }
 
@@ -201,7 +214,7 @@ void uav_reference::CarrotReference::positionRefCb(
 			posMsg->transforms[0].rotation.y,
 			posMsg->transforms[0].rotation.z, 
 			posMsg->transforms[0].rotation.w);
-		ROS_WARN("CarrotReference - Trajectory reference received");
+		ROS_WARN_THROTTLE(5.0, "CarrotReference - Trajectory reference received");
 	}
 	else
 	{
@@ -391,6 +404,7 @@ void uav_reference::CarrotReference::updateCarrotStatus()
 		if (_carrotEnabled) {
 			_carrotOnLand = true;
 		}
+		resetCarrot();
 	}
 
 	// Detect enable button - rising edge

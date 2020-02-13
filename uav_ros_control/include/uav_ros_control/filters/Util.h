@@ -17,14 +17,21 @@ struct EnumClassHash
 };
 
 template<class T>
-T getParamOrThrow(ros::NodeHandle& nh, const std::string& param_name) {
-  T param;
-  bool gotParam = nh.getParam(param_name, param);
-  ROS_INFO_STREAM("Got param [" << param_name << "] = " << param);
+void getParamOrThrow(
+  ros::NodeHandle& t_nh, const std::string& t_paramName, T& t_paramContainer)
+{
+  bool gotParam = t_nh.getParam(t_paramName, t_paramContainer);
+  ROS_INFO_STREAM("Got param [" << t_paramName << "] = " << t_paramContainer);
   if (!gotParam) {
-    ROS_FATAL_STREAM("Unable to get param: [" << param_name << "]. Throwing...");
+    ROS_FATAL_STREAM("Unable to get param: [" << t_paramName << "]. Throwing...");
     throw std::runtime_error("Parameter initialization failed.");
   }
+} 
+
+template<class T>
+T getParamOrThrow(ros::NodeHandle& nh, const std::string& param_name) {
+  T param;
+  getParamOrThrow(nh, param_name, param);
   return param;
 }
 

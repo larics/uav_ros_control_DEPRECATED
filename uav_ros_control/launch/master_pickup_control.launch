@@ -2,8 +2,21 @@
   <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
   
   <group ns="$(arg namespace)">
+    <!-- Point generator search algorithm -->
     <node name="point_generator" pkg="uav_search" type="waypoint_generator_ros.py" output="screen"/>
-    <node name="master_brick_pickup" pkg="uav_ros_control" type="master_brick_pickup" output="screen"/>
+
+    <rosparam command="load" file="$(find uav_ros_control)/config/reference/master_pickup_sm.yaml"/>
+
+    <!-- Master Pickup State Machine -->
+    <node name="master_brick_pickup" pkg="uav_ros_control" type="master_brick_pickup" output="screen">
+      <remap from="n_contours" to="red_color_filter/nContours"/>
+    </node>
+
+    <!-- Mission Control - brick task handler -->
+    <include file="$(find mbzirc_mission_control)/launch/ch2_uav.launch"/>
+
+    <!-- Color setter for MBZIRC_color_filter -->
+    <node name="color_filter_init" pkg="color_filter" type="filter_initial_dummy.py" output="screen"/>
   </group>
 
 </launch>

@@ -12,7 +12,6 @@
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Empty.h>
-#include <color_filter/color.h>
 #include <std_msgs/Bool.h>
 #include <uav_ros_control/reference/PickupStates.h>
 
@@ -20,11 +19,6 @@ using namespace pickup_states;
 using namespace ros_util;
 
 namespace uav_sm {
-
-enum class VisualServoState {
-  OFF
-  // Some other states as well
-};
 
 struct BrickPickupStatus {
   BrickPickupStatus() : BrickPickupStatus("red", Eigen::Vector3d(0, 0, 0)) { }
@@ -101,11 +95,13 @@ GlobalPickupStateMachine(ros::NodeHandle& t_nh) :
   // Initialize service callers
   m_vssmCaller = t_nh.serviceClient
     <std_srvs::SetBool::Request, std_srvs::SetBool::Response>("brick_pickup/local");
-  m_chooseColorCaller = t_nh.serviceClient
-    <color_filter::color::Request, color_filter::color::Response>("filter_color");
-  m_magnetOverrideCaller = t_nh.serviceClient
+  m_magnetOverrideOnCaller = t_nh.serviceClient
     <std_srvs::Empty::Request, std_srvs::Empty::Response>("magnet/override_ON");
-  
+  m_magnetOverrideOffCaller = t_nh.serviceClient
+    <std_srvs::Empty::Request, std_srvs::Empty::Response>("magnet/override_OFF");
+  m_pickupSuccessCaller = t_nh.serviceClient
+    <std_srvs::SetBool::Request, std_srvs::SetBool::Response>("brick_pickup/success");
+
   // Advertise service
   m_serviceBrickPickup = t_nh.advertiseService(
     "brick_pickup/global",
@@ -114,20 +110,21 @@ GlobalPickupStateMachine(ros::NodeHandle& t_nh) :
   
   // Iniitalize timers
   m_stateTimer = t_nh.createTimer(
-    ros::Duration(1.0 / getParamOrThrow<double>(t_nh, "brick_pickup/rate")), 
-    &uav_sm::GlobalPickupStateMachine::update_state, this);
-  m_initFilterTimer = t_nh.createTimer(
-    ros::Duration(1.0 / getParamOrThrow<double>(t_nh, "brick_pickup/color_init_rate")),
-    &uav_sm::GlobalPickupStateMachine::init_filter, this);
+    ros::Duration(1.0 / getParamOrThrow<double>(t_nh, "brick_pickup/update_rate")), 
+    &uav_sm::GlobalPickupStateMachine::update_state, 
+    this
+  );
   m_publishTrajectoryTimer = t_nh.createTimer(
-    ros::Duration(1.0 / getParamOrThrow<double>(t_nh, "brick_pickup/search_traj_rate")),
-    &uav_sm::GlobalPickupStateMachine::publish_trajectory, this);
+    ros::Duration(1.0 / getParamOrThrow<double>(t_nh, "brick_pickup/pub_traj_rate")),
+    &uav_sm::GlobalPickupStateMachine::publish_trajectory, 
+    this
+  );
 }
 
 private:
 
-inline const VisualServoState getCurrentVisualServoState() {
-  return static_cast<VisualServoState>(m_handlerVSSMState.getData().data);
+inline const LocalPickupState getCurrentVisualServoState() {
+  return static_cast<LocalPickupState>(m_handlerVSSMState.getData().data);
 }
 
 void update_state(const ros::TimerEvent& /* unused */) 
@@ -137,28 +134,31 @@ void update_state(const ros::TimerEvent& /* unused */)
   if (m_currentStatus.isApproaching() && is_close_to_brick()) {
     ROS_WARN("BrickPickup::update_state - SEARCH state activated");
     m_currentStatus.m_status = GlobalPickupStates::SEARCH;
+    m_searchRadius = m_pickupConfig->getData().initial_search_radius;
     clear_current_trajectory();
     return;
   }
 
   if (m_currentStatus.isSearching() 
-       && getCurrentVisualServoState() == VisualServoState::OFF
+       && getCurrentVisualServoState() == LocalPickupState::OFF
        && toggle_visual_servo_state_machine(true)) {
     ROS_WARN("BrickPickup::update_state - ATTEMPT_PICKUP activated");
     m_currentStatus.m_status = GlobalPickupStates::ATTEMPT_PICKUP;
+    toggle_magnet(true);
     clear_current_trajectory();
     return;
   }
 
   if (m_currentStatus.isAttemptingPickup() 
-      && getCurrentVisualServoState() == VisualServoState::OFF) {
+      && getCurrentVisualServoState() == LocalPickupState::OFF) {
     ROS_WARN("BrickPickup::update_state - VisualServoState is OFF!.");
-
+    m_searchRadius = m_pickupConfig->getData().initial_search_radius;
+    
     clear_current_trajectory();
     if (is_brick_picked_up()) {
 
       // Update both dropoff and brick pickup global position with current relative height
-      ros::Duration(AFTER_PICKUP_SLEEP).sleep();
+      ros::Duration(m_pickupConfig->getData().after_pickup_sleep).sleep();
       m_currentStatus.m_dropoffPos.z() = m_handlerOdometry.getData().pose.pose.position.z;
       m_currentStatus.m_localBrick.z() = m_handlerOdometry.getData().pose.pose.position.z;
 
@@ -168,6 +168,7 @@ void update_state(const ros::TimerEvent& /* unused */)
     } else {
       ROS_FATAL("BrickPickup::update_state - brick is not picked up, ATTEMPT_PICKUP state activated");
       m_currentStatus.m_status = GlobalPickupStates::SEARCH;
+      advertise_pickup_success(false);
     }
     return;
   }
@@ -177,39 +178,34 @@ void update_state(const ros::TimerEvent& /* unused */)
     ROS_WARN("BrickPickup::update_state - DROPOFF finished, APPROACH activated");
     m_currentStatus.m_status = GlobalPickupStates::APPROACH;
     clear_current_trajectory();
+    toggle_magnet(false);
+    advertise_pickup_success(true); // TODO: Sometimes mighnt not be successful
     return;
   }
 
   if (m_currentStatus.isDropOff() && is_brick_picked_up() && is_close_to_dropoff()) {
     ROS_INFO("BrickPickup::updateState - at DROPOFF position");
-    toggle_magnet();
+    toggle_magnet(false);
     clear_current_trajectory();
     return;
-  }
-}
-
-void init_filter(const ros::TimerEvent& /* unused */) 
-{
-  if (m_currentStatus.isSearching()) {
-    // TODO: dont use color chooser filter for now...
-    //ROS_INFO("BrickPickup::init_filter - initializing color %s", 
-    //  m_currentStatus.m_brickColor.c_str());
-    //filter_choose_color(m_currentStatus.m_brickColor);
   }
 }
 
 void publish_trajectory(const ros::TimerEvent& /* unused */) 
 {  
   if (m_currentStatus.isSearching() && !is_trajectory_active()) {    
-    ROS_INFO("BrickPickup - generating SEARCH trajectory.");
+    ROS_INFO("BrickPickup - generating SEARCH trajectory with radius: %.3f.", m_searchRadius);
     m_pubTrajGen.publish(
       uav_reference::traj_gen::generateCircleTrajectory_topp(
         m_currentStatus.m_localBrick.x(),
         m_currentStatus.m_localBrick.y(),
         m_currentStatus.m_localBrick.z(),
-        m_handlerOdometry.getData()
+        m_handlerOdometry.getData(),
+        20, /* Number of points */
+        m_searchRadius
       )
     );
+    m_searchRadius += m_pickupConfig->getData().search_readius_increment;
     return;
   }
 
@@ -246,7 +242,7 @@ bool brick_pickup_global_cb(GeoBrickReq& request, GeoBrickResp& response)
     toggle_visual_servo_state_machine(false);
     return true;
   }
-
+  
   // Enable global brick pickup
   m_currentStatus = BrickPickupStatus(request.brick_color,
     m_global2Local.toLocal(
@@ -277,34 +273,49 @@ bool brick_pickup_global_cb(GeoBrickReq& request, GeoBrickResp& response)
     m_currentStatus.m_localBrick.z());
 
   clear_current_trajectory();
+  response.status = true;
   return true;
 }
 
 void initialize_parameters(ros::NodeHandle& nh) {
   PickupParams initParams;
-  initParams.brick_approach_tolerance = getParamOrThrow<double>(nh, "brick_pickup/brick_approach_tolerance");
-  initParams.dropoff_approach_tolerance = getParamOrThrow<double>(nh, "brick_pickup/dropoff_approach_tolerance");
-  m_pickupConfig.reset(new ParamHandler<PickupParams>(initParams, "brick_pickup"));
+  getParamOrThrow(nh, "brick_pickup/brick_approach_tolerance", initParams.brick_approach_tolerance);
+  getParamOrThrow(nh, "brick_pickup/dropoff_approach_tolerance", initParams.dropoff_approach_tolerance);
+  getParamOrThrow(nh, "brick_pickup/after_pickup_sleep", initParams.after_pickup_sleep);
+  getParamOrThrow(nh, "brick_pickup/initial_search_radius", initParams.initial_search_radius);
+  getParamOrThrow(nh, "brick_pickup/search_readius_increment", initParams.search_readius_increment);
+  m_pickupConfig.reset(new ParamHandler<PickupParams>(initParams, "brick_config/brick_pickup"));
 }
 
 bool all_services_available()
 {
   ROS_FATAL_COND(!m_vssmCaller.exists(), "GlobalPickup - VSSM service non exsistant.");
-  ROS_FATAL_COND(!m_magnetOverrideCaller.exists(), "GlobalPickup - magnet override does not exist.");
-  return m_vssmCaller.exists() && m_magnetOverrideCaller.exists();
+  ROS_FATAL_COND(!m_magnetOverrideOnCaller.exists(), "GlobalPickup - magnet override does not exist.");
+  ROS_FATAL_COND(!m_magnetOverrideOffCaller.exists(), "GlobalPickup - magnet override does not exist.");
+  return m_vssmCaller.exists() 
+    && m_magnetOverrideOnCaller.exists()
+    && m_magnetOverrideOffCaller.exists();
 }
 
-bool toggle_magnet() 
+bool toggle_magnet(bool t_magnetOn = true) 
 {
   std_srvs::Empty::Request req;
   std_srvs::Empty::Response resp;
 
-  if (!m_magnetOverrideCaller.call(req, resp)) {
-    ROS_FATAL("BrickPickup - unable to toggle magnet!");
+  bool magnetToggled = false;
+  if (t_magnetOn) {
+    magnetToggled = m_magnetOverrideOnCaller.call(req, resp);
+  }
+  else {
+    magnetToggled = m_magnetOverrideOffCaller.call(req, resp);
+  }
+  
+  if (!magnetToggled) {
+    ROS_FATAL("GlobalPickup::toggle_magnet - unable to toggle magnet.");
     return false;
   }
 
-  ROS_INFO("BrickPickup - magnet toggled");
+  ROS_INFO("GlobalPickupt::toggle_magnet - magnet toggled");
   return true;
 }
 
@@ -319,20 +330,6 @@ bool toggle_visual_servo_state_machine(bool t_enable = true) {
   }
   ROS_INFO_COND(resp.success, "BrickPickup - VSSM activated");
   return resp.success;
-}
-
-bool filter_choose_color(const std::string& t_color) {
-  color_filter::color::Request req;
-  color_filter::color::Response resp;
-  req.color = t_color;
-
-  if (!m_chooseColorCaller.call(req, resp)) {
-    ROS_FATAL("BrickPickup - color initialization failed");
-    return false;
-  }
-
-  // At this point color_initialization is assumed to be finished
-  return true;
 }
 
 bool is_close_to_brick() 
@@ -371,14 +368,25 @@ bool is_trajectory_active()
   return m_handlerTrajectoryStatus.getData().data;
 }
 
-static constexpr double AFTER_PICKUP_SLEEP = 3.0;
+void advertise_pickup_success(bool success)
+{
+  std_srvs::SetBool::Request req;
+  std_srvs::SetBool::Response resp;
+  req.data = success;
+  if (!m_pickupSuccessCaller.call(req, resp)) {
+    ROS_FATAL("GlobalPickup::advertise_pickup_success - unable to call brick_pickup/success service");
+    return;
+  }
+}
 
+double m_searchRadius; // Initialized at initializeParameters
 Global2Local m_global2Local;
 BrickPickupStatus m_currentStatus;
 std::unique_ptr<ParamHandler<PickupParams>> m_pickupConfig;
 
 ros::ServiceServer m_serviceBrickPickup;
-ros::ServiceClient m_vssmCaller, m_chooseColorCaller, m_magnetOverrideCaller;
+ros::ServiceClient m_vssmCaller, m_magnetOverrideOnCaller, m_magnetOverrideOffCaller,
+  m_pickupSuccessCaller;
 
 ros::NodeHandle m_nh;
 ros::Publisher m_pubTrajGen, m_pubGlobalPickupStatus;

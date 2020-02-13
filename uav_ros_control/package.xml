@@ -19,13 +19,14 @@
 
   <build_depend>uav_ros_control_msgs</build_depend>
   <build_depend>larics_motion_planning</build_depend>
+  <build_depend>mbzirc_mission_control</build_depend>
 
   <build_depend>geographiclib</build_depend>
   <build_depend>geographiclib-tools</build_depend>
   
   <run_depend>uav_ros_control_msgs</run_depend>
   <run_depend>larics_motion_planning</run_depend>
-  
+  <run_depend>mbzirc_mission_control</run_depend>  
   
   <!-- The export tag contains other, unspecified, tags -->
   <export>

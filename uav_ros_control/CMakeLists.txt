@@ -13,7 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
 	mavros
 	color_filter
 	larics_motion_planning
-	uav_search)
+	uav_search
+	mbzirc_mission_control)
 
 
 list(INSERT CMAKE_MODULE_PATH 0 "/usr/share/cmake/geographiclib/")
@@ -37,7 +38,7 @@ generate_dynamic_reconfigure_options(
 	config/reference/VisualServoParameters.cfg
 	config/reference/VisualServoStateMachineParameters.cfg
 	config/reference/GlobalPickupStateMachineParameters.cfg
-)
+	config/reference/MasterPickupStateMachineParameters.cfg)
 
 catkin_package(
 	INCLUDE_DIRS include

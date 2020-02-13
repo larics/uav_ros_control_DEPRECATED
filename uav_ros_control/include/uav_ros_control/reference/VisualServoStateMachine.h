@@ -22,7 +22,7 @@ namespace uav_reference
 {
 
 typedef uav_ros_control::VisualServoStateMachineParametersConfig vssm_param_t;
-#define VSSM_DYN_RECONF             "vs_state_machine"
+#define VSSM_DYN_RECONF             "brick_config/vs_state_machine"
 #define PARAM_MIN_ERROR             "visual_servo/state_machine/min_error"
 #define PARAM_MIN_TD_TAR_ERROR_Z      "visual_servo/state_machine/min_touchdown_target_position_error_z"
 #define PARAM_MIN_TD_UAV_VEL_ERROR_Z  "visual_servo/state_machine/min_touchdown_uav_velocity_error_z"
@@ -176,17 +176,17 @@ bool brickPickupServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool
     if (!request.data || stateMachineDisableConditions() || !healthyNumberOfPublishers() )
     {
         if (!healthyNumberOfPublishers())
-            ROS_FATAL_THROTTLE(2.0, "VSSM::brickPickupServiceCb - check connected publishers.");
+            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::brickPickupServiceCb - check connected publishers.");
         
         if (!request.data)
-            ROS_FATAL_THROTTLE(2.0, "VSSM::brickPickupServiceCb - brick pickup deactivation requested.");
+            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::brickPickupServiceCb - brick pickup deactivation requested.");
         
         if (_nContours == 0)
-            ROS_FATAL_THROTTLE(2.0, "VSSM::brickPickupServiceCb - no contours found.");
+            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::brickPickupServiceCb - no contours found.");
 
         if (!isRelativeDistanceValid(_relativeBrickDistance_local)
             || !isRelativeDistanceValid(_relativeBrickDistance_global))
-            ROS_FATAL_THROTTLE(2.0, "VSSM::brickPIckupServiceCb - distances invalid");
+            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::brickPIckupServiceCb - distances invalid");
 
         turnOffVisualServo();
         _brickPickupActivated = false;
@@ -336,12 +336,12 @@ void turnOffVisualServo()
 
     if (!resp.success)
     {
-        ROS_INFO_THROTTLE(2.0, "VSSM::updateStatus - visual servo successfully deactivated");
+        ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - visual servo successfully deactivated");
         // Visual servo successfully activated
         _currentState = LocalPickupState::OFF;
-        ROS_INFO_THROTTLE(1.0, "VSSM::updateStatus - OFF state activated. ");
+        ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - OFF state activated. ");
         _brickPickupActivated = false; 
-        ROS_INFO_THROTTLE(2.0, "VSSM::updateStatus - Brick pickup finished.");
+        ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - Brick pickup finished.");
         return;
     }
     else
@@ -367,11 +367,11 @@ void updateState()
         _currentState == LocalPickupState::TOUCHDOWN_ALIGNMENT && stateMachineDisableConditions())
     {
         // deactivate state machine
-        ROS_WARN_THROTTLE(2,0, "VSSM::updateStatus - Visual servo is inactive.");
+        ROS_WARN_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - Visual servo is inactive.");
         _currentState = LocalPickupState::OFF;
         _brickPickupActivated = false;
         turnOffVisualServo();
-        ROS_WARN_THROTTLE(2.0, "VSSM::updateStatus - OFF State activated.");
+        ROS_WARN_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - OFF State activated.");
         return;
     }
 
@@ -622,6 +622,7 @@ void run()
 
 private:
 
+    static constexpr double THROTTLE_TIME = 3.0;
     double _rate = 50;
 
     /* Service brick pickup */
