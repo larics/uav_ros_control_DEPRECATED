@@ -62,7 +62,7 @@ class Tfm_Aprox():
         self.hausdorff_counter = 0
 
         self.hausdorff = -1.0
-        self.num_of_pts_hausdorff = 20
+        self.num_of_pts_hausdorff = 100
 
         self.hausdorff_threshold = 0.35
 
@@ -310,6 +310,7 @@ class Tfm_Aprox():
 
                         self.publish_goal_setpoint = True
                         self.goal_setpoint.header.stamp = rospy.get_rostime()
+                        self.goal_setpoint.header.frame_id = "world"
                         self.goal_setpoint.pose.position.x = self.goal_x_g
                         self.goal_setpoint.pose.position.y = self.goal_y_g
                         self.goal_setpoint.pose.position.z = self.goal_z_g + self.z_offset
@@ -328,6 +329,7 @@ class Tfm_Aprox():
                         self.goal_setpoint.pose.orientation.z = quaternion[3]
                         self.goal_setpoint.pose.orientation.w = quaternion[0]
                         
+                        self.plot()
 
                 self.uav_position_publisher.publish(uav_position)
 
@@ -546,13 +548,13 @@ if __name__ == '__main__':
     rospy.Subscriber('/uav_object_tracking/uav/distance_kf_header', PointStamped, figure8.distance_callback)
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
     rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
-    rospy.Subscriber('/mavros/global_position/local', Odometry, figure8.odometry_callback)
+    rospy.Subscriber('/red/mavros/global_position/local', Odometry, figure8.odometry_callback)
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
     rospy.Service('plot', Empty, figure8.plot_callback)
 
-    uav_position = rospy.Publisher('uav/position_estimated', PointStamped, queue_size=1)
-    uav_setpoint = rospy.Publisher('uav/setpoint_estimated', PoseStamped, queue_size=1)
+    uav_position = rospy.Publisher('/red/target_uav/position_estimated', PointStamped, queue_size=1)
+    uav_setpoint = rospy.Publisher('/red/target_uav/setpoint_estimated', PoseStamped, queue_size=1)
 
     figure8.set_uav_position_publisher(uav_position)
     figure8.set_uav_setpoint_publisher(uav_setpoint)

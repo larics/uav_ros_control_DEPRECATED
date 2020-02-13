@@ -3,7 +3,7 @@
     <arg name="input_trajectory" default="topp/input/trajectory"/>
     <arg name="output_point" default="position_hold/trajectory"/>
     <arg name="odom" default="mavros/global_position/local"/>
-    <arg name="trajectory_flag" default="/topp/trajectory_flag"/>
+    <arg name="trajectory_flag" default="topp/trajectory_flag"/>
 
     <!-- Trajectory generation -->
     <node name="trajectory_gen" pkg="topp_ros" type="generate_toppra_trajectory.py" 
@@ -19,6 +19,10 @@
     </node>
 
     <node name="generate_search" pkg="uav_ros_control" type="generate_search.py" output="screen" ns="$(arg namespace)" >
+        <remap from="odom" to="$(arg odom)"/>
+    </node>
+
+    <node name="generate_interception" pkg="uav_ros_control" type="generate_interception.py" output="screen" ns="$(arg namespace)" >
         <remap from="odom" to="$(arg odom)"/>
     </node>
 

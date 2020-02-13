@@ -74,6 +74,8 @@ class RequestSearchTrajectory():
         self.y_size = req.y_size
         self.x_offset = req.x_offset
         self.y_offset = req.y_offset
+        self.x_takeOff = req.x_takeOff
+        self.y_takeOff = req.y_takeOff
 
         # Takeo Off point
         self.takeOffPoint = MultiDOFJointTrajectoryPoint()
@@ -167,10 +169,10 @@ class RequestSearchTrajectory():
     def generateLine(self):
         if (self.x_size > self.y_size):
             temp_x = np.linspace(self.takeOffPoint.transforms[0].translation.x + self.x_offset, self.takeOffPoint.transforms[0].translation.x + (self.x_size-self.x_offset), self.numPoints)
-            temp_y = [0.0]*len(temp_x)
+            temp_y = [self.y_takeOff]*len(temp_x)
         elif (self.y_size > self.x_size):
             temp_y = np.linspace(self.takeOffPoint.transforms[0].translation.y + self.y_offset, self.takeOffPoint.transforms[0].translation.y + (self.y_size-self.y_offset), self.numPoints)
-            temp_x = [0.0]*len(temp_y)        
+            temp_x = [self.x_takeOff]*len(temp_y)        
 
         temp_z = [self.z_default]*len(temp_x)
         temp_yaw = [0]*len(temp_x)
@@ -222,7 +224,7 @@ class RequestSearchTrajectory():
         print(self.line_array[self.startInTrajectoryIdx])
 
         # Add my position
-        # self.trajectoryPoints.points.append(self.starting_point)
+        self.trajectoryPoints.points.append(self.starting_point)
 
 
         for i in range(self.startInTrajectoryIdx, 2*self.numPoints):
