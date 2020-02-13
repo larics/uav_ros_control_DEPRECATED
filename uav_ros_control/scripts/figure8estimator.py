@@ -42,6 +42,7 @@ class Tfm_Aprox():
         self.d = 0.0
         self.p = []
         self.p_reconstructed = []
+        self.time_vector = []
 
         self.x = []
         self.y = []
@@ -65,6 +66,9 @@ class Tfm_Aprox():
         self.num_of_pts_hausdorff = 20
 
         self.hausdorff_threshold = 0.35
+
+        self.direction_estimation_data_size = 10
+        self.direction_estimation_min_time_diff = 0.3
 
         self.z_offset = 0.0
         self.publish_goal_setpoint = False
@@ -213,6 +217,49 @@ class Tfm_Aprox():
 
         return quaternion
 
+    def estimateDirection(self, real_data, estimated_data, time_vector):
+        index = 0
+        found_flag = True
+        index_list = []
+        sign = 0
+        
+        for i in range(len(real_data) - self.direction_estimation_data_size):
+            counter = 0
+
+            for j in range(self.direction_estimation_data_size):
+                diff = math.fabs(time_vector[i+j]-time_vector[i+j+1])
+
+                if (diff < self.direction_estimation_min_time_diff):
+                    counter = counter + 1
+
+            if (counter == self.direction_estimation_data_size):
+                index = i
+                found_flag = True
+                break
+
+
+        for i in range(self.direction_estimation_data_size):
+            min_distance_index = 0
+            min_distance = 0.0
+            for j in range(len(estimated_data)):
+                distance = self.euclidean_distance(estimated_data[j], real_data[index+i])
+                if (j == 0):
+                    min_distance_index = j
+                    min_distance = distance
+
+                if (min_distance > distance):
+                    min_distance = distance
+                    min_distance_index = j
+            index_list.append(min_distance_index)
+
+
+        if (index_list[0]-index_list[-1] < 0.0):
+            sign = -1
+        else:
+            sign = 1
+
+        return sign
+
 
     def run(self, rate):
         r = rospy.Rate(rate)
@@ -276,6 +323,8 @@ class Tfm_Aprox():
 
                     if (self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.publish_goal_setpoint):
                         #gledamo s 1/4 pi prema 3/4 pi
+                        direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
+
                         self.goal_x_l = 0.0
                         self.goal_y_l = 0.0
                         self.goal_z_l = 0.0
@@ -284,12 +333,19 @@ class Tfm_Aprox():
                         self.target_y_l = 0.0
                         self.target_z_l = 0.0
 
-                        t = 1.0 * pi / 4.0
+                        if (direction < 0.0):
+                            t = 1.0 * pi / 4.0
+                        else:
+                            t = 3.0 * pi / 4.0
 
                         self.goal_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
                         self.goal_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
 
-                        t = 3.0 * pi / 4.0
+                        if (direction < 0.0):
+                            t = 3.0 * pi / 4.0
+                        else:
+                            t = 1.0 * pi / 4.0
+                            
                         self.target_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
                         self.target_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
 
@@ -418,6 +474,7 @@ class Tfm_Aprox():
                 d = self.euclidean_distance(XA[i,:], XB[j,:])
                 if d<cmin:
                     cmin = d
+
                 if cmin<cmax_a:
                     break
             if cmin>cmax_a and np.inf>cmin:
@@ -461,6 +518,7 @@ class Tfm_Aprox():
         row = [data.point.x, data.point.y, data.point.z]
 
         self.p.append(row)
+        self.time_vector.append(data.header.stamp.to_sec())
 
         num_of_pts = len(self.p)
 
@@ -517,7 +575,7 @@ class Tfm_Aprox():
 
         #generiranje tocnih tocki lemniskate u 2D
 
-        t_points = np.linspace(0, 2 * pi, num_of_pts)
+        t_points = np.linspace(0, 2 * pi, 500)
         self.x_l=[]
         self.y_l=[]
         for t in t_points:
