@@ -124,6 +124,9 @@ class Tfm_Aprox():
     def set_path_g_publisher(self, publisher):
         self.path_g_publisher = publisher
 
+    def set_path_coord_publisher(self, publisher):
+        self.path_coord_publisher = publisher
+
     def find_min_time_diff_data(self, data, time_s):
         min_value = 0.0
         return_data = data[0]
@@ -364,7 +367,25 @@ class Tfm_Aprox():
 
             self.path_g.header.frame_id = "world"
 
+            self.path_coord = Path()
+            for i in range(len(self.xcoord)):
+                temp_pose = PoseStamped()
+                temp_pose.pose.position.x = self.xcoord[i]
+                temp_pose.pose.position.y = self.ycoord[i]
+                temp_pose.pose.position.z = self.zcoord[i]
+
+                temp_header = Header()
+                temp_header.stamp = rospy.Time.now()
+                temp_header.frame_id = "world"
+
+                temp_pose.header = temp_header
+
+                self.path_coord.poses.append(temp_pose)
+
+            self.path_coord.header.frame_id = "world"
+
             self.path_g_publisher.publish(self.path_g)
+            self.path_coord_publisher.publish(self.path_coord)
 
             r.sleep()
 
@@ -586,10 +607,14 @@ if __name__ == '__main__':
     uav_setpoint = rospy.Publisher('/red/target_uav/setpoint_estimated', PoseStamped, queue_size=1)
 
     estimated_figure_pub = rospy.Publisher('/red/figure8_estimated', Path, queue_size=1)
+    received_points_pub = rospy.Publisher('/red/figure8_received', Path, queue_size=1)
+
 
 
     figure8.set_uav_position_publisher(uav_position)
     figure8.set_uav_setpoint_publisher(uav_setpoint)
     figure8.set_path_g_publisher(estimated_figure_pub)
+    figure8.set_path_coord_publisher(received_points_pub)
+
 
     figure8.run(50)
