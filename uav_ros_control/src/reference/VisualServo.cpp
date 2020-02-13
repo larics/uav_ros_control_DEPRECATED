@@ -521,11 +521,11 @@ void VisualServo::updateSetpoint() {
   // MSGS
   _moveLeftMsg.data = move_left;
   _changeYawMsg.data = change_yaw;
-  _moveUpMsg.data = move_up;
+  _moveUpMsg.data = -move_up;
   _moveForwardMsg.data = move_forward;
 
   _moveForwardLimitedMsg.data = move_forward_limited;
-  _moveUpLimitedMsg.data = move_up_limited;
+  _moveUpLimitedMsg.data = -move_up_limited;
   _changeYawLimitedMsg.data = change_yaw_limited;
 
   // PUB
