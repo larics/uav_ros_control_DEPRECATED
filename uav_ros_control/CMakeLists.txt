@@ -43,7 +43,7 @@ generate_dynamic_reconfigure_options(
 
 catkin_package(
 	INCLUDE_DIRS include
-	LIBRARIES pid nfilt kalman
+	LIBRARIES my_pid nfilt my_kalman
 	CATKIN_DEPENDS uav_ros_control_msgs)
 
 include_directories(
@@ -52,21 +52,21 @@ include_directories(
   ${GeographicLib_INCLUDE_DIRS})
 
 # PID controller library
-add_library(pid src/control/PID.cpp)
-target_link_libraries(pid ${catkin_LIBRARIES})
+add_library(my_pid src/control/PID.cpp)
+target_link_libraries(my_pid ${catkin_LIBRARIES})
 
 # Nonlinear filters library
 add_library(nfilt src/filters/NonlinearFilters.cpp)
 target_link_libraries(nfilt ${catkin_LIBRARIES})
 
 # Kalman filter library
-add_library(kalman src/filters/KalmanFilter.cpp)
-target_link_libraries(kalman ${catkin_LIBRARIES})
+add_library(my_kalman src/filters/KalmanFilter.cpp)
+target_link_libraries(my_kalman ${catkin_LIBRARIES})
 
 # References library
 file(GLOB_RECURSE reference_SRC "src/reference/*.cpp")
 add_library(reference_lib ${reference_SRC})
-target_link_libraries(reference_lib ${catkin_LIBRARIES} nfilt pid)
+target_link_libraries(reference_lib ${catkin_LIBRARIES} nfilt my_pid)
 
 # Controller library
 file(GLOB_RECURSE controllers_SRC "src/control/*.cpp")

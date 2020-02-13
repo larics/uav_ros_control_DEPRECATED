@@ -240,6 +240,7 @@ bool brick_pickup_global_cb(GeoBrickReq& request, GeoBrickResp& response)
     m_currentStatus = BrickPickupStatus();
     clear_current_trajectory();
     toggle_visual_servo_state_machine(false);
+    toggle_magnet(false);
     return true;
   }
   

@@ -1,5 +1,5 @@
 master_pickup:
-  state_timer_rate: 20
+  state_timer_rate: 10
   
   search_size_x: 10
   search_size_y: 10

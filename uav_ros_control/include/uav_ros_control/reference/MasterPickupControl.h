@@ -116,6 +116,9 @@ MasterPickupControl(ros::NodeHandle& t_nh) :
   m_pubTrajGen = t_nh.advertise<trajectory_msgs::MultiDOFJointTrajectory>(
     "topp/input/trajectory", 1
   );
+  m_pubMasterState = t_nh.advertise<std_msgs::Int32>(
+    "master_pickup/state", 1
+  );
   m_serviceMasterPickup = t_nh.advertiseService(
     "brick_pickup/master",
     &uav_sm::MasterPickupControl::master_pickup_cb,
@@ -220,6 +223,9 @@ bool pickup_success_cb(std_srvs::SetBool::Request& request,
 
 void state_timer_cb(const ros::TimerEvent& /* unused */) 
 {
+  //Always try to publish current state
+  m_pubMasterState.publish(static_cast<int>(m_currentState));
+  
   // Check if we see any bricks
   if (in_search_state() && !m_challengeInfo.isBrickLocationSet() && is_brick_visible()) {
     ROS_INFO("MasterPickupControl::state_timer - BRICK seen at [%.10f, %.10f, %.10f]",
@@ -498,7 +504,7 @@ void generate_search_trajectory()
   clear_current_trajectory();
   ROS_INFO("MasterPickup - generating search trajectory.");
   m_pubTrajGen.publish(searchtrajectory);
-  ros::Duration(1.0).sleep();
+  ros::Duration(2.0).sleep();
 }
 
 void clear_current_trajectory() 
@@ -626,7 +632,7 @@ ros::ServiceClient m_clientArming, m_clientTakeoff,
   m_clientGlobalPickup, m_chooseColorCaller;
 
 ros::Timer m_stateTimer;
-ros::Publisher m_pubTrajGen;
+ros::Publisher m_pubTrajGen, m_pubMasterState;
 TopicHandler<mavros_msgs::State> m_handlerState;
 TopicHandler<sensor_msgs::NavSatFix> m_handlerGpsFix;
 TopicHandler<std_msgs::String> m_handlerCarrotStatus;
