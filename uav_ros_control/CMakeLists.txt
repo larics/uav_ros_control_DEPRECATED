@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
 	sensor_msgs
 	mav_msgs
 	tf
+	sensor_fusion_comm
 	mavros
 	color_filter
 	larics_motion_planning
