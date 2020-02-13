@@ -93,8 +93,6 @@ public:
 			&flight_init::FlightInit::msfOdometryCb, this);
 
 		// Initialize publishers 
-		m_pubGoalsMarker = nh.advertise<visualization_msgs::MarkerArray>(
-			"flight_init/goals_marker", 20);
 		m_pubTrajectory = nh.advertise<trajectory_msgs::JointTrajectory> (
 			"joint_trajectory", 1);
 		m_pubReadyForExploration = nh.advertise<std_msgs::Bool> (
@@ -130,19 +128,18 @@ public:
 void initializeParameters(ros::NodeHandle& nh)
 {
     ROS_INFO("FlightInit::initializeParameters()");
-    bool initialized = 
-        nh.getParam(PARAM_TIME_FOR_INIT, m_timeForInit)
+    bool initialized = nh.getParam(PARAM_TIME_FOR_INIT, m_timeForInit)
 		&& nh.getParam(PARAM_TAKEOFF_HEIGHT, m_takeoffHeight)
 		&& nh.getParam(PARAM_RADIUS_INIT, m_radiusInit)
-	&& nh.getParam(PARAM_EXECUTION_NUM, m_executeTrajectoryNum)
+		&& nh.getParam(PARAM_EXECUTION_NUM, m_executeTrajectoryNum)
 		&& nh.getParam(PARAM_MAP_FRAME, m_mapFrame)
-        && nh.getParam(PARAM_RATE, m_rate);
+    && nh.getParam(PARAM_RATE, m_rate);
 
     ROS_INFO("Node rate: %.2f", m_rate);
     ROS_INFO("Time for initialization: %.2f", m_timeForInit);
-	 ROS_INFO("Radius around UAV for initialization: %.2f", m_radiusInit);
-	ROS_INFO("Execution num: %d", m_executeTrajectoryNum);
-	ROS_INFO("Takeoff height: %.2f", m_takeoffHeight);
+	 	ROS_INFO("Radius around UAV for initialization: %.2f", m_radiusInit);
+		ROS_INFO("Execution num: %d", m_executeTrajectoryNum);
+		ROS_INFO("Takeoff height: %.2f", m_takeoffHeight);
     if (!initialized)
 	{
 		ROS_FATAL("FlightInit::initializeParameters() - failed to initialize parameters");
@@ -150,13 +147,46 @@ void initializeParameters(ros::NodeHandle& nh)
 	}
 }
 
+bool subscribedTopicsActive() 
+{
+    double currentTime = ros::Time::now().toSec();
+    double dt_odom = currentTime - m_timeLastOdometry;
+    double dt_state = currentTime - m_timeLastState;
+    double dt_cartographer = currentTime - m_timeLastCartographer;
+    
+    static constexpr double MAX_DT = 0.1;
+    ROS_FATAL_COND(dt_odom > MAX_DT,        	"FI - odometry timeout reached.");
+    ROS_FATAL_COND(dt_state > MAX_DT,     		"FI - mavros state timeout reached.");
+    ROS_FATAL_COND(dt_cartographer > MAX_DT,  "FI - cartographer pose timeout reached.");
+    
+    return dt_odom < MAX_DT 
+        && dt_state < MAX_DT 
+        && dt_cartographer < MAX_DT;
+}
+
+bool healthyNumberOfPublishers() 
+{
+    ROS_FATAL_COND(!m_subOdometry.getNumPublishers() > 0, "IF - 'mavros odometry' topic publisher missing");
+    ROS_FATAL_COND(!m_subState.getNumPublishers() > 0, "IF - 'mavros state' topic publisher missing");
+		ROS_FATAL_COND(!m_subCartographerPose.getNumPublishers() > 0, "IF - 'cartographer pose' topic publisher missing");
+
+    return m_subOdometry.getNumPublishers() > 0 
+      && 	m_subState.getNumPublishers() > 0
+			&& 	m_subCartographerPose.getNumPublishers() > 0;
+}
+
+bool stateMachineDisableConditions()
+{
+    return !subscribedTopicsActive();
+}
+
 void fiParamCb(fi_param_t& configMsg,uint32_t level)
 {
     ROS_WARN("FlightInit::fiParamCb()");
     m_timeForInit = configMsg.time_for_init;
-	m_takeoffHeight = configMsg.takeoff_height;
-	 m_radiusInit = configMsg.radius_init;
-	m_executeTrajectoryNum = configMsg.execute_trajectory_num;
+		m_takeoffHeight = configMsg.takeoff_height;
+		m_radiusInit = configMsg.radius_init;
+		m_executeTrajectoryNum = configMsg.execute_trajectory_num;
 
 }
 
@@ -172,9 +202,10 @@ void setReconfigureParameters(fi_param_t& configMsg)
 void stateCb(const mavros_msgs::State::ConstPtr& msg)
 {
 	m_currentState = *msg;
+	m_timeLastState = ros::Time::now().toSec();
 }
 
-void cartographerPoseCb(const geometry_msgs::PoseStamped& msg)
+void cartographerPoseCb(const geometry_msgs::PoseStampedPtr& msg)
 {
 	std_msgs::Bool m_ready;
 	// When we take off
@@ -184,13 +215,13 @@ void cartographerPoseCb(const geometry_msgs::PoseStamped& msg)
 		if (first_time)
 		{
 			first_time = false;
-			m_previousCartographerPose = msg;
-			m_currentCartographerPose = msg;
+			m_previousCartographerPose = *msg;
+			m_currentCartographerPose = *msg;
 			// Set timer for map initialization
 			m_timer = ros::Time::now();
-}
+		}
 		m_previousCartographerPose = m_currentCartographerPose;
-		m_currentCartographerPose = msg;
+		m_currentCartographerPose = *msg;
 		double distance = sqrt(
 				pow(m_previousCartographerPose.pose.position.x
 					- m_currentCartographerPose.pose.position.x, 2)
@@ -211,15 +242,19 @@ void cartographerPoseCb(const geometry_msgs::PoseStamped& msg)
 		{
 			if (ros::Time::now() - m_timer > ros::Duration(m_timeForInit))
 			{
-				// Enough time pass --> map is initialized
+				// Enough time pass --> map is initialize 
 				ROS_INFO("Map initialized.");
 				m_ready.data = true;
 				m_mapInitializedFlag = true;
+				for (int i = 0; i < 5; i++)
+				{
+					m_pubReadyForExploration.publish(m_ready);	
+				}
 			}
-
 		}
 	m_pubReadyForExploration.publish(m_ready);	
 	}
+	m_timeLastCartographer = ros::Time::now().toSec();
 }
 
 void msfOdometryCb(const nav_msgs::OdometryConstPtr& msg)
@@ -233,7 +268,14 @@ bool armAndTakeOffCb(
 	std_srvs::SetBool::Response& response)
 {
 	const auto set_response = [&response] (bool success) { response.success = success; };
-
+	if (stateMachineDisableConditions() || !healthyNumberOfPublishers())
+  {
+    if (!healthyNumberOfPublishers())
+      ROS_FATAL("IF::armAndTakeoffCb - check connected publishers.");
+			set_response(false);
+			return false;
+	}
+	
 	if (!modeGuided())
 	{
 		ROS_FATAL("TakeoffCb - request denied, not in GUIDED_NOGPS");
@@ -245,13 +287,13 @@ bool armAndTakeOffCb(
 	{
 		 ROS_FATAL("TakeoffCb - request denied, ARMING failed.");
 		set_response(false);
-	return true;
-}
+		return true;
+	}
 
 	ros::Duration(ARM_DURATION).sleep();
 
 	if (!takeOffUAV())
-{
+	{
 		ROS_FATAL("TakeoffCb - request denied, TAKEOFF unsuccessful");
 		set_response(false);
 		return true;
@@ -263,8 +305,7 @@ bool armAndTakeOffCb(
 	ROS_INFO("TakeoffCb - request approved, TAKEOFF successful");
 	m_takeoffFlag = true;
 	set_response(true);
-	return true;
-	
+	return true;	
 }
 
 void odometryCb(const nav_msgs::OdometryConstPtr& msg)
@@ -275,6 +316,7 @@ void odometryCb(const nav_msgs::OdometryConstPtr& msg)
 		m_homeOdom = *msg; 
 	}	
 	m_currentOdom = *msg;
+	m_timeLastOdometry = ros::Time::now().toSec();
 }
 
 bool modeGuided()
@@ -531,23 +573,23 @@ void startMission()
 		{
 			startInitFlight();
 			ROS_WARN("START MISSION: publishing trajectory called.");
-				}
-		if (m_mapInitializedFlag && !m_msfInitializedHeightFlag)
-		{
-			// Map is initialized and octomap server is called
-			msfInitializeHeight();
-			ros::Duration(2.0).sleep();
-			if (!m_msfInitializedScaleFlag)
-				{
-				msfInitializeScale();
-				}
-			}
-		if (m_msfOdometryFlag)
-			{
-			ROS_INFO("START MISSION: msf odometry publishing.");
-			}
 		}
-		}
+		// if (m_mapInitializedFlag && !m_msfInitializedHeightFlag)
+		// {
+		// 	// Map is initialized and octomap server is called
+		// 	msfInitializeHeight();
+		// 	ros::Duration(2.0).sleep();
+		// 	if (!m_msfInitializedScaleFlag)
+		// 		{
+		// 		msfInitializeScale();
+		// 		}
+		// 	}
+		// if (m_msfOdometryFlag)
+		// 	{
+		// 	ROS_INFO("START MISSION: msf odometry publishing.");
+		// 	}
+	}
+}
 
 void run()
 {
@@ -563,6 +605,9 @@ void run()
 
 private: 
 double m_timeForInit, m_takeoffHeight, m_rate, m_radiusInit;
+double m_timeLastOdometry = 0,
+  m_timeLastState = 0,
+  m_timeLastCartographer = 0;
 std_msgs::Int32 m_executingTrajectory;
 int m_executeTrajectoryNum;
 mavros_msgs::State m_currentState;
@@ -571,7 +616,7 @@ geometry_msgs::Point m_currGoal;
 geometry_msgs::PoseStamped m_previousCartographerPose, m_currentCartographerPose;
 nav_msgs::Odometry m_currentOdom, m_homeOdom;
 ros::Subscriber m_subState, m_subOdometry, m_subCartographerPose, m_subMsfOdometry;
-ros::Publisher m_pubGoalsMarker, m_pubTrajectory, m_pubReadyForExploration;
+ros::Publisher m_pubTrajectory, m_pubReadyForExploration;
 ros::Time m_timer;
 bool m_takeoffFlag = false;
 bool m_startFlightFlag = false;
