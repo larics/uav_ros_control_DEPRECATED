@@ -275,7 +275,7 @@ bool armAndTakeOffCb(
 			set_response(false);
 			return false;
 	}
-	
+
 	if (!modeGuided())
 	{
 		ROS_FATAL("TakeoffCb - request denied, not in GUIDED_NOGPS");
