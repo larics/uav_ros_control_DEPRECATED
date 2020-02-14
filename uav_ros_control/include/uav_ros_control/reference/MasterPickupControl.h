@@ -436,7 +436,6 @@ void switch_to_off_state()
 
 void switch_to_search_state()
 {
-  ros::spinOnce();
   ROS_WARN_STREAM(m_currentState << " -> " << MasterPickupStates::SEARCH);
   clear_current_trajectory();
   filter_choose_color("all");
