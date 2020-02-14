@@ -154,7 +154,7 @@ bool subscribedTopicsActive()
     double dt_state = currentTime - m_timeLastState;
     double dt_cartographer = currentTime - m_timeLastCartographer;
     
-    static constexpr double MAX_DT = 0.1;
+    static constexpr double MAX_DT = 0.2;
     ROS_FATAL_COND(dt_odom > MAX_DT,        	"FI - odometry timeout reached.");
    //ROS_FATAL_COND(dt_state > MAX_DT,     		"FI - mavros state timeout reached.");
     ROS_FATAL_COND(dt_cartographer > MAX_DT,  "FI - cartographer pose timeout reached.");
@@ -177,6 +177,23 @@ bool healthyNumberOfPublishers()
 bool stateMachineDisableConditions()
 {
     return !subscribedTopicsActive();
+}
+
+bool all_services_available()
+{
+  ROS_FATAL_COND(!m_armingClient.exists(), "FI - arming service does not exist.");
+  ROS_FATAL_COND(!m_setModeClient.exists(), "FI - set mode service does not exist.");
+  ROS_FATAL_COND(!m_takeoffClient.exists(), "FI - takeoff service does not exist.");
+	ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
+	ROS_FATAL_COND(!m_initializeMsfScaleClient.exists(), "FI - msf scale service does not exist.");
+	ROS_FATAL_COND(!m_planTrajectoryClient.exists(), "FI - multi_dof_trajectory does not exist.");
+
+  return m_armingClient.exists() 
+    && m_setModeClient.exists()
+    && m_takeoffClient.exists()
+		&& m_initializeMsfHeightClient.exists()
+		&& m_initializeMsfScaleClient.exists()
+		&& m_planTrajectoryClient.exists();
 }
 
 void fiParamCb(fi_param_t& configMsg,uint32_t level)
@@ -266,12 +283,20 @@ bool armAndTakeOffCb(
 	std_srvs::SetBool::Response& response)
 {
 	const auto set_response = [&response] (bool success) { response.success = success; };
-	if (stateMachineDisableConditions() || !healthyNumberOfPublishers())
+	if (stateMachineDisableConditions() || !healthyNumberOfPublishers() || !all_services_available())
   {
     if (!healthyNumberOfPublishers())
+		{
       ROS_FATAL("IF::armAndTakeoffCb - check connected publishers.");
 			set_response(false);
-			return false;
+			return true;
+		}
+		if (!all_services_available())
+		{
+      ROS_FATAL("IF::armAndTakeoffCb - check services.");
+			set_response(false);
+			return true;			
+		}
 	}
 
 	if (!modeGuided())
@@ -320,9 +345,9 @@ void odometryCb(const nav_msgs::OdometryConstPtr& msg)
 bool modeGuided()
 {
 	mavros_msgs::SetMode offb_set_mode;
-	offb_set_mode.request.custom_mode = "GUIDED";
+	offb_set_mode.request.custom_mode = "GUIDED_NOGPS";
 	
-	if (m_currentState.mode != "GUIDED")
+	if (m_currentState.mode != "GUIDED_NOGPS")
 	{
 		if (m_setModeClient.call(offb_set_mode))
 		{
@@ -392,6 +417,7 @@ bool takeOffUAV()
 
 void startInitFlight()
 {
+	ROS_INFO("start init flight");
 	m_vectorWaypoints = {};
 	generateWaypoints(m_vectorWaypoints);
 
@@ -400,9 +426,10 @@ void startInitFlight()
 	{
 		ROS_FATAL("startFlightCb: waypoints are not generated.");
 		m_startFlightFlag = false;
-		}
+	}
+
 	if (!publishTrajectory(m_vectorWaypoints))
-{
+	{
 		ROS_FATAL("startInitFlight - publishing trajectory failed.");
 		m_startFlightFlag = false;
 
@@ -418,25 +445,22 @@ void generateWaypoints(
 	std::vector<geometry_msgs::Point> &m_vectorWaypoints)
 {
 	geometry_msgs::Point m_point;
-	double m_circumference = 2 * m_radiusInit * PI;
-	double m_k = PI;
-	// Round down value
-	int m_points_num = int(ceil(m_circumference / m_k));
-	std::cout << m_points_num << std::endl;
-	double m_segment = 360 / m_points_num;
 	// Current UAV position
 	geometry_msgs::Point m_current_position = m_currentOdom.pose.pose.position;
+	double angle_inc = 180 / m_radiusInit;
 	// CIRCLE around UAV
-	for (int i = 0; i < m_points_num; i++)
+	for (double angle = 0; angle < m_executeTrajectoryNum * 360; angle += angle_inc)
 	{
+		ROS_INFO("for");
 		m_point.x = m_current_position.x + 
-			(m_radiusInit * cos(i * m_segment * DEGTORAD));
+			(m_radiusInit * cos(angle * DEGTORAD));
 		m_point.y = m_current_position.y + 
-			(m_radiusInit * sin(i * m_segment * DEGTORAD));
+			(m_radiusInit * sin(angle * DEGTORAD));
 		m_point.z = m_takeoffHeight;
 		m_vectorWaypoints.push_back(m_point);
 	}
-}
+	std::cout << "vector:" << m_vectorWaypoints.size() << std::endl;
+ }
 
 double quaternion2Yaw(geometry_msgs::Quaternion quaternion)
   {
@@ -468,21 +492,19 @@ bool publishTrajectory (
 	m_trajectory_point.positions = m_points_arr;
 	m_srv.request.waypoints.points.push_back(m_trajectory_point);
 
-	for (int k = 0; k < m_executeTrajectoryNum; k++)
+	// Create another points from generated vector of points
+	for (int i = 0; i < m_vectorOfPoints.size() - 1; i++)
 	{
-		// Create another points from generated vector of points
-		for (int i = 0; i < m_vectorOfPoints.size() - 1; i++)
-	{
-			m_points_arr = {
-				m_vectorOfPoints[i].x,
-				m_vectorOfPoints[i].y, 
-				m_vectorOfPoints[i].z,
-				atan2(( m_vectorOfPoints[i+1].y - m_vectorOfPoints[i].y),
-				( m_vectorOfPoints[i+1].x - m_vectorOfPoints[i].x))};
-			m_trajectory_point.positions.clear();
-			m_trajectory_point.positions = m_points_arr;
-			m_srv.request.waypoints.points.push_back(m_trajectory_point);
-		}
+		m_points_arr = {
+			m_vectorOfPoints[i].x,
+			m_vectorOfPoints[i].y, 
+			m_vectorOfPoints[i].z,
+			atan2(( m_vectorOfPoints[i+1].y - m_vectorOfPoints[i].y),
+			( m_vectorOfPoints[i+1].x - m_vectorOfPoints[i].x))};
+		m_trajectory_point.positions.clear();
+		m_trajectory_point.positions = m_points_arr;
+		m_srv.request.waypoints.points.push_back(m_trajectory_point);
+	}
 		
 	// Append last point with orientation from the first point
 	m_points_arr = {
@@ -499,12 +521,11 @@ bool publishTrajectory (
 	m_srv.request.publish_trajectory = false;
 	m_srv.request.plan_path = false;
 	m_srv.request.plan_trajectory = true;
-	}
 	// Call the service
 	bool m_service_succes = m_planTrajectoryClient.call(m_srv);
 		
 	if (m_service_succes && m_srv.response.success)
-		{
+	{
 		ROS_INFO("publishTrajectory - MultiDOFTrajectory service successfully called.");
 		trajectory_msgs::JointTrajectory m_generated_trajectory = 
 			m_srv.response.trajectory; 
