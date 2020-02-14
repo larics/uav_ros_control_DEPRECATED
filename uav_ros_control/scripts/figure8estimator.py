@@ -70,7 +70,7 @@ class Tfm_Aprox():
         self.hausdorff = -1.0
         self.num_of_pts_hausdorff = 100
 
-        self.hausdorff_threshold = 0.25
+        self.hausdorff_threshold = 0.35
 
         self.direction_estimation_data_size = 10
         self.direction_estimation_min_time_diff = 0.3
@@ -334,7 +334,8 @@ class Tfm_Aprox():
 
                     if (self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.publish_goal_setpoint):
                         #gledamo s 1/4 pi prema 3/4 pi
-                        direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
+                        direction = -1 * self.estimateDirection(p, p_reconstructed, self.time_vector)
+                        print direction
 
                         self.goal_x_l = 0.0
                         self.goal_y_l = 0.0
