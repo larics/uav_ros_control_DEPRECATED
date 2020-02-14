@@ -6,11 +6,11 @@ import copy, time
 import rospy
 import numpy as np
 import tf
-from math import pi
+from math import pi, sqrt, sin, cos, atan2
 from nav_msgs.msg import Odometry
 from uav_ros_control.srv import GenerateSearch, GenerateSearchResponse
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
-from geometry_msgs.msg import Transform, Twist
+from geometry_msgs.msg import Transform, Twist, PointStamped
 
 # from uav_search.msg import *
 # from uav_search.srv import *
@@ -35,8 +35,14 @@ class RequestSearchTrajectory():
         self.odom_msg = Odometry()
         self.odom_flag = False
 
+        # Type of search [scan, estimated]
+        self.type = "scan"
         # Define height
         self.z_default = 10.0
+        self.estimated_point_stamped = PointStamped()
+        self.r_estimated = 4.0
+        self.num_of_circle_points = 360
+        self.estimated_z_offset = 3.0
 
         # Define arena dimensions
         self.x_size = 100.0
@@ -66,9 +72,8 @@ class RequestSearchTrajectory():
         # Define msg for points
         self.trajectoryPoints = MultiDOFJointTrajectory()
 
-        # fail
-
         #get params
+        self.type = req.type
         self.z_default = req.desired_height
         self.x_size = req.x_size
         self.y_size = req.y_size
@@ -76,6 +81,7 @@ class RequestSearchTrajectory():
         self.y_offset = req.y_offset
         self.x_takeOff = req.x_takeOff
         self.y_takeOff = req.y_takeOff
+        self.estimated_point_stamped = req.estimated_point
 
         # Takeo Off point
         self.takeOffPoint = MultiDOFJointTrajectoryPoint()
@@ -86,17 +92,33 @@ class RequestSearchTrajectory():
 
         self.takeOffPoint.transforms.append(temp_transform)
 
-        if self.odom_flag:
-            self.getMyPosition()
-            self.generateLine()
-            self.modifyTrajectory()
+        if (self.type == "scan"):
 
-            self.trajectory_pub.publish(self.trajectoryPoints)
-            self.odom_flag = False
-            res.success = True
-        else:
-            print "GenerateSearch - Odometry unavailable."
-            res.success = False
+            if self.odom_flag:
+                self.getMyPosition()
+                self.generateLine()
+                self.modifyTrajectory()
+
+                self.trajectory_pub.publish(self.trajectoryPoints)
+                self.odom_flag = False
+                res.success = True
+            else:
+                print "GenerateSearch - Odometry unavailable."
+                res.success = False
+
+        elif (self.type == "estimated"):
+            if self.odom_flag:
+                self.getMyPosition()
+                self.getMidPoint()
+                self.getEstimatedPoint()
+                self.generateEstimatedSearch()
+
+                self.trajectory_pub.publish(self.trajectoryPoints)
+                self.odom_flag = False
+                res.success = True
+            else:
+                print "GenerateSearch - Odometry unavailable."
+                res.success = False
 
         return res
 
@@ -136,6 +158,8 @@ class RequestSearchTrajectory():
             self.odom_msg.pose.pose.orientation.z,
             self.odom_msg.pose.pose.orientation.w])[2]
 
+        print yaw_start
+
         temp_transform.rotation.x = self.odom_msg.pose.pose.orientation.x
         temp_transform.rotation.y = self.odom_msg.pose.pose.orientation.y
         temp_transform.rotation.z = self.odom_msg.pose.pose.orientation.z
@@ -148,6 +172,54 @@ class RequestSearchTrajectory():
         # print(yaw_start)
         # My point
         # self.trajectoryPoints.points.append(self.starting_point)
+
+    def getMidPoint(self):
+        self.mid_point = MultiDOFJointTrajectoryPoint()
+        temp_transform = Transform()
+        temp_transform.translation.x = self.odom_msg.pose.pose.position.x
+        temp_transform.translation.y = self.odom_msg.pose.pose.position.y 
+        temp_transform.translation.z = self.odom_msg.pose.pose.position.z
+
+        # yaw_start = tf.transformations.euler_from_quaternion(
+        #     [self.odom_msg.pose.pose.orientation.x, 
+        #     self.odom_msg.pose.pose.orientation.y,
+        #     self.odom_msg.pose.pose.orientation.z,
+        #     self.odom_msg.pose.pose.orientation.w])[2]
+
+        # print yaw_start
+
+        # temp_transform.rotation.x = self.odom_msg.pose.pose.orientation.x
+        # temp_transform.rotation.y = self.odom_msg.pose.pose.orientation.y
+        # temp_transform.rotation.z = self.odom_msg.pose.pose.orientation.z
+        # temp_transform.rotation.w = self.odom_msg.pose.pose.orientation.w
+
+        yaw_start = pi
+        q_backwards = tf.transformations.quaternion_from_euler(0, 0, yaw_start, 'rxyz')
+
+        temp_transform.rotation.x = q_backwards[0]
+        temp_transform.rotation.y = q_backwards[1]
+        temp_transform.rotation.z = q_backwards[2]
+        temp_transform.rotation.w = q_backwards[3]
+
+        self.mid_point.transforms.append(temp_transform)
+
+    def getEstimatedPoint(self):
+        self.estimated_point = MultiDOFJointTrajectoryPoint()
+        temp_transform = Transform()
+        temp_transform.translation.x = self.estimated_point_stamped.point.x
+        temp_transform.translation.y = self.estimated_point_stamped.point.y
+        temp_transform.translation.z = self.estimated_point_stamped.point.z + self.estimated_z_offset
+
+        yaw_start = pi
+        q_backwards = tf.transformations.quaternion_from_euler(0, 0, yaw_start, 'rxyz')
+
+        temp_transform.rotation.x = q_backwards[0]
+        temp_transform.rotation.y = q_backwards[1]
+        temp_transform.rotation.z = q_backwards[2]
+        temp_transform.rotation.w = q_backwards[3]
+
+        self.estimated_point.transforms.append(temp_transform)
+
 
     def getToCenter(self):
 
@@ -188,6 +260,43 @@ class RequestSearchTrajectory():
         # Backwards
         for i in range(0, len(temp_x)):
             self.line_array[i+self.numPoints][:]= np.array([temp_x[-i-1], temp_y[-i-1], temp_z[-i-1], temp_yaw[i]])
+
+    def generateEstimatedSearch(self):
+        self.trajectoryPoints.points.append(self.starting_point)
+        #self.trajectoryPoints.points.append(self.mid_point)
+        #self.trajectoryPoints.points.append(self.estimated_point)
+
+        x = [0] * self.num_of_circle_points
+        y = [0] * self.num_of_circle_points
+        z = [0] * self.num_of_circle_points
+        yaw = [0] * self.num_of_circle_points
+
+        theta = np.linspace(0 , 2*pi, self.num_of_circle_points)
+
+        for i in range(self.num_of_circle_points):
+            x[i] = self.estimated_point_stamped.point.x + self.r_estimated * cos(theta[i])
+            y[i] = self.estimated_point_stamped.point.y + self.r_estimated * sin(theta[i])
+            z[i] = self.estimated_point_stamped.point.z + self.estimated_z_offset
+
+            yaw[i] = atan2((self.estimated_point_stamped.point.y - y[i]),
+                self.estimated_point_stamped.point.x - x[i])
+
+            temp_point = MultiDOFJointTrajectoryPoint()
+            temp_transform = Transform()
+            temp_transform.translation.x = x[i]
+            temp_transform.translation.y = y[i]
+            temp_transform.translation.z = z[i]
+
+            q_backwards = tf.transformations.quaternion_from_euler(0, 0, yaw[i], 'rxyz')
+
+            temp_transform.rotation.x = q_backwards[0]
+            temp_transform.rotation.y = q_backwards[1]
+            temp_transform.rotation.z = q_backwards[2]
+            temp_transform.rotation.w = q_backwards[3]
+            temp_point.transforms.append(temp_transform)
+
+            self.trajectoryPoints.points.append(temp_point)
+
 
     def modifyTrajectory(self):
         dist = []

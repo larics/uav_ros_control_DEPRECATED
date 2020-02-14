@@ -1,3 +1,4 @@
+string                              type
 float32                             desired_height
 float32                             x_size
 float32                             y_size
@@ -5,5 +6,6 @@ float32                             x_offset
 float32                             y_offset
 float32                             x_takeOff
 float32                             y_takeOff
+geometry_msgs/PointStamped          estimated_point
 ---
 bool                                success
