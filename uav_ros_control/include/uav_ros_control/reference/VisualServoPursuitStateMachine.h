@@ -385,6 +385,12 @@ void updateState()
     // 1
     // If visual servo is inactive, deactivate state machine
     // Visual servo can be inactive in state OFF and SEARCH.
+    if(_currentState == PursuitState::OFF && _lastState == PursuitState::UAV_FOLLOWING){
+        ROS_WARN("PursuitSM::updateStatus - Sleep for 5 secs.");
+        ros::Duration(5.0).sleep();
+        ros::spinOnce();
+    }
+    _lastState = _currentState;
     if (_currentState != PursuitState::OFF && !_pursuitActivated && !_interceptionActivated)
     {
         ROS_WARN("PursuitSM::updateStatus - Visual servo is inactive.");
@@ -524,16 +530,16 @@ void publishVisualServoSetpoint(double dt)
 {
     switch (_currentState)
     {
-        case PursuitState::OFF :
-            _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
-            _currVisualServoFeed.y = _currOdom.pose.pose.position.y;
-            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
-            _currVisualServoFeed.yaw = util::calculateYaw(
-                _currOdom.pose.pose.orientation.x,
-                _currOdom.pose.pose.orientation.y,
-                _currOdom.pose.pose.orientation.z,
-                _currOdom.pose.pose.orientation.w);
-            break;
+        // case PursuitState::OFF :
+        //     _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
+        //     _currVisualServoFeed.y = _currOdom.pose.pose.position.y;
+        //     _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
+        //     _currVisualServoFeed.yaw = util::calculateYaw(
+        //         _currOdom.pose.pose.orientation.x,
+        //         _currOdom.pose.pose.orientation.y,
+        //         _currOdom.pose.pose.orientation.z,
+        //         _currOdom.pose.pose.orientation.w);
+        //     break;
         
         case PursuitState::UAV_FOLLOWING : 
             _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
@@ -641,7 +647,7 @@ private:
     /* Service Pursuit */
 	ros::ServiceServer _servicePursuit;
     bool _pursuitActivated = false;
-    PursuitState _currentState = PursuitState::OFF;
+    PursuitState _currentState = PursuitState::OFF, _lastState = PursuitState::OFF;
     
     /* Client for calling visual servo and search trajectory */
     ros::ServiceClient _vsClienCaller, _searchTrajectoryClientCaller, _interceptionTrajectoryClientCaller;
