@@ -499,7 +499,7 @@ bool subscribedTopicsActive()
     double dt_centLocal = currentTime - _timeLastCentroidLocal;
     double dt_yaw = currentTime - _timeLastYawError;
     
-    static constexpr double MAX_DT = 0.1;
+    static constexpr double MAX_DT = 0.5;
     ROS_FATAL_COND(dt_odom > MAX_DT,        "VSSM - odometry timeout reached.");
     ROS_FATAL_COND(dt_contour > MAX_DT,     "VSSM - contour timeout reached.");
     ROS_FATAL_COND(dt_centGlobal > MAX_DT,  "VSSM - centroid global timeout reached.");

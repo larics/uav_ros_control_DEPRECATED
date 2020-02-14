@@ -159,6 +159,7 @@ void update_state(const ros::TimerEvent& /* unused */)
 
       // Update both dropoff and brick pickup global position with current relative height
       ros::Duration(m_pickupConfig->getData().after_pickup_sleep).sleep();
+      ros::spinOnce();
       m_currentStatus.m_dropoffPos.z() = m_handlerOdometry.getData().pose.pose.position.z;
       m_currentStatus.m_localBrick.z() = m_handlerOdometry.getData().pose.pose.position.z;
 

@@ -403,6 +403,15 @@ void VisualServo::targetCentroidCb(const geometry_msgs::PointStamped &msg)
     _targetCentroid.point.z = transformedTarget.getZ();
 }
 
+static double signum (double val) {
+  if (val >= 0) {
+    return 1;
+  }
+  else {
+    return -1;
+  }
+}
+
 void VisualServo::updateSetpoint() {
 
   double move_forward = 0.0;
@@ -417,17 +426,59 @@ void VisualServo::updateSetpoint() {
   if (_targetCentroid.point.x != -1 
       && _targetCentroid.point.y != -1
       && _targetCentroid.point.z != -1) {
-    _setpointPosition[0] = _uavPos[0] + move_forward;
-    _setpointPosition[1] = _uavPos[1] + move_left;
+
+    // Do some basic rate limiter
+    const double newSetpoint_0 = _uavPos[0] + move_forward;
+    const double newSetpoint_1 = _uavPos[1] + move_left;
+
+    static constexpr double RATE_LIMIT = 0.35;
+    static constexpr double DT = 0.02;
+
+    double rate_0 = fabs(newSetpoint_0 - _setpointPosition[0]) / DT;
+    double rate_1 = fabs(newSetpoint_1 - _setpointPosition[1]) / DT;  
+    
+    if (rate_0 > RATE_LIMIT) {
+      _setpointPosition[0] = _setpointPosition[0] + signum(newSetpoint_0 - _setpointPosition[0]) * RATE_LIMIT * DT;
+      rate_0 = RATE_LIMIT;
+    }
+    else {
+      _setpointPosition[0] = newSetpoint_0;
+    }
+
+    if (rate_1 > RATE_LIMIT ) {
+      rate_1 = RATE_LIMIT;
+      _setpointPosition[1] = _setpointPosition[1] + signum(newSetpoint_1 - _setpointPosition[1]) * RATE_LIMIT * DT;
+    }
+    else {
+      _setpointPosition[1] = newSetpoint_1;
+    }
+
+    _moveLeftMsg.data = rate_0;
+    _changeYawMsg.data = rate_1;
+
+    //_setpointPosition[0] = _uavPos[0] + move_forward;
+    //_setpointPosition[1] = _uavPos[1] + move_left;
+  } 
+  else {
+    _setpointPosition[0] = _uavPos[0];
+    _setpointPosition[1] = _uavPos[1];
+
+    double rate_0 = 0;
+    double rate_1 = 0;
+
+    _moveLeftMsg.data = rate_0;
+    _changeYawMsg.data = rate_1;
   }
+
+
   _setpointPosition[2] = _uavPos[2];
   _setpointYaw = _uavYaw + change_yaw;
 
   _floatMsg.data = change_yaw;
   _pubChangeYawDebug.publish(_floatMsg);
   
-  _moveLeftMsg.data = move_left;
-  _changeYawMsg.data = change_yaw;
+  //_moveLeftMsg.data = move_left;
+  //_changeYawMsg.data = change_yaw;
   _moveForwardMsg.data = move_forward;
 
   _pubMoveLeft.publish(_moveLeftMsg);

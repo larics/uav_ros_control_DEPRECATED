@@ -133,6 +133,16 @@ generateLinearTrajectory_topp(const double x, const double y, const double z,
 
   tf2::Quaternion q = getHeadingQuaternion(
     odom.pose.pose.position.x,odom.pose.pose.position.y, x, y);
+
+  trajectory.points.push_back(
+    toTrajectoryPointMsg(
+      odom.pose.pose.position.x,
+      odom.pose.pose.position.y,
+      odom.pose.pose.position.z,
+      q.getX(), q.getY(), q.getZ(), q.getW()
+    )
+  );
+
   trajectory.points.push_back(
     toTrajectoryPointMsg(x, y, z, q.getX(), q.getY(), q.getZ(), q.getW())
   );

@@ -6,5 +6,5 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
 
     auto masterPickup = std::make_shared<uav_sm::MasterPickupControl>(nh);
-    ros::spin();
+    masterPickup->run(nh);
 }
