@@ -75,6 +75,8 @@ class Tfm_Aprox():
         self.direction_estimation_data_size = 10
         self.direction_estimation_min_time_diff = 0.3
 
+        self.num_of_estimated_pts = 500
+
         self.z_offset = 0.0
         self.publish_goal_setpoint = False
         self.goal_setpoint = PoseStamped()
@@ -627,7 +629,7 @@ class Tfm_Aprox():
 
         #generiranje tocnih tocki lemniskate u 2D
 
-        t_points = np.linspace(0, 2 * pi, 500)
+        t_points = np.linspace(0, 2 * pi, self.num_of_estimated_pts)
         self.x_l=[]
         self.y_l=[]
         for t in t_points:
