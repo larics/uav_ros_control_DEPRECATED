@@ -288,17 +288,10 @@ class RequestSearchTrajectory():
             else:
                 delta = yaw[i-1] - yaw[i]
 
-            if (i == 0):
-                if (delta > pi):
-                    yaw[0] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
-                elif (delta < -pi):
-                    yaw[0] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
-            else:
-                if (delta > pi):
-                    yaw[i] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
-                elif (delta < -pi):
-                    yaw[i] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
-
+            if (delta > pi):
+                yaw[i] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+            elif (delta < -pi):
+                yaw[i] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
 
             temp_point = MultiDOFJointTrajectoryPoint()
             temp_transform = Transform()
@@ -338,14 +331,8 @@ class RequestSearchTrajectory():
 
         if (temp_yaw[idx[0]] < temp_yaw[idx[1]]):
             self.startInTrajectoryIdx = idx[0]
-            print "prvi"
-            print(idx[0])
-            print(self.line_array[idx[0]])
         else:
             self.startInTrajectoryIdx = idx[1]
-            print "drugi"            
-            print(idx[1])
-            print(self.line_array[idx[1]])
 
         print(self.startInTrajectoryIdx)
         print(self.line_array[self.startInTrajectoryIdx])
@@ -355,6 +342,18 @@ class RequestSearchTrajectory():
 
 
         for i in range(self.startInTrajectoryIdx, 2*self.numPoints):
+
+            if (i == self.startInTrajectoryIdx):
+                delta = self.yaw_starting - self.line_array[i][3]
+            else:
+                delta = self.line_array[i-1][3] - self.line_array[i][3]
+
+            if (delta > pi):
+                self.line_array[i][3] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+            elif (delta < -pi):
+                self.line_array[i][3] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+
+
             temp_point = MultiDOFJointTrajectoryPoint()
             temp_transform = Transform()
             temp_transform.translation.x = self.line_array[i][0]
