@@ -5,6 +5,7 @@ pursuit:
     uav_distance_offset: 7.0
     ball_distance_offset: 5.0
     z_offset: 0.0
+    yaw_deadzone: 0.0
 
     search:
       desired_height: 10.0

@@ -16,6 +16,7 @@
 #include <std_srvs/Empty.h>
 #include <std_msgs/Bool.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PointStamped.h>
 #include <dynamic_reconfigure/server.h>
 #include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
@@ -35,6 +36,7 @@ typedef uav_ros_control::VisualServoPursuitParametersConfig pursuit_param_t;
 #define PARAM_BALL_DISTANCE_OFFSET      "pursuit/state_machine/ball_distance_offset"
 #define INVALID_DISTANCE -1
 #define PARAM_Z_OFFSET                  "pursuit/state_machine/z_offset"
+#define PARAM_YAW_ERROR_DEADZONE        "pursuit/state_machine/yaw_deadzone"
 #define PARAM_ARENA_X_SIZE              "pursuit/state_machine/search/x_size"
 #define PARAM_ARENA_Y_SIZE              "pursuit/state_machine/search/y_size"
 #define PARAM_ARENA_X_OFFSET            "pursuit/state_machine/search/x_offset"
@@ -88,6 +90,7 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _subBALLPursuitConfident = nh.subscribe("/red_ball/confident", 1, &uav_reference::PursuitStateMachine::ballConfidentCb, this);
     /* Figure 8 estimator*/
     _subInterceptionPoint = nh.subscribe("target_uav/setpoint_estimated", 1, &uav_reference::PursuitStateMachine::figureEstimatorCb, this);
+    _subCurrentEstimatedTargetPoint = nh.subscribe("/red/target_uav/position_estimated", 1, &uav_reference::PursuitStateMachine::currentEstimatedTargetPointCb, this);
     _subToppStatus = nh.subscribe("topp/status", 1, &uav_reference::PursuitStateMachine::toppStatusCb, this);
 
 
@@ -169,6 +172,11 @@ void figureEstimatorCb(geometry_msgs::PoseStamped msg){
     _interceptionPoint.pose.position.z += _interceptionZOffset;
     _interceptionActivated = true;
 }
+void currentEstimatedTargetPointCb(geometry_msgs::PointStamped msg){
+    _currentEstimatedTargetPoint = msg;
+    _searchEstimated = true;
+
+}
 
 void toppStatusCb(std_msgs::Bool msg){
     _toppStatus = msg;
@@ -220,6 +228,7 @@ void pursuitParamCb(pursuit_param_t& configMsg,uint32_t level)
     _y_takeOff = configMsg.y_takeOff;
     _search_height = configMsg.desired_height;
     _interceptionZOffset = configMsg.interception_z_offset;
+    _yawDeadZoneThreshold = configMsg.yaw_deadzone;
 }
 
 void setPursuitParameters(pursuit_param_t& config)
@@ -236,6 +245,7 @@ void setPursuitParameters(pursuit_param_t& config)
     config.y_takeOff = _y_takeOff;
     config.desired_height = _search_height;
     config.interception_z_offset = _interceptionZOffset;
+    config.yaw_deadzone = _yawDeadZoneThreshold;
 }
 
 void initializeParameters(ros::NodeHandle& nh)
@@ -251,7 +261,8 @@ void initializeParameters(ros::NodeHandle& nh)
     && nh.getParam(PARAM_X_TAKEOFF, _x_takeOff)
     && nh.getParam(PARAM_Y_TAKEOFF, _y_takeOff)
     && nh.getParam(PARAM_SEARCH_HEIGHT, _search_height)
-    && nh.getParam(PARAM_INTERCEPTION_Z_OFFSET, _interceptionZOffset);
+    && nh.getParam(PARAM_INTERCEPTION_Z_OFFSET, _interceptionZOffset)
+    && nh.getParam(PARAM_YAW_ERROR_DEADZONE, _yawDeadZoneThreshold);
     // TODO: Load all the yaml parameters here 
     // Tip: Define parameter name at the top of the file
 
@@ -270,6 +281,15 @@ void initializeParameters(ros::NodeHandle& nh)
 void requestSearchTrajectory(){
     ROS_INFO("PursuitSM::update status - requesting search trajectory.");
     uav_ros_control::GenerateSearch srv;
+
+    if (_searchEstimated){
+        ROS_FATAL("PursuitSM::updateStatus - ESTIMATED saerch requested.");
+        srv.request.type = "estimated";
+    }
+    else{
+        ROS_FATAL("PursuitSM::updateStatus - SCAN saerch requested.");
+        srv.request.type = "scan";
+    }
     srv.request.desired_height = _search_height;
     srv.request.x_size = _arena_x_size;
     srv.request.y_size = _arena_y_size;
@@ -277,6 +297,7 @@ void requestSearchTrajectory(){
     srv.request.y_offset = _arena_y_offset;
     srv.request.x_takeOff = _x_takeOff;
     srv.request.y_takeOff = _y_takeOff;
+    srv.request.estimated_point = _currentEstimatedTargetPoint;
 
     if(!_searchTrajectoryClientCaller.call(srv)){
         ROS_FATAL("PursuitSM::updateStatus - search trajectory not generated.");
@@ -565,6 +586,14 @@ void publishErrors(){
         msg.data = _currHeightReference;
         _pubZError.publish(msg);
 
+        // Deadzone for error
+        if (abs(_currYawReference) < _yawDeadZoneThreshold){
+            _currYawReference = 0;
+        }
+        else{
+            _currYawReference -= _yawDeadZoneThreshold; 
+        }
+
         msg.data = _currYawReference;
         _pubYawError.publish(msg);
     }
@@ -644,8 +673,10 @@ private:
     ros::Subscriber _subUAVDistanceConfident;
 
     /* Interception subscribers*/
-    ros::Subscriber _subInterceptionPoint;
+    ros::Subscriber _subInterceptionPoint, _subCurrentEstimatedTargetPoint;
     float _interceptionZOffset;
+    bool _searchEstimated = false;
+    geometry_msgs::PointStamped _currentEstimatedTargetPoint;
 
     /* Pose publisher */
     ros::Publisher _pubVisualServoFeed;
@@ -659,7 +690,7 @@ private:
     double _currDistanceReference, _currHeightReference, _currYawReference;
     bool _start_following_uav = false, _isDetectionActive = false, _kf_distance_active = false;
     float _uav_distance_offset, _ball_distance_offset;
-    float _uav_z_offset;
+    float _uav_z_offset, _yawDeadZoneThreshold;
     ros::Time _time_last_detection_msg;
     float _maxDistanceReference = 15.0;
     float _arena_x_size, _arena_y_size, _arena_x_offset, _arena_y_offset;
