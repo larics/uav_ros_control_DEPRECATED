@@ -6,7 +6,7 @@ import copy, time
 import rospy
 import numpy as np
 import tf
-from math import pi, sqrt, sin, cos, atan2
+from math import pi, sqrt, sin, cos, atan2, floor, ceil, fabs
 from nav_msgs.msg import Odometry
 from uav_ros_control.srv import GenerateSearch, GenerateSearchResponse
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
@@ -41,7 +41,7 @@ class RequestSearchTrajectory():
         self.z_default = 10.0
         self.estimated_point_stamped = PointStamped()
         self.r_estimated = 4.0
-        self.num_of_circle_points = 360
+        self.num_of_circle_points = 20
         self.estimated_z_offset = 3.0
 
         # Define arena dimensions
@@ -152,13 +152,12 @@ class RequestSearchTrajectory():
         temp_transform.translation.y = self.odom_msg.pose.pose.position.y
         temp_transform.translation.z = self.odom_msg.pose.pose.position.z
 
-        yaw_start = tf.transformations.euler_from_quaternion(
+        self.yaw_starting = tf.transformations.euler_from_quaternion(
             [self.odom_msg.pose.pose.orientation.x, 
             self.odom_msg.pose.pose.orientation.y,
             self.odom_msg.pose.pose.orientation.z,
             self.odom_msg.pose.pose.orientation.w])[2]
 
-        print yaw_start
 
         temp_transform.rotation.x = self.odom_msg.pose.pose.orientation.x
         temp_transform.rotation.y = self.odom_msg.pose.pose.orientation.y
@@ -281,6 +280,26 @@ class RequestSearchTrajectory():
             yaw[i] = atan2((self.estimated_point_stamped.point.y - y[i]),
                 self.estimated_point_stamped.point.x - x[i])
 
+
+        for i in range (self.num_of_circle_points):
+
+            if (i == 0):
+                delta = self.yaw_starting - yaw[i]
+            else:
+                delta = yaw[i-1] - yaw[i]
+
+            if (i == 0):
+                if (delta > pi):
+                    yaw[0] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+                elif (delta < -pi):
+                    yaw[0] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+            else:
+                if (delta > pi):
+                    yaw[i] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+                elif (delta < -pi):
+                    yaw[i] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+
+
             temp_point = MultiDOFJointTrajectoryPoint()
             temp_transform = Transform()
             temp_transform.translation.x = x[i]
@@ -296,7 +315,6 @@ class RequestSearchTrajectory():
             temp_point.transforms.append(temp_transform)
 
             self.trajectoryPoints.points.append(temp_point)
-
 
     def modifyTrajectory(self):
         dist = []
