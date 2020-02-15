@@ -5,7 +5,7 @@ import rospy
 from geometry_msgs.msg import PointStamped, PoseStamped, PoseArray, Pose
 from uav_object_tracking.msg import object
 from sensor_msgs.msg import CameraInfo
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Bool
 from nav_msgs.msg import Odometry, Path
 import math
 import numpy as np
@@ -76,7 +76,7 @@ class Tfm_Aprox():
         self.direction_estimation_min_time_diff = 0.3
 
         self.z_offset = 0.0
-        self.publish_goal_setpoint = False
+        self.estimator_state = False
         self.goal_setpoint = PoseStamped()
 
         self.goal_x_l = 0.0
@@ -130,6 +130,9 @@ class Tfm_Aprox():
 
     def set_path_coord_publisher(self, publisher):
         self.path_coord_publisher = publisher
+
+    def set_estimator_state_publisher(self, publisher):
+        self.estimator_state_publisher = publisher
 
     def find_min_time_diff_data(self, data, time_s):
         min_value = 0.0
@@ -321,7 +324,7 @@ class Tfm_Aprox():
                 uav_position.point.y = Tworld_uav1[1,3]
                 uav_position.point.z = Tworld_uav1[2,3]
 
-                if (not self.publish_goal_setpoint):
+                if (not self.estimator_state):
                     self.estimatefigure8(uav_position)
 
                 if (self.hausdorff_counter > self.num_of_pts_hausdorff):
@@ -331,70 +334,69 @@ class Tfm_Aprox():
                     self.hausdorff_counter = 0
                     print(self.hausdorff, self.hausdorff/self.a, 'hausdorff')
 
+                    #gledamo s 1/4 pi prema 3/4 pi
+                    direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
 
-                    if (self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.publish_goal_setpoint):
-                        #gledamo s 1/4 pi prema 3/4 pi
-                        direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
+                    self.goal_x_l = 0.0
+                    self.goal_y_l = 0.0
+                    self.goal_z_l = 0.0
 
-                        self.goal_x_l = 0.0
-                        self.goal_y_l = 0.0
-                        self.goal_z_l = 0.0
+                    self.target_x_l = 0.0
+                    self.target_y_l = 0.0
+                    self.target_z_l = 0.0
 
-                        self.target_x_l = 0.0
-                        self.target_y_l = 0.0
-                        self.target_z_l = 0.0
+                    if (direction < 0.0):
+                        t = 1.0 * pi / 4.0
+                    else:
+                        t = 3.0 * pi / 4.0
 
-                        if (direction < 0.0):
-                            t = 1.0 * pi / 4.0
-                        else:
-                            t = 3.0 * pi / 4.0
+                    self.goal_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
+                    self.goal_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
 
-                        self.goal_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
-                        self.goal_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
+                    if (direction < 0.0):
+                        t = 3.0 * pi / 4.0
+                    else:
+                        t = 1.0 * pi / 4.0
+                        
+                    self.target_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
+                    self.target_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
 
-                        if (direction < 0.0):
-                            t = 3.0 * pi / 4.0
-                        else:
-                            t = 1.0 * pi / 4.0
-                            
-                        self.target_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
-                        self.target_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
+                    pp = np.asarray(self.p)
+                    T = self.get_transform(pp)
 
-                        pp = np.asarray(self.p)
-                        T = self.get_transform(pp)
+                    p_in = np.asarray([[self.goal_x_l], [self.goal_y_l], [self.goal_z_l], [1]])
+                    p_out = np.dot(T, p_in)
+                    self.goal_x_g = p_out[0]
+                    self.goal_y_g = p_out[1]
+                    self.goal_z_g = p_out[2]
 
-                        p_in = np.asarray([[self.goal_x_l], [self.goal_y_l], [self.goal_z_l], [1]])
-                        p_out = np.dot(T, p_in)
-                        self.goal_x_g = p_out[0]
-                        self.goal_y_g = p_out[1]
-                        self.goal_z_g = p_out[2]
+                    p_in = np.asarray([[self.target_x_l], [self.target_y_l], [self.target_z_l], [1]])
+                    p_out = np.dot(T, p_in)
+                    self.target_x_g = p_out[0]
+                    self.target_y_g = p_out[1]
+                    self.target_z_g = p_out[2]
 
-                        p_in = np.asarray([[self.target_x_l], [self.target_y_l], [self.target_z_l], [1]])
-                        p_out = np.dot(T, p_in)
-                        self.target_x_g = p_out[0]
-                        self.target_y_g = p_out[1]
-                        self.target_z_g = p_out[2]
+                    self.goal_setpoint.header.stamp = rospy.get_rostime()
+                    self.goal_setpoint.header.frame_id = "world"
+                    self.goal_setpoint.pose.position.x = self.goal_x_g
+                    self.goal_setpoint.pose.position.y = self.goal_y_g
+                    self.goal_setpoint.pose.position.z = self.goal_z_g + self.z_offset
 
-                        self.publish_goal_setpoint = True
-                        self.goal_setpoint.header.stamp = rospy.get_rostime()
-                        self.goal_setpoint.header.frame_id = "world"
-                        self.goal_setpoint.pose.position.x = self.goal_x_g
-                        self.goal_setpoint.pose.position.y = self.goal_y_g
-                        self.goal_setpoint.pose.position.z = self.goal_z_g + self.z_offset
+                    dx = self.target_x_g - self.goal_x_g
+                    dy = self.target_y_g - self.goal_y_g
+                    yaw = math.atan2(dy, dx)
 
-                        dx = self.target_x_g - self.goal_x_g
-                        dy = self.target_y_g - self.goal_y_g
-                        yaw = math.atan2(dy, dx)
+                    euler = [0.0, 0.0, yaw]
+                    quaternion = self.euler2quaternion(euler)
 
-                        euler = [0.0, 0.0, yaw]
-                        quaternion = self.euler2quaternion(euler)
+                    self.goal_setpoint.pose.orientation.x = quaternion[1]
+                    self.goal_setpoint.pose.orientation.y = quaternion[2]
+                    self.goal_setpoint.pose.orientation.z = quaternion[3]
+                    self.goal_setpoint.pose.orientation.w = quaternion[0]
 
-                        print yaw
 
-                        self.goal_setpoint.pose.orientation.x = quaternion[1]
-                        self.goal_setpoint.pose.orientation.y = quaternion[2]
-                        self.goal_setpoint.pose.orientation.z = quaternion[3]
-                        self.goal_setpoint.pose.orientation.w = quaternion[0]
+                    if (self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.estimator_state):
+                        self.estimator_state = True
                         
                         #self.plot()
 
@@ -402,8 +404,11 @@ class Tfm_Aprox():
 
                 self.new_distance_data = False
 
-            if (self.publish_goal_setpoint):
-                    self.uav_setpoint_publisher.publish(self.goal_setpoint)
+            self.uav_setpoint_publisher.publish(self.goal_setpoint)
+
+            estimator_state_msg = Bool()
+            estimator_state_msg.data = self.estimator_state
+            self.estimator_state_publisher.publish(estimator_state_msg)
 
             # plot publish
             self.path_g = Path()
@@ -558,7 +563,6 @@ class Tfm_Aprox():
         self.hausdorff_counter = 0
 
         self.hausdorff = -1.0
-        self.publish_goal_setpoint = False
 
     def plot_callback(self, req):
         self.plot()
@@ -656,7 +660,7 @@ if __name__ == '__main__':
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
     rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
 
-    rospy.Subscriber('/red/mavros/global_position/local', Odometry, figure8.odometry_callback)
+    rospy.Subscriber('/mavros/global_position/local', Odometry, figure8.odometry_callback)
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
     rospy.Service('plot', Empty, figure8.plot_callback)
@@ -666,6 +670,7 @@ if __name__ == '__main__':
 
     estimated_figure_pub = rospy.Publisher('/red/figure8_estimated', Path, queue_size=1)
     received_points_pub = rospy.Publisher('/red/figure8_received', Path, queue_size=1)
+    estimator_state_pub = rospy.Publisher('/red/figure8_state', Bool, queue_size=1)
 
 
 
@@ -673,6 +678,7 @@ if __name__ == '__main__':
     figure8.set_uav_setpoint_publisher(uav_setpoint)
     figure8.set_path_g_publisher(estimated_figure_pub)
     figure8.set_path_coord_publisher(received_points_pub)
+    figure8.set_estimator_state_publisher(estimator_state_pub)
 
 
     figure8.run(50)
