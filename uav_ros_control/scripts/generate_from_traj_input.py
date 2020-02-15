@@ -81,7 +81,7 @@ class TrajectoryPointPublisher:
             # constraints are added only on the first waypoint since the
             # TOPP-RA reads them only from there.
             if i==0:
-                waypoint.velocities = [1, 1, 1, 1] 
+                waypoint.velocities = [1, 1, 1, 0.5] 
                 waypoint.accelerations = [0.25, 0.25, 0.5, 0.75]
 
             # Append all waypoints in request
@@ -165,7 +165,7 @@ class TrajectoryPointPublisher:
             if not self.trajectory.points:
                 print("TrajectoryPointPublisher - No trajectory available")
                 self.publish_trajectory_status(False)
-                #rospy.sleep(0.5)
+                rospy.sleep(0.01)
                 continue
             if not self.publish_trajectory:
                 print("TrajectoryPointPublisher - Do not have a permission to publish trajectory.")

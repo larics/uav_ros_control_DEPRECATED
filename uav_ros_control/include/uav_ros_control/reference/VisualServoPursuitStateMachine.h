@@ -49,6 +49,7 @@ typedef uav_ros_control::VisualServoPursuitParametersConfig pursuit_param_t;
 
 enum PursuitState {
     OFF,
+    SETTLE,
     SEARCH,
     UAV_FOLLOWING,
     INTERCEPTION,
@@ -384,40 +385,42 @@ void turnOffVisualServo()
 
 void updateState()
 {
-    // TODO: DO state machine logic here
     checkDetection();
-
-    // 1
     // If visual servo is inactive, deactivate state machine
     // Visual servo can be inactive in state OFF and SEARCH.
-    if(_currentState == PursuitState::OFF && _lastState == PursuitState::UAV_FOLLOWING){
-        ROS_WARN("PursuitSM::updateStatus - Sleep for 5 secs.");
-        ros::Duration(5.0).sleep();
-        ros::spinOnce();
-    }
-    _lastState = _currentState;
     if (_currentState != PursuitState::OFF && !_pursuitActivated && !_interceptionActivated)
     {
         ROS_WARN("PursuitSM::updateStatus - Visual servo is inactive.");
         _currentState = PursuitState::OFF;
+        _settleTime = 0;
         turnOffVisualServo();
         _searchTrajectoryFlag.data = false;
         _inferenceEnabled.data = true;
         ROS_WARN("PursuitSM::updateStatus - OFF State activated.");
         return;
     }
+
     // Request search trajectory
-    if (_currentState == PursuitState::OFF && (!_start_following_uav | !_isDetectionActive) && _pursuitActivated){
+    if (_currentState == PursuitState::OFF && (!_start_following_uav || !_isDetectionActive) && _pursuitActivated){
         ROS_WARN("PursuitSM::updateStatus - SEARCH state activated.");
         turnOffVisualServo();
         _currentState = PursuitState::SEARCH;
         _searchTrajectoryFlag.data = true;
         _inferenceEnabled.data = true;
-        requestSearchTrajectory();
+
         return;
     }
+
+    if (_currentState == PursuitState::SEARCH && (!_start_following_uav || !_isDetectionActive) && _pursuitActivated){
+        if (!_toppStatus.data){
+            requestSearchTrajectory();
+            ros::Duration(0.5).sleep();
+        }
+        return;
+    }
+
     // Activate Pursuit algorithm when detection is confident.
-    if ((_currentState == PursuitState::OFF | _currentState == PursuitState::SEARCH ) && _start_following_uav && _isDetectionActive && _pursuitActivated)
+    if ((_currentState == PursuitState::OFF || _currentState == PursuitState::SEARCH || _currentState == PursuitState::SETTLE) && _start_following_uav && _isDetectionActive && _pursuitActivated)
     {
         ROS_INFO("PursuitSM::updateStatus - Starting visual servo for UAV following.");
         _currentState = PursuitState::UAV_FOLLOWING;
@@ -456,10 +459,21 @@ void updateState()
         ROS_WARN_COND(!_isDetectionActive, "PursuitSM::condition - detection is inactive.");
 
         turnOffVisualServo();
-        _currentState = PursuitState::OFF;
+        _currentState = PursuitState::SETTLE;
+        _settleTime = 0;
         _inferenceEnabled.data = true;
         //requestSearchTrajectory();
-        ROS_WARN("PursuitSM::updateStatus - OFF State activated.");
+        ROS_WARN("PursuitSM::updateStatus - SETTLE State activated.");
+        return;
+    }
+
+    if (_currentState == PursuitState::SETTLE){
+        _settleTime += 1/_rate;
+        if (_settleTime >= _searchTimeOut){
+            _currentState = PursuitState::OFF;
+            ROS_WARN("PursuitSM::updateStatus - Settle timeout exceeded. Transition to OFF state.");
+            _settleTime = 0.0;
+        }
         return;
     }
 
@@ -535,16 +549,16 @@ void publishVisualServoSetpoint(double dt)
 {
     switch (_currentState)
     {
-        // case PursuitState::OFF :
-        //     _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
-        //     _currVisualServoFeed.y = _currOdom.pose.pose.position.y;
-        //     _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
-        //     _currVisualServoFeed.yaw = util::calculateYaw(
-        //         _currOdom.pose.pose.orientation.x,
-        //         _currOdom.pose.pose.orientation.y,
-        //         _currOdom.pose.pose.orientation.z,
-        //         _currOdom.pose.pose.orientation.w);
-        //     break;
+        case PursuitState::OFF :
+            _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
+            _currVisualServoFeed.y = _currOdom.pose.pose.position.y;
+            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
+            _currVisualServoFeed.yaw = util::calculateYaw(
+                _currOdom.pose.pose.orientation.x,
+                _currOdom.pose.pose.orientation.y,
+                _currOdom.pose.pose.orientation.z,
+                _currOdom.pose.pose.orientation.w);
+            break;
         
         case PursuitState::UAV_FOLLOWING : 
             _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
@@ -709,6 +723,7 @@ private:
     // Interception
     geometry_msgs::PoseStamped _interceptionPoint;
     bool _interceptionActivated = false;
+    double _settleTime, _searchTimeOut = 5.0;
 
     /* Define Dynamic Reconfigure parameters */
     boost::recursive_mutex _pursuitConfigMutex;
