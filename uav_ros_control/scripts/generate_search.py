@@ -6,11 +6,11 @@ import copy, time
 import rospy
 import numpy as np
 import tf
-from math import pi
+from math import pi, sqrt, sin, cos, atan2, floor, ceil, fabs
 from nav_msgs.msg import Odometry
 from uav_ros_control.srv import GenerateSearch, GenerateSearchResponse
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
-from geometry_msgs.msg import Transform, Twist
+from geometry_msgs.msg import Transform, Twist, PointStamped
 
 # from uav_search.msg import *
 # from uav_search.srv import *
@@ -74,6 +74,9 @@ class RequestSearchTrajectory():
         self.y_size = req.y_size
         self.x_offset = req.x_offset
         self.y_offset = req.y_offset
+        self.x_takeOff = req.x_takeOff
+        self.y_takeOff = req.y_takeOff
+        self.scan_yaw_offset_deg = req.yaw_offset
 
         # Takeo Off point
         self.takeOffPoint = MultiDOFJointTrajectoryPoint()
@@ -92,6 +95,7 @@ class RequestSearchTrajectory():
             self.trajectory_pub.publish(self.trajectoryPoints)
             self.odom_flag = False
             res.success = True
+            print "GenerateSearch - Points generated"
         else:
             print "GenerateSearch - Odometry unavailable."
             res.success = False
@@ -128,7 +132,7 @@ class RequestSearchTrajectory():
         temp_transform.translation.y = self.odom_msg.pose.pose.position.y
         temp_transform.translation.z = self.odom_msg.pose.pose.position.z
 
-        yaw_start = tf.transformations.euler_from_quaternion(
+        self.yaw_starting = tf.transformations.euler_from_quaternion(
             [self.odom_msg.pose.pose.orientation.x, 
             self.odom_msg.pose.pose.orientation.y,
             self.odom_msg.pose.pose.orientation.z,
@@ -140,12 +144,6 @@ class RequestSearchTrajectory():
         temp_transform.rotation.w = self.odom_msg.pose.pose.orientation.w
 
         self.starting_point.transforms.append(temp_transform)
-        # print " staring point:"
-        # print(self.starting_point)
-        # print "yaw"
-        # print(yaw_start)
-        # My point
-        # self.trajectoryPoints.points.append(self.starting_point)
 
     def getToCenter(self):
 
@@ -167,10 +165,10 @@ class RequestSearchTrajectory():
     def generateLine(self):
         if (self.x_size > self.y_size):
             temp_x = np.linspace(self.takeOffPoint.transforms[0].translation.x + self.x_offset, self.takeOffPoint.transforms[0].translation.x + (self.x_size-self.x_offset), self.numPoints)
-            temp_y = [0.0]*len(temp_x)
+            temp_y = [self.y_takeOff]*len(temp_x)
         elif (self.y_size > self.x_size):
             temp_y = np.linspace(self.takeOffPoint.transforms[0].translation.y + self.y_offset, self.takeOffPoint.transforms[0].translation.y + (self.y_size-self.y_offset), self.numPoints)
-            temp_x = [0.0]*len(temp_y)        
+            temp_x = [self.x_takeOff]*len(temp_y)
 
         temp_z = [self.z_default]*len(temp_x)
         temp_yaw = [0]*len(temp_x)
@@ -191,41 +189,54 @@ class RequestSearchTrajectory():
         dist = []
         temp_yaw = []
 
+        # Align with arena orientation
+        theta = np.radians(self.scan_yaw_offset_deg)
+        c, s = np.cos(theta), np.sin(theta)
+        R = np.array(((c, -s), (s, c)))
+
+        for i in range(len(self.line_array)):
+            self.line_array[i][3] += self.scan_yaw_offset_deg * pi / 180
+            self.line_array[i][:2] = (R.dot(self.line_array[i][:2].reshape(2,1))).flatten()
+
+        # Get current yaw
         yaw_start = tf.transformations.euler_from_quaternion(
             [self.odom_msg.pose.pose.orientation.x, 
             self.odom_msg.pose.pose.orientation.y,
             self.odom_msg.pose.pose.orientation.z,
             self.odom_msg.pose.pose.orientation.w])[2]
-        print(yaw_start)
 
         # Compare current position and orientation with points in line_array
         for i in range(0,len(self.line_array)):
             dist.append(np.linalg.norm(self.line_array[i][:2]-[self.starting_point.transforms[0].translation.x, self.starting_point.transforms[0].translation.y]))
             temp_yaw.append(pi-abs(abs(yaw_start -self.line_array[i][3])-pi))
 
-
+        # Index of two nearest points in line array with opposite orientation
         idx = np.argpartition(dist, 2)
         print(temp_yaw[idx[0]], temp_yaw[idx[1]])
 
+        # Select one point with an orientation closer to the current yaw
         if (temp_yaw[idx[0]] < temp_yaw[idx[1]]):
             self.startInTrajectoryIdx = idx[0]
-            print "prvi"
-            print(idx[0])
-            print(self.line_array[idx[0]])
         else:
             self.startInTrajectoryIdx = idx[1]
-            print "drugi"            
-            print(idx[1])
-            print(self.line_array[idx[1]])
-
-        print(self.startInTrajectoryIdx)
-        print(self.line_array[self.startInTrajectoryIdx])
 
         # Add my position
-        # self.trajectoryPoints.points.append(self.starting_point)
+        self.trajectoryPoints.points.append(self.starting_point)
 
 
         for i in range(self.startInTrajectoryIdx, 2*self.numPoints):
+
+            if (i == self.startInTrajectoryIdx):
+                delta = self.yaw_starting - self.line_array[i][3]
+            else:
+                delta = self.line_array[i-1][3] - self.line_array[i][3]
+
+            if (delta > pi):
+                self.line_array[i][3] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+            elif (delta < -pi):
+                self.line_array[i][3] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+
+
             temp_point = MultiDOFJointTrajectoryPoint()
             temp_transform = Transform()
             temp_transform.translation.x = self.line_array[i][0]

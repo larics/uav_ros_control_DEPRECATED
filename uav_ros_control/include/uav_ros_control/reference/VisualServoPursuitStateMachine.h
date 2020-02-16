@@ -38,6 +38,7 @@ typedef uav_ros_control::VisualServoPursuitParametersConfig pursuit_param_t;
 #define PARAM_ARENA_Y_SIZE              "pursuit/state_machine/search/y_size"
 #define PARAM_ARENA_X_OFFSET            "pursuit/state_machine/search/x_offset"
 #define PARAM_ARENA_Y_OFFSET            "pursuit/state_machine/search/y_offset"
+#define PARAM_ARENA_YAW_OFFSET          "pursuit/state_machine/search/yaw_offset"
 #define PARAM_SEARCH_HEIGHT             "pursuit/state_machine/search/desired_height"
 #define PARAM_X_TAKEOFF                 "pursuit/state_machine/search/x_takeOff"
 #define PARAM_Y_TAKEOFF                 "pursuit/state_machine/search/y_takeOff"
@@ -192,6 +193,7 @@ void pursuitParamCb(pursuit_param_t& configMsg,uint32_t level)
     _arena_y_size = configMsg.arena_y_size;
     _arena_x_offset = configMsg.arena_x_offset;
     _arena_y_offset = configMsg.arena_y_offset;
+    _arena_yaw_offset = configMsg.arena_yaw_offset;
     _x_takeOff = configMsg.x_takeOff;
     _y_takeOff = configMsg.y_takeOff;
     _search_height = configMsg.desired_height;
@@ -207,6 +209,7 @@ void setPursuitParameters(pursuit_param_t& config)
     config.arena_y_size = _arena_y_size;
     config.arena_x_offset = _arena_x_offset;
     config.arena_y_offset = _arena_y_offset;
+    config.arena_yaw_offset = _arena_yaw_offset;
     config.x_takeOff = _x_takeOff;
     config.y_takeOff = _y_takeOff;
     config.desired_height = _search_height;
@@ -221,7 +224,8 @@ void initializeParameters(ros::NodeHandle& nh)
     && nh.getParam(PARAM_ARENA_X_SIZE, _arena_x_size)
     && nh.getParam(PARAM_ARENA_Y_SIZE, _arena_y_size)
     && nh.getParam(PARAM_ARENA_X_OFFSET, _arena_x_offset)
-    && nh.getParam(PARAM_ARENA_X_OFFSET, _arena_y_offset)
+    && nh.getParam(PARAM_ARENA_Y_OFFSET, _arena_y_offset)
+    && nh.getParam(PARAM_ARENA_YAW_OFFSET, _arena_yaw_offset)
     && nh.getParam(PARAM_X_TAKEOFF, _x_takeOff)
     && nh.getParam(PARAM_Y_TAKEOFF, _y_takeOff)
     && nh.getParam(PARAM_SEARCH_HEIGHT, _search_height);
@@ -244,6 +248,7 @@ void requestSearchTrajectory(){
     srv.request.y_size = _arena_y_size;
     srv.request.x_offset = _arena_x_offset;
     srv.request.y_offset = _arena_y_offset;
+    srv.request.yaw_offset = _arena_yaw_offset;
     srv.request.x_takeOff = _x_takeOff;
     srv.request.y_takeOff = _y_takeOff;
 
@@ -572,7 +577,7 @@ private:
     float _uav_z_offset;
     ros::Time _time_last_detection_msg;
     float _maxDistanceReference = 15.0;
-    float _arena_x_size, _arena_y_size, _arena_x_offset, _arena_y_offset;
+    float _arena_x_size, _arena_y_size, _arena_x_offset, _arena_y_offset, _arena_yaw_offset;
     double _x_takeOff, _y_takeOff, _search_height;
 
     /* Define Dynamic Reconfigure parameters */

@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
     dynamic_reconfigure
     sensor_msgs
 	mav_msgs
+	geometry_msgs
 	trajectory_msgs
 	message_generation
 	tf)
@@ -29,7 +30,8 @@ add_service_files(
   GenerateSearch.srv
 )
 
-generate_messages(DEPENDENCIES std_msgs)
+generate_messages(DEPENDENCIES std_msgs geometry_msgs)
+
 
 catkin_package(
 	INCLUDE_DIRS include

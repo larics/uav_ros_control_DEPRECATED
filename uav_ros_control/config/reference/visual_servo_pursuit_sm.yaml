@@ -12,5 +12,6 @@ pursuit:
       y_size: 40.0
       x_offset: 0.0
       y_offset: 0.0
+      yaw_offset: 0.0
       x_takeOff: 0.0
       y_takeOff: 0.0
