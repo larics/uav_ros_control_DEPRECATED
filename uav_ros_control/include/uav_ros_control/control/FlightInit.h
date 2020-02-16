@@ -167,7 +167,7 @@ bool healthyNumberOfPublishers()
 {
     ROS_FATAL_COND(!m_subOdometry.getNumPublishers() > 0, "IF - 'mavros odometry' topic publisher missing");
     ROS_FATAL_COND(!m_subState.getNumPublishers() > 0, "IF - 'mavros state' topic publisher missing");
-		ROS_FATAL_COND(!m_subCartographerPose.getNumPublishers() > 0, "IF - 'cartographer pose' topic publisher missing");
+    ROS_FATAL_COND(!m_subCartographerPose.getNumPublishers() > 0, "IF - 'cartographer pose' topic publisher missing");
 
     return m_subOdometry.getNumPublishers() > 0 
       && 	m_subState.getNumPublishers() > 0
@@ -184,16 +184,14 @@ bool all_services_available()
   ROS_FATAL_COND(!m_armingClient.exists(), "FI - arming service does not exist.");
   ROS_FATAL_COND(!m_setModeClient.exists(), "FI - set mode service does not exist.");
   ROS_FATAL_COND(!m_takeoffClient.exists(), "FI - takeoff service does not exist.");
-	ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
-	ROS_FATAL_COND(!m_initializeMsfScaleClient.exists(), "FI - msf scale service does not exist.");
-	ROS_FATAL_COND(!m_planTrajectoryClient.exists(), "FI - multi_dof_trajectory does not exist.");
+  //ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
+  //ROS_FATAL_COND(!m_initializeMsfScaleClient.exists(), "FI - msf scale service does not exist.");
+  //ROS_FATAL_COND(!m_planTrajectoryClient.exists(), "FI - multi_dof_trajectory does not exist.");
 
   return m_armingClient.exists() 
     && m_setModeClient.exists()
     && m_takeoffClient.exists()
-		&& m_initializeMsfHeightClient.exists()
-		&& m_initializeMsfScaleClient.exists()
-		&& m_planTrajectoryClient.exists();
+    && m_planTrajectoryClient.exists();
 }
 
 void fiParamCb(fi_param_t& configMsg,uint32_t level)
@@ -451,15 +449,15 @@ void generateWaypoints(
 	// CIRCLE around UAV
 	for (double angle = 0; angle < m_executeTrajectoryNum * 360; angle += angle_inc)
 	{
-		ROS_INFO("for");
 		m_point.x = m_current_position.x + 
 			(m_radiusInit * cos(angle * DEGTORAD));
 		m_point.y = m_current_position.y + 
 			(m_radiusInit * sin(angle * DEGTORAD));
-		m_point.z = m_takeoffHeight;
+		m_point.z = m_currentOdom.pose.pose.position.z;
 		m_vectorWaypoints.push_back(m_point);
 	}
-	std::cout << "vector:" << m_vectorWaypoints.size() << std::endl;
+	std::cout << "vector:" << m_vectorWaypoints.size() << std::endl;	
+	
  }
 
 double quaternion2Yaw(geometry_msgs::Quaternion quaternion)
@@ -658,7 +656,7 @@ dynamic_reconfigure::Server<fi_param_t>
 dynamic_reconfigure::Server<fi_param_t>::CallbackType m_fiParamCallback;
 
 static constexpr double ARM_DURATION = 3.0;
-static constexpr double TAKEOFF_DURATION = 15.0;
+static constexpr double TAKEOFF_DURATION = 30.0;
 };
 
 }
