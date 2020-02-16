@@ -109,6 +109,7 @@ MasterPickupControl(ros::NodeHandle& t_nh) :
   m_handlerPatchCount(t_nh, "n_contours"),
   m_handlerBrickGlobalStatus(t_nh, "global_pickup/status"),
   m_handlerTrajectoryStatus(t_nh, "topp/status"),
+  m_handlerTrajectoryPoint(t_nh, "carrot/trajectory"),
   m_globalToLocal(t_nh),
   m_currentState(MasterPickupStates::OFF)
 {
@@ -476,17 +477,7 @@ void generate_search_trajectory()
 
   trajectory_msgs::MultiDOFJointTrajectory searchtrajectory;
   searchtrajectory.header.stamp = ros::Time::now();
-  searchtrajectory.points.push_back(
-    traj_gen::toTrajectoryPointMsg(
-      m_handlerOdometry.getData().pose.pose.position.x,
-      m_handlerOdometry.getData().pose.pose.position.y,
-      m_handlerOdometry.getData().pose.pose.position.z,
-      m_handlerOdometry.getData().pose.pose.orientation.x,
-      m_handlerOdometry.getData().pose.pose.orientation.y,
-      m_handlerOdometry.getData().pose.pose.orientation.z,
-      m_handlerOdometry.getData().pose.pose.orientation.w
-    )
-  );
+  searchtrajectory.points.push_back(m_handlerTrajectoryPoint.getData());
 
   for (std::size_t i = 0; 
       i < pointsResponse.response.data.size(); 
@@ -507,7 +498,7 @@ void generate_search_trajectory()
       newX_rot, newY_rot
     );
 
-    // Quick hack
+    // Quick hack for quaternion
     searchtrajectory.points.push_back(
       traj_gen::toTrajectoryPointMsg(
         searchtrajectory.points.back().transforms[0].translation.x,
@@ -517,6 +508,7 @@ void generate_search_trajectory()
       )
     );
 
+    // Quick hack
     searchtrajectory.points.push_back(
       traj_gen::toTrajectoryPointMsg(
         newX_rot, newY_rot, m_masterConfig->getData().search_height,
@@ -663,6 +655,7 @@ TopicHandler<nav_msgs::Odometry> m_handlerOdometry;
 TopicHandler<std_msgs::Int32> m_handlerPatchCount;
 TopicHandler<std_msgs::Int32> m_handlerBrickGlobalStatus;
 TopicHandler<std_msgs::Bool> m_handlerTrajectoryStatus;
+TopicHandler<trajectory_msgs::MultiDOFJointTrajectoryPoint> m_handlerTrajectoryPoint;
 };
 
 }

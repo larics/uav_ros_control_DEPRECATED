@@ -205,6 +205,9 @@ bool brickPickupServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool
     }
 
     // Try calling visual servo
+    ros::spinOnce();
+    publishVisualServoSetpoint(1.0 / _rate);
+    
     std_srvs::SetBool::Request req;
     std_srvs::SetBool::Response resp;
     req.data = true;
@@ -232,6 +235,8 @@ bool brickPickupServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool
     response.message = "Visual servo failed to start - brick pickup inactive.";
     _brickPickupActivated = false;
 
+    ros::spinOnce();
+    ros::spinOnce();
     return true;
 }
 

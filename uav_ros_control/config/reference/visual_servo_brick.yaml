@@ -3,11 +3,12 @@ visual_servo:
   compensate_roll_and_pitch: true
   compensate_camera_nonlinearity: true
   yaw_added_offset: 1.57
-
+  rate_limit: 0.15
+  
   camera:
     position:
       x: 0.0
-      y: 0.21
+      y: 0.2
       z: -0.3
     orientation:
       x: 1
@@ -17,7 +18,7 @@ visual_servo:
 
   pid_x:
     x_armed:  true
-    kp:  0.5
+    kp:  1
     ki:  0.0
     kd:  0
     lim_low: -0.75
@@ -26,7 +27,7 @@ visual_servo:
 
   pid_y:
     y_armed:  true
-    kp:  0.5
+    kp:  1
     ki:  0.0
     kd:  0
     lim_low: -0.75

@@ -65,6 +65,8 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
   bool initialized = 
     nh.getParam("visual_servo/compensate_roll_and_pitch", _compensate_roll_and_pitch) &&
     nh.getParam("visual_servo/yaw_added_offset", _yawAddedOffset) &&
+    nh.getParam("visual_servo/rate_limit", _rateLimit) &&
+
     nh.getParam("visual_servo/pid_x/x_armed", x_armed) &&
     nh.getParam("visual_servo/pid_y/y_armed", y_armed) &&
     nh.getParam("visual_servo/pid_z/z_armed", z_armed) &&
@@ -150,6 +152,7 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     cfg.deadzone_yaw = _deadzone_yaw;
   }
 
+  cfg.rate_limit = _rateLimit;
   cfg.compensate_roll_and_pitch = _compensate_roll_and_pitch;
   cfg.yaw_added_offset = _yawAddedOffset;
   cfg.camera_x = _cameraPose.position.x;
@@ -245,7 +248,8 @@ void VisualServo::visualServoParamsCb(uav_ros_control::VisualServoParametersConf
   _cameraPose.orientation.x = configMsg.camera_qx;
   _cameraPose.orientation.y = configMsg.camera_qy;
   _cameraPose.orientation.z = configMsg.camera_qz;
-  _cameraPose.orientation.w = configMsg.camera_qw;  
+  _cameraPose.orientation.w = configMsg.camera_qw;
+  _rateLimit = configMsg.rate_limit;
 }
 
 void VisualServo::odomCb(const nav_msgs::OdometryConstPtr& odom) {
@@ -431,23 +435,22 @@ void VisualServo::updateSetpoint() {
     const double newSetpoint_0 = _uavPos[0] + move_forward;
     const double newSetpoint_1 = _uavPos[1] + move_left;
 
-    static constexpr double RATE_LIMIT = 0.35;
     static constexpr double DT = 0.02;
 
     double rate_0 = fabs(newSetpoint_0 - _setpointPosition[0]) / DT;
     double rate_1 = fabs(newSetpoint_1 - _setpointPosition[1]) / DT;  
     
-    if (rate_0 > RATE_LIMIT) {
-      _setpointPosition[0] = _setpointPosition[0] + signum(newSetpoint_0 - _setpointPosition[0]) * RATE_LIMIT * DT;
-      rate_0 = RATE_LIMIT;
+    if (rate_0 > _rateLimit) {
+      rate_0 = _rateLimit;
+      _setpointPosition[0] = _setpointPosition[0] + signum(newSetpoint_0 - _setpointPosition[0]) * _rateLimit * DT;
     }
     else {
       _setpointPosition[0] = newSetpoint_0;
     }
 
-    if (rate_1 > RATE_LIMIT ) {
-      rate_1 = RATE_LIMIT;
-      _setpointPosition[1] = _setpointPosition[1] + signum(newSetpoint_1 - _setpointPosition[1]) * RATE_LIMIT * DT;
+    if (rate_1 > _rateLimit ) {
+      rate_1 = _rateLimit;
+      _setpointPosition[1] = _setpointPosition[1] + signum(newSetpoint_1 - _setpointPosition[1]) * _rateLimit * DT;
     }
     else {
       _setpointPosition[1] = newSetpoint_1;

@@ -80,6 +80,8 @@ GlobalPickupStateMachine(ros::NodeHandle& t_nh) :
     m_handlerOdometry(t_nh, "odometry"),
     m_handlerBrickAttached(t_nh, "brick_attached"),
     m_handlerTrajectoryStatus(t_nh, "topp/status"),
+    m_handlerCurrentTrajectory(t_nh, "carrot/trajectory"),
+    m_handlerPatchCount(t_nh, "n_contours"),
     m_global2Local(t_nh) 
 {
   initialize_parameters(t_nh);
@@ -141,6 +143,7 @@ void update_state(const ros::TimerEvent& /* unused */)
 
   if (m_currentStatus.isSearching() 
        && getCurrentVisualServoState() == LocalPickupState::OFF
+       && m_handlerPatchCount.getData().data > 0 // THere are some patches visible, so activation is possible
        && toggle_visual_servo_state_machine(true)) {
     ROS_WARN("BrickPickup::update_state - ATTEMPT_PICKUP activated");
     m_currentStatus.m_status = GlobalPickupStates::ATTEMPT_PICKUP;
@@ -194,6 +197,7 @@ void update_state(const ros::TimerEvent& /* unused */)
 
 void publish_trajectory(const ros::TimerEvent& /* unused */) 
 {  
+  ros::spinOnce();
   if (m_currentStatus.isSearching() && !is_trajectory_active()) {    
     ROS_INFO("BrickPickup - generating SEARCH trajectory with radius: %.3f.", m_searchRadius);
     m_pubTrajGen.publish(
@@ -201,7 +205,7 @@ void publish_trajectory(const ros::TimerEvent& /* unused */)
         m_currentStatus.m_localBrick.x(),
         m_currentStatus.m_localBrick.y(),
         m_currentStatus.m_localBrick.z(),
-        m_handlerOdometry.getData(),
+        m_handlerCurrentTrajectory.getData(),
         20, /* Number of points */
         m_searchRadius
       )
@@ -214,8 +218,10 @@ void publish_trajectory(const ros::TimerEvent& /* unused */)
     ROS_INFO("BrickPickup - generating APPROACH trajectory.");
     m_pubTrajGen.publish(
       uav_reference::traj_gen::generateLinearTrajectory_topp(
-        m_currentStatus.m_localBrick.x(), m_currentStatus.m_localBrick.y(),
-        m_currentStatus.m_localBrick.z(), m_handlerOdometry.getData()
+        m_currentStatus.m_localBrick.x(), 
+        m_currentStatus.m_localBrick.y(),
+        m_currentStatus.m_localBrick.z(), 
+        m_handlerCurrentTrajectory.getData()
       )
     ); 
     return;
@@ -225,8 +231,10 @@ void publish_trajectory(const ros::TimerEvent& /* unused */)
     ROS_INFO("BrickPickup - generating DROPOFF trajectory.");
     m_pubTrajGen.publish(
       uav_reference::traj_gen::generateLinearTrajectory_topp(
-        m_currentStatus.m_dropoffPos.x(), m_currentStatus.m_dropoffPos.y(),
-        m_currentStatus.m_dropoffPos.z(), m_handlerOdometry.getData()
+        m_currentStatus.m_dropoffPos.x(), 
+        m_currentStatus.m_dropoffPos.y(),
+        m_currentStatus.m_dropoffPos.z(), 
+        m_handlerCurrentTrajectory.getData()
       )
     );
   }
@@ -393,10 +401,11 @@ ros::ServiceClient m_vssmCaller, m_magnetOverrideOnCaller, m_magnetOverrideOffCa
 ros::NodeHandle m_nh;
 ros::Publisher m_pubTrajGen, m_pubGlobalPickupStatus;
 ros::Timer m_stateTimer, m_initFilterTimer, m_publishTrajectoryTimer;
-TopicHandler<std_msgs::Int32> m_handlerVSSMState;
+TopicHandler<std_msgs::Int32> m_handlerVSSMState, m_handlerPatchCount;
 TopicHandler<nav_msgs::Odometry> m_handlerOdometry;
 TopicHandler<std_msgs::Bool> m_handlerBrickAttached;
 TopicHandler<std_msgs::Bool> m_handlerTrajectoryStatus;
+TopicHandler<trajectory_msgs::MultiDOFJointTrajectoryPoint> m_handlerCurrentTrajectory;
 };
 }
 #endif
