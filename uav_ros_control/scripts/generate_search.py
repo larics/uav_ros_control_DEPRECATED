@@ -6,7 +6,7 @@ import copy, time
 import rospy
 import numpy as np
 import tf
-from math import pi, sqrt, sin, cos, atan2, floor, ceil, fabs
+from math import pi, sqrt, sin, cos, atan2, floor, ceil, fabs, radians
 from nav_msgs.msg import Odometry
 from uav_ros_control.srv import GenerateSearch, GenerateSearchResponse
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
@@ -89,7 +89,7 @@ class RequestSearchTrajectory():
 
         if self.odom_flag:
             self.getMyPosition()
-            self.generateLine()
+            self.generateTrajectory()
             self.modifyTrajectory()
 
             self.trajectory_pub.publish(self.trajectoryPoints)
@@ -162,28 +162,75 @@ class RequestSearchTrajectory():
 
         self.trajectoryPoints.points.append(temp_point)
 
-    def generateLine(self):
-        if (self.x_size > self.y_size):
-            temp_x = np.linspace(self.takeOffPoint.transforms[0].translation.x + self.x_offset, self.takeOffPoint.transforms[0].translation.x + (self.x_size-self.x_offset), self.numPoints)
-            temp_y = [self.y_takeOff]*len(temp_x)
-        elif (self.y_size > self.x_size):
-            temp_y = np.linspace(self.takeOffPoint.transforms[0].translation.y + self.y_offset, self.takeOffPoint.transforms[0].translation.y + (self.y_size-self.y_offset), self.numPoints)
-            temp_x = [self.x_takeOff]*len(temp_y)
+    def generateLine(self, x1, y1, x2, y2, desired_yaw, num_points):
+
+        temp_x = np.linspace(x1, x2, num_points)
+        temp_y = np.linspace(y1, y2, num_points)
+
+        # if (self.x_size > self.y_size):
+        #     temp_x = np.linspace(self.takeOffPoint.transforms[0].translation.x + self.x_offset, self.takeOffPoint.transforms[0].translation.x + (self.x_size-self.x_offset), self.numPoints)
+        #     temp_y = [self.y_takeOff]*len(temp_x)
+        # elif (self.y_size > self.x_size):
+        #     temp_y = np.linspace(self.takeOffPoint.transforms[0].translation.y + self.y_offset, self.takeOffPoint.transforms[0].translation.y + (self.y_size-self.y_offset), self.numPoints)
+        #     temp_x = [self.x_takeOff]*len(temp_y)
 
         temp_z = [self.z_default]*len(temp_x)
-        temp_yaw = [0]*len(temp_x)
+        temp_yaw = [desired_yaw]*len(temp_x)
 
-        self.line_array = np.zeros((2*self.numPoints, 4))
+        line_array = np.zeros((num_points, 4))
 
         for i in range(0, len(temp_x)):
             # self.line_arrayp[i][0] = temp_x[i]
-            self.line_array[i][:]= np.array([temp_x[i], temp_y[i], temp_z[i], temp_yaw[i]])
+            line_array[i][:]= np.array([temp_x[i], temp_y[i], temp_z[i], temp_yaw[i]])
 
-        temp_yaw = [pi]*len(temp_x)
+        return line_array
 
-        # Backwards
-        for i in range(0, len(temp_x)):
-            self.line_array[i+self.numPoints][:]= np.array([temp_x[-i-1], temp_y[-i-1], temp_z[-i-1], temp_yaw[i]])
+    def generateTrajectory(self):
+        """ Generate a double rectangular search trajectory.
+        The rectangle has the dimensions num_ponts x num_points / 2. """
+
+        self.trajectory_size = 3 * self.numPoints
+
+        self.trajectory = np.zeros((self.trajectory_size, 4))
+
+        takeoff_point = self.takeOffPoint.transforms[0].translation
+
+        # Move along x axis
+        line1 = self.generateLine(takeoff_point.x + self.x_offset, takeoff_point.y + self.y_offset,
+                     takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_offset,
+                     0,
+                     self.numPoints)
+
+        # Turn and move along y axis
+        line2 = self.generateLine(takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_offset,
+                     takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
+                     radians(90),  # Todo check this out, together with the other angles
+                     self.numPoints / 2)
+
+        # Turn and return along the x axis
+        line3 = self.generateLine(takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
+                     takeoff_point.x + self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
+                     pi,
+                     self.numPoints)
+
+        # Turn and return along the y axis
+        line4 = self.generateLine(takeoff_point.x + self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
+                     takeoff_point.x + self.x_offset, takeoff_point.y + self.y_offset,
+                     radians(-90),
+                     self.numPoints / 2)
+
+        for i in range(self.numPoints):
+            self.trajectory[i][:] = line1[i][:]
+
+        for i in range(self.numPoints / 2):
+            self.trajectory[i + self.numPoints][:] = line2[i][:]
+
+        for i in range(self.numPoints):
+            self.trajectory[i + int(1.5*self.numPoints)][:] = line3[i][:]
+
+        for i in range(self.numPoints / 2):
+            self.trajectory[i + int(2.5*self.numPoints)][:] = line4[i][:]
+
 
     def modifyTrajectory(self):
         dist = []
@@ -194,9 +241,9 @@ class RequestSearchTrajectory():
         c, s = np.cos(theta), np.sin(theta)
         R = np.array(((c, -s), (s, c)))
 
-        for i in range(len(self.line_array)):
-            self.line_array[i][3] += self.scan_yaw_offset_deg * pi / 180
-            self.line_array[i][:2] = (R.dot(self.line_array[i][:2].reshape(2,1))).flatten()
+        for i in range(len(self.trajectory)):
+            self.trajectory[i][3] += self.scan_yaw_offset_deg * pi / 180
+            self.trajectory[i][:2] = (R.dot(self.trajectory[i][:2].reshape(2,1))).flatten()
 
         # Get current yaw
         yaw_start = tf.transformations.euler_from_quaternion(
@@ -205,10 +252,10 @@ class RequestSearchTrajectory():
             self.odom_msg.pose.pose.orientation.z,
             self.odom_msg.pose.pose.orientation.w])[2]
 
-        # Compare current position and orientation with points in line_array
-        for i in range(0,len(self.line_array)):
-            dist.append(np.linalg.norm(self.line_array[i][:2]-[self.starting_point.transforms[0].translation.x, self.starting_point.transforms[0].translation.y]))
-            temp_yaw.append(pi-abs(abs(yaw_start -self.line_array[i][3])-pi))
+        # Compare current position and orientation with points in trajectory
+        for i in range(0,len(self.trajectory)):
+            dist.append(np.linalg.norm(self.trajectory[i][:2]-[self.starting_point.transforms[0].translation.x, self.starting_point.transforms[0].translation.y]))
+            temp_yaw.append(pi-abs(abs(yaw_start -self.trajectory[i][3])-pi))
 
         # Index of two nearest points in line array with opposite orientation
         idx = np.argpartition(dist, 2)
@@ -224,26 +271,26 @@ class RequestSearchTrajectory():
         self.trajectoryPoints.points.append(self.starting_point)
 
 
-        for i in range(self.startInTrajectoryIdx, 2*self.numPoints):
+        for i in range(self.startInTrajectoryIdx, self.trajectory_size):
 
             if (i == self.startInTrajectoryIdx):
-                delta = self.yaw_starting - self.line_array[i][3]
+                delta = self.yaw_starting - self.trajectory[i][3]
             else:
-                delta = self.line_array[i-1][3] - self.line_array[i][3]
+                delta = self.trajectory[i-1][3] - self.trajectory[i][3]
 
             if (delta > pi):
-                self.line_array[i][3] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+                self.trajectory[i][3] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
             elif (delta < -pi):
-                self.line_array[i][3] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+                self.trajectory[i][3] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
 
 
             temp_point = MultiDOFJointTrajectoryPoint()
             temp_transform = Transform()
-            temp_transform.translation.x = self.line_array[i][0]
-            temp_transform.translation.y = self.line_array[i][1]
-            temp_transform.translation.z = self.line_array[i][2]
+            temp_transform.translation.x = self.trajectory[i][0]
+            temp_transform.translation.y = self.trajectory[i][1]
+            temp_transform.translation.z = self.trajectory[i][2]
 
-            q_backwards = tf.transformations.quaternion_from_euler(0, 0, self.line_array[i][3], 'rxyz')
+            q_backwards = tf.transformations.quaternion_from_euler(0, 0, self.trajectory[i][3], 'rxyz')
 
             temp_transform.rotation.x = q_backwards[0]
             temp_transform.rotation.y = q_backwards[1]
@@ -256,11 +303,11 @@ class RequestSearchTrajectory():
         for i in range(0, self.startInTrajectoryIdx):
             temp_point = MultiDOFJointTrajectoryPoint()
             temp_transform = Transform()
-            temp_transform.translation.x = self.line_array[i][0]
-            temp_transform.translation.y = self.line_array[i][1]
-            temp_transform.translation.z = self.line_array[i][2]
+            temp_transform.translation.x = self.trajectory[i][0]
+            temp_transform.translation.y = self.trajectory[i][1]
+            temp_transform.translation.z = self.trajectory[i][2]
 
-            q_backwards = tf.transformations.quaternion_from_euler(0, 0, self.line_array[i][3], 'rxyz')
+            q_backwards = tf.transformations.quaternion_from_euler(0, 0, self.trajectory[i][3], 'rxyz')
 
             temp_transform.rotation.x = q_backwards[0]
             temp_transform.rotation.y = q_backwards[1]
