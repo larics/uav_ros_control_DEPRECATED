@@ -42,6 +42,7 @@ typedef uav_ros_control::VisualServoPursuitParametersConfig pursuit_param_t;
 #define PARAM_SEARCH_HEIGHT             "pursuit/state_machine/search/desired_height"
 #define PARAM_X_TAKEOFF                 "pursuit/state_machine/search/x_takeOff"
 #define PARAM_Y_TAKEOFF                 "pursuit/state_machine/search/y_takeOff"
+#define PARAM_SEARCH_YAW                "pursuit/state_machine/search/uav_yaw"
 
 enum PursuitState {
     OFF,
@@ -197,6 +198,7 @@ void pursuitParamCb(pursuit_param_t& configMsg,uint32_t level)
     _x_takeOff = configMsg.x_takeOff;
     _y_takeOff = configMsg.y_takeOff;
     _search_height = configMsg.desired_height;
+    _search_uav_yaw = configMsg.uav_yaw;
 }
 
 void setPursuitParameters(pursuit_param_t& config)
@@ -213,6 +215,7 @@ void setPursuitParameters(pursuit_param_t& config)
     config.x_takeOff = _x_takeOff;
     config.y_takeOff = _y_takeOff;
     config.desired_height = _search_height;
+    config.uav_yaw = _search_uav_yaw;
 }
 
 void initializeParameters(ros::NodeHandle& nh)
@@ -228,6 +231,7 @@ void initializeParameters(ros::NodeHandle& nh)
     && nh.getParam(PARAM_ARENA_YAW_OFFSET, _arena_yaw_offset)
     && nh.getParam(PARAM_X_TAKEOFF, _x_takeOff)
     && nh.getParam(PARAM_Y_TAKEOFF, _y_takeOff)
+    && nh.getParam(PARAM_SEARCH_YAW, _search_uav_yaw)
     && nh.getParam(PARAM_SEARCH_HEIGHT, _search_height);
     // TODO: Load all the yaml parameters here 
     // Tip: Define parameter name at the top of the file
@@ -251,6 +255,7 @@ void requestSearchTrajectory(){
     srv.request.yaw_offset = _arena_yaw_offset;
     srv.request.x_takeOff = _x_takeOff;
     srv.request.y_takeOff = _y_takeOff;
+    srv.request.uav_yaw = _search_uav_yaw;
 
     if(!_searchTrajectoryClientCaller.call(srv)){
         ROS_FATAL("PursuitSM::updateStatus - search trajectory not generated.");
@@ -579,6 +584,7 @@ private:
     float _maxDistanceReference = 15.0;
     float _arena_x_size, _arena_y_size, _arena_x_offset, _arena_y_offset, _arena_yaw_offset;
     double _x_takeOff, _y_takeOff, _search_height;
+    double _search_uav_yaw;
 
     /* Define Dynamic Reconfigure parameters */
     boost::recursive_mutex _pursuitConfigMutex;

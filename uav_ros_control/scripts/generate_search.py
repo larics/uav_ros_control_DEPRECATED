@@ -77,6 +77,7 @@ class RequestSearchTrajectory():
         self.x_takeOff = req.x_takeOff
         self.y_takeOff = req.y_takeOff
         self.scan_yaw_offset_deg = req.yaw_offset
+        self.uav_yaw = req.uav_yaw  # uav yaw relative to trajectory
 
         # Takeo Off point
         self.takeOffPoint = MultiDOFJointTrajectoryPoint()
@@ -198,25 +199,25 @@ class RequestSearchTrajectory():
         # Move along x axis
         line1 = self.generateLine(takeoff_point.x + self.x_offset, takeoff_point.y + self.y_offset,
                      takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_offset,
-                     0,
+                     radians(0 + self.uav_yaw),
                      self.numPoints)
 
         # Turn and move along y axis
         line2 = self.generateLine(takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_offset,
                      takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
-                     radians(90),  # Todo check this out, together with the other angles
+                     radians(90 + self.uav_yaw),  # Todo check this out, together with the other angles
                      self.numPoints / 2)
 
         # Turn and return along the x axis
         line3 = self.generateLine(takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
                      takeoff_point.x + self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
-                     pi,
+                     radians(180 + self.uav_yaw),
                      self.numPoints)
 
         # Turn and return along the y axis
         line4 = self.generateLine(takeoff_point.x + self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
                      takeoff_point.x + self.x_offset, takeoff_point.y + self.y_offset,
-                     radians(-90),
+                     radians(-90 + self.uav_yaw),
                      self.numPoints / 2)
 
         for i in range(self.numPoints):
