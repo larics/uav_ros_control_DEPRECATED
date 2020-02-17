@@ -474,8 +474,8 @@ void VisualServo::updateSetpoint() {
   _floatMsg.data = change_yaw;
   _pubChangeYawDebug.publish(_floatMsg);
   
-  //_moveLeftMsg.data = move_left;
-  //_changeYawMsg.data = change_yaw;
+  _moveLeftMsg.data = move_left;
+  _changeYawMsg.data = change_yaw;
   _moveForwardMsg.data = move_forward;
 
   _pubMoveLeft.publish(_moveLeftMsg);
