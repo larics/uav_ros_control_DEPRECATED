@@ -24,6 +24,7 @@ class RequestSearchTrajectory():
 
         # Subscribers
         self.odom_sub = rospy.Subscriber("odom", Odometry, self.odom_cb)
+        self.carrot_reference_sub = rospy.Subscriber("carrot/trajectory", MultiDOFJointTrajectoryPoint, self.carrot_reference_cb)
 
         # Publishers
         self.trajectory_pub = rospy.Publisher("topp/input/trajectory", MultiDOFJointTrajectory, queue_size=1)
@@ -34,6 +35,8 @@ class RequestSearchTrajectory():
         # Odometry msg
         self.odom_msg = Odometry()
         self.odom_flag = False
+
+        self.carrot_reference = MultiDOFJointTrajectoryPoint()
 
         # Type of search [scan, estimated]
         self.type = "scan"
@@ -97,7 +100,7 @@ class RequestSearchTrajectory():
         if (self.type == "scan"):
 
             if self.odom_flag:
-                self.getMyPosition()
+                self.getMyPosition2()
                 self.generateLine()
                 self.modifyTrajectory()
 
@@ -111,7 +114,7 @@ class RequestSearchTrajectory():
 
         elif (self.type == "estimated"):
             if self.odom_flag:
-                self.getMyPosition()
+                # self.getMyPosition2()
                 self.getMidPoint()
                 self.getEstimatedPoint()
                 self.generateEstimatedSearch()
@@ -131,6 +134,9 @@ class RequestSearchTrajectory():
         self.odom_msg = msg
         self.odom_flag = True
 
+    def carrot_reference_cb(self, msg):
+        self.carrot_reference = msg
+
 
     # def start(self):
     #     # Starting point = odom
@@ -147,7 +153,9 @@ class RequestSearchTrajectory():
 
     def run(self):
         #  Waiting for service request
+        r = rospy.Rate(100)
         rospy.spin()
+        r.sleep()
 
 
     def getMyPosition(self):
@@ -170,6 +178,19 @@ class RequestSearchTrajectory():
         temp_transform.rotation.w = self.odom_msg.pose.pose.orientation.w
 
         self.starting_point.transforms.append(temp_transform)
+
+    def getMyPosition2(self):
+        self.starting_point = MultiDOFJointTrajectoryPoint()
+        self.starting_point = self.carrot_reference
+
+        self.yaw_starting = tf.transformations.euler_from_quaternion(
+            [self.starting_point.transforms[0].rotation.x, 
+            self.starting_point.transforms[0].rotation.y,
+            self.starting_point.transforms[0].rotation.z,
+            self.starting_point.transforms[0].rotation.w])[2]
+
+        print self.starting_point
+
 
     def getMidPoint(self):
         self.mid_point = MultiDOFJointTrajectoryPoint()
@@ -260,6 +281,7 @@ class RequestSearchTrajectory():
             self.line_array[i+self.numPoints][:]= np.array([temp_x[-i-1], temp_y[-i-1], temp_z[-i-1], temp_yaw[i]])
 
     def generateEstimatedSearch(self):
+        self.getMyPosition2()
         self.trajectoryPoints.points.append(self.starting_point)
         #self.trajectoryPoints.points.append(self.mid_point)
         #self.trajectoryPoints.points.append(self.estimated_point)
@@ -343,7 +365,12 @@ class RequestSearchTrajectory():
             self.startInTrajectoryIdx = idx[1]
 
         # Add my position
+        self.getMyPosition2()
         self.trajectoryPoints.points.append(self.starting_point)
+        self.trajectoryPoints.points.append(self.starting_point)
+        self.trajectoryPoints.points.append(self.starting_point)
+
+        print self.starting_point
 
 
         for i in range(self.startInTrajectoryIdx, 2*self.numPoints):
