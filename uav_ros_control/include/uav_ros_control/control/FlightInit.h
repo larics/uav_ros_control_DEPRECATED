@@ -181,19 +181,19 @@ bool stateMachineDisableConditions()
 
 bool all_services_available()
 {
-  ROS_FATAL_COND(!m_armingClient.exists(), "FI - arming service does not exist.");
-  ROS_FATAL_COND(!m_setModeClient.exists(), "FI - set mode service does not exist.");
-  ROS_FATAL_COND(!m_takeoffClient.exists(), "FI - takeoff service does not exist.");
-	ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
+    ROS_FATAL_COND(!m_armingClient.exists(), "FI - arming service does not exist.");
+    ROS_FATAL_COND(!m_setModeClient.exists(), "FI - set mode service does not exist.");
+    ROS_FATAL_COND(!m_takeoffClient.exists(), "FI - takeoff service does not exist.");
+    ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
 	ROS_FATAL_COND(!m_initializeMsfScaleClient.exists(), "FI - msf scale service does not exist.");
 	ROS_FATAL_COND(!m_planTrajectoryClient.exists(), "FI - multi_dof_trajectory does not exist.");
 
   return m_armingClient.exists() 
     && m_setModeClient.exists()
     && m_takeoffClient.exists()
-		&& m_initializeMsfHeightClient.exists()
-		&& m_initializeMsfScaleClient.exists()
-		&& m_planTrajectoryClient.exists();
+	&& m_initializeMsfHeightClient.exists()
+	&& m_initializeMsfScaleClient.exists()
+	&& m_planTrajectoryClient.exists();
 }
 
 void fiParamCb(fi_param_t& configMsg,uint32_t level)
@@ -258,12 +258,20 @@ void cartographerPoseCb(const geometry_msgs::PoseStampedPtr& msg)
 			if (ros::Time::now() - m_timer > ros::Duration(m_timeForInit))
 			{
 				// Enough time pass --> map is initialize 
-				ROS_INFO("Map initialized.");
-				m_ready.data = true;
-				m_mapInitializedFlag = true;
-				for (int i = 0; i < 5; i++)
-				{
-					m_pubReadyForExploration.publish(m_ready);	
+				double d = sqrt(pow(m_homeOdom.pose.pose.position.x
+					- m_currentOdom.pose.pose.position.x, 2)
+				+ pow(m_homeOdom.pose.pose.position.y
+					- m_currentOdom.pose.pose.position.y, 2)
+				+ pow(m_takeoffHeight
+					- m_currentOdom.pose.pose.position.z, 2));
+				ROS_INFO("Map initialized. %.2f", d);
+				if (d < 0.4) {
+					m_ready.data = true;
+					m_mapInitializedFlag = true;
+					for (int i = 0; i < 5; i++)
+					{
+						m_pubReadyForExploration.publish(m_ready);	
+					}
 				}
 			}
 		}
@@ -459,6 +467,10 @@ void generateWaypoints(
 		m_point.z = m_takeoffHeight;
 		m_vectorWaypoints.push_back(m_point);
 	}
+	m_point.x = m_current_position.x;
+	m_point.y = m_current_position.y;
+	m_point.z = m_takeoffHeight;
+	m_vectorWaypoints.push_back(m_point);
 	std::cout << "vector:" << m_vectorWaypoints.size() << std::endl;
  }
 
