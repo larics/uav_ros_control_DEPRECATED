@@ -367,9 +367,7 @@ class RequestSearchTrajectory():
         # Add my position
         self.getMyPosition2()
         self.trajectoryPoints.points.append(self.starting_point)
-        self.trajectoryPoints.points.append(self.starting_point)
-        self.trajectoryPoints.points.append(self.starting_point)
-
+        
         print self.starting_point
 
 
