@@ -109,6 +109,8 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _subVisualServoProcessValuesMsg =
       nh.subscribe("VisualServoProcessValueTopic", 1, &uav_reference::VisualServo::VisualServoProcessValuesCb, this);
 
+  _subCarrotTrajectory = nh.subscribe("carrot/trajectory", 1, &uav_reference::VisualServo::CarrotReferenceCb, this);
+
   // Setup dynamic reconfigure
   _VSParamCallback = boost::bind(&VisualServo::visualServoParamsCb, this, _1, _2);
   _VSConfigServer.setCallback(_VSParamCallback);
@@ -153,7 +155,9 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     nh.getParam("visual_servo/rate_limiters/height/rate_limiter_R", _HeightRateLimiter_R) &&
     nh.getParam("visual_servo/rate_limiters/height/rate_limiter_T", _HeightRateLimiter_T) &&
     nh.getParam("visual_servo/rate_limiters/yaw/rate_limiter_R", _YawRateLimiter_R) &&
-    nh.getParam("visual_servo/rate_limiters/yaw/rate_limiter_T", _YawRateLimiter_T);
+    nh.getParam("visual_servo/rate_limiters/yaw/rate_limiter_T", _YawRateLimiter_T) &&
+    nh.getParam("visual_servo/rate_limiters/main/rate_limiter_R", _SetpointRateLimiter_R) &&
+    nh.getParam("visual_servo/rate_limiters/main/rate_limiter_T", _SetpointRateLimiter_T);
   
   ROS_INFO_COND(_compensate_roll_and_pitch, "VS - Roll and pitch compensation is active");
   ROS_INFO("VS - camera FOV %.2f", _camera_fov);
@@ -227,6 +231,9 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
   cfg.yaw_R = _YawRateLimiter_R;
   cfg.yaw_T = _YawRateLimiter_T;
 
+  cfg.main_R = _SetpointRateLimiter_R;
+  cfg.main_T = _SetpointRateLimiter_T;
+
   cfg.camera_fov = _camera_fov;
   cfg.compensate_roll_and_pitch = _compensate_roll_and_pitch;
   cfg.yaw_added_offset = _yaw_added_offset;
@@ -254,6 +261,15 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
   MoveForwardRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, _DistanceRateLimiter_F, 0.0);
   MoveUpRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
   ChangeYawRateLimiter.init(_YawRateLimiter_T, _YawRateLimiter_R, -_YawRateLimiter_R, 0.0);
+
+  XRateLimiter.init(_SetpointRateLimiter_T, _SetpointRateLimiter_R, -_SetpointRateLimiter_R, 0.0);
+  XRateLimiter.initialCondition(_currCarrotReference.transforms[0].translation.x, _currCarrotReference.transforms[0].translation.x);
+  YRateLimiter.init(_SetpointRateLimiter_T, _SetpointRateLimiter_R, -_SetpointRateLimiter_R, 0.0);
+  YRateLimiter.initialCondition(_currCarrotReference.transforms[0].translation.y, _currCarrotReference.transforms[0].translation.y);
+  ZRateLimiter.init(_SetpointRateLimiter_T, _SetpointRateLimiter_R, -_SetpointRateLimiter_R, 0.0);
+  ZRateLimiter.initialCondition(_currCarrotReference.transforms[0].translation.z, _currCarrotReference.transforms[0].translation.z);
+
+
 
   ROS_INFO("Initializing rate limiters");
 
@@ -338,6 +354,9 @@ void VisualServo::visualServoParamsCb(uav_ros_control::VisualServoParametersConf
   _HeightRateLimiter_T = configMsg.height_T;
   _YawRateLimiter_R = configMsg.yaw_R;
   _YawRateLimiter_T = configMsg.yaw_T;
+
+  _SetpointRateLimiter_R = configMsg.main_R;
+  _SetpointRateLimiter_T = configMsg.main_T;
 }
 
 void VisualServo::odomCb(const nav_msgs::OdometryConstPtr& odom) {
@@ -354,6 +373,10 @@ void VisualServo::odomCb(const nav_msgs::OdometryConstPtr& odom) {
     _pubUavRollDebug.publish(_floatMsg);
     _floatMsg.data = _uavPitch;
     _pubUavPitchDebug.publish(_floatMsg);
+}
+
+void VisualServo::CarrotReferenceCb(const trajectory_msgs::MultiDOFJointTrajectoryPoint msg){
+  _currCarrotReference = msg;
 }
 
 void VisualServo::xErrorCb(const std_msgs::Float32 &data) {
@@ -462,6 +485,18 @@ void VisualServo::updateRateLimiters(){
   ChangeYawRateLimiter.setR(_YawRateLimiter_R);
   ChangeYawRateLimiter.setF(- _YawRateLimiter_R);
   ChangeYawRateLimiter.setSampleTime(_YawRateLimiter_T);
+
+  XRateLimiter.setR(_SetpointRateLimiter_R);
+  XRateLimiter.setF(- _SetpointRateLimiter_R);
+  XRateLimiter.setSampleTime(_SetpointRateLimiter_T);
+
+  YRateLimiter.setR(_SetpointRateLimiter_R);
+  YRateLimiter.setF(- _SetpointRateLimiter_R);
+  YRateLimiter.setSampleTime(_SetpointRateLimiter_T);
+
+  ZRateLimiter.setR(_SetpointRateLimiter_R);
+  ZRateLimiter.setF(- _SetpointRateLimiter_R);
+  ZRateLimiter.setSampleTime(_SetpointRateLimiter_T);
 }
 
 void VisualServo::updateSetpoint() {
@@ -472,6 +507,8 @@ void VisualServo::updateSetpoint() {
   double move_up_limited = 0.0;
   double change_yaw = 0.0;
   double change_yaw_limited = 0.0;
+
+  double _newXSetpoint = 0.0, _newYSetpoint = 0.0, _newZSetpoint = 0.0;
 
   if (!_x_frozen) move_left = _x_axis_PID.compute(_offset_x, _error_x, 1 / _rate);
   // PT1
@@ -484,8 +521,8 @@ void VisualServo::updateSetpoint() {
   if (!_y_frozen){
     move_forward  = _y_axis_PID.compute(_offset_y, _error_y, 1 / _rate);
 
-    MoveForwardRateLimiter.setInput(move_forward);
-    move_forward_limited = MoveForwardRateLimiter.getData();
+    // MoveForwardRateLimiter.setInput(move_forward);
+    // move_forward_limited = MoveForwardRateLimiter.getData();
   } 
 
   // if (!_z_frozen) move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
@@ -493,8 +530,8 @@ void VisualServo::updateSetpoint() {
   if (!_z_frozen){
     move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
 
-    MoveUpRateLimiter.setInput(move_up);
-    move_up_limited = MoveUpRateLimiter.getData();
+    // MoveUpRateLimiter.setInput(move_up);
+    // move_up_limited = MoveUpRateLimiter.getData();
   } 
 
   // if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
@@ -510,11 +547,27 @@ void VisualServo::updateSetpoint() {
   _floatMsg.data = change_yaw;
   _pubChangeYawDebug.publish(_floatMsg);
 
-  _setpointPosition[0] = _uavPos[0] + move_forward_limited * cos(_uavYaw + _yaw_added_offset);
-  _setpointPosition[0] -= move_left * sin(_uavYaw + _yaw_added_offset);
-  _setpointPosition[1] = _uavPos[1] + move_forward_limited * sin(_uavYaw + _yaw_added_offset);
-  _setpointPosition[1] += move_left * cos(_uavYaw + _yaw_added_offset);
-  _setpointPosition[2] = _uavPos[2] + move_up_limited;
+  _newXSetpoint = _uavPos[0] + move_forward * cos(_uavYaw + _yaw_added_offset) - move_left * sin(_uavYaw + _yaw_added_offset);
+  _newYSetpoint = _uavPos[1] + move_forward * sin(_uavYaw + _yaw_added_offset) + move_left * cos(_uavYaw + _yaw_added_offset);
+  _newZSetpoint = _uavPos[2] + move_up;
+
+  XRateLimiter.setInput(_newXSetpoint);
+  YRateLimiter.setInput(_newYSetpoint);
+  ZRateLimiter.setInput(_newZSetpoint);
+
+  // XRateLimiter.initialCondition(_newXSetpoint, _setpointPosition[0]);
+  // YRateLimiter.initialCondition(_newYSetpoint, _setpointPosition[1]);
+  // ZRateLimiter.initialCondition(_newZSetpoint, _setpointPosition[2]);
+
+  _setpointPosition[0] = XRateLimiter.getData();
+  _setpointPosition[1] = YRateLimiter.getData();
+  _setpointPosition[2] = ZRateLimiter.getData();
+
+  // _setpointPosition[0] = _uavPos[0] + move_forward_limited * cos(_uavYaw + _yaw_added_offset);
+  // _setpointPosition[0] -= move_left * sin(_uavYaw + _yaw_added_offset);
+  // _setpointPosition[1] = _uavPos[1] + move_forward_limited * sin(_uavYaw + _yaw_added_offset);
+  // _setpointPosition[1] += move_left * cos(_uavYaw + _yaw_added_offset);
+  // _setpointPosition[2] = _uavPos[2] + move_up_limited;
 
   _setpointYaw = _uavYaw + change_yaw_limited;
 

@@ -77,6 +77,8 @@ namespace uav_reference {
         * Odometry callback function for extracting the UAV's pose.
         */
       void odomCb(const nav_msgs::OdometryConstPtr&);
+      void CarrotReferenceCb(const trajectory_msgs::MultiDOFJointTrajectoryPoint msg);
+
 
       /**
        * Callback functions for the visual servo process values.
@@ -111,6 +113,8 @@ namespace uav_reference {
       float k = 0.0;
       double move_forward_old = 0.0;
 
+      trajectory_msgs::MultiDOFJointTrajectoryPoint _currCarrotReference;
+
       /** Publishers */
       ros::Publisher _pubNewSetpoint;
       trajectory_msgs::MultiDOFJointTrajectoryPoint _new_point;
@@ -132,7 +136,7 @@ namespace uav_reference {
       ros::Publisher _pubXError, _pubYError, _pubZError;
 
       /** Subscribers */
-      ros::Subscriber _subOdom, _subImu;
+      ros::Subscriber _subOdom, _subImu, _subCarrotTrajectory;
       ros::Subscriber _subXError, _subYError, _subZError, _subYawError, _subNContours;
       ros::Subscriber _subVisualServoProcessValuesMsg;
       ros::Subscriber _subXOffset, _subYOffset, _subZOffset;
@@ -156,6 +160,9 @@ namespace uav_reference {
       RateLimiter ChangeYawRateLimiter;
       float _YawRateLimiter_R, _YawRateLimiter_T;
       ros::Publisher _pubChangeYawLimited;
+
+      RateLimiter XRateLimiter, YRateLimiter, ZRateLimiter;
+      float _SetpointRateLimiter_T, _SetpointRateLimiter_R;
 
       std_msgs::Float32 _moveForwardLimitedMsg, _moveUpLimitedMsg, _changeYawLimitedMsg;
 
