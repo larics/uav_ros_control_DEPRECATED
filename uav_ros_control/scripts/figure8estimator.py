@@ -661,8 +661,9 @@ if __name__ == '__main__':
     rospy.Subscriber('/uav_object_tracking/uav/distance_kf_header', PointStamped, figure8.distance_callback)
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
     rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
+    # rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
 
-    rospy.Subscriber('/mavros/global_position/local', Odometry, figure8.odometry_callback)
+    rospy.Subscriber('/red/mavros/global_position/local', Odometry, figure8.odometry_callback)
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
     rospy.Service('plot', Empty, figure8.plot_callback)
