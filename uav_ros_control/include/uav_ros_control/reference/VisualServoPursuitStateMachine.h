@@ -435,7 +435,8 @@ void updateState()
     }
 
     // Activate Pursuit algorithm when detection is confident.
-    if ((_currentState == PursuitState::OFF || _currentState == PursuitState::SEARCH || _currentState == PursuitState::SETTLE) && _start_following_uav && _isDetectionActive && _pursuitActivated)
+    if ((_currentState == PursuitState::OFF || _currentState == PursuitState::SEARCH || _currentState == PursuitState::SETTLE)
+     && _start_following_uav && _isDetectionActive && _pursuitActivated && !_interceptionActivated)
     {
         ROS_INFO("PursuitSM::updateStatus - Starting visual servo for UAV following.");
         _currentState = PursuitState::UAV_FOLLOWING;
@@ -510,6 +511,15 @@ void updateState()
     }
 
     if (_currentState == PursuitState::UAV_FOLLOWING && _interceptionActivated){
+        ROS_WARN("PursuitSM::updateStatus - Going to SETTLE state to prepare for interception.");
+        turnOffVisualServo();
+        _settleTime = 0;
+        _currentState = PursuitState::SETTLE;
+        _pursuitActivated = false;
+        return;
+    }
+
+    if (_currentState == PursuitState::OFF && _interceptionActivated){
         ROS_WARN("PursuitSM::updateStatus - INTERCEPT state activated.");
         turnOffVisualServo();
         _currentState = PursuitState::INTERCEPTION;
@@ -545,19 +555,6 @@ void updateState()
 
         _inferenceEnabled.data = true;
         _followingStartTime += 1/_rate;
-
-        // if( _followingStartTime > 0.05){
-        // _currDistanceReference = _relativeUAVDistance;
-        // _currHeightReference = _relativeUAVHeight;
-        // _currYawReference = _relativeUAVYaw;
-
-        // }
-        // else{
-        //     _currDistanceReference = _uav_distance_offset;
-        //     _currHeightReference = 0;
-        //     _currYawReference = 0;
-
-        // }
 
         _currDistanceReference = _relativeUAVDistance;
         _currHeightReference = _relativeUAVHeight;
