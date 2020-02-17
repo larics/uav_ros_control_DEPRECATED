@@ -15,6 +15,7 @@
 #include <nav_msgs/Odometry.h>
 #include <uav_search/GetPoints.h>
 #include <std_msgs/Int32.h>
+#include <geometry_msgs/Vector3.h>
 #include <std_msgs/Bool.h>
 #include <uav_ros_control/MasterPickupStateMachineParametersConfig.h>
 
@@ -103,13 +104,13 @@ public:
 
 MasterPickupControl(ros::NodeHandle& t_nh) :
   m_handlerState(t_nh, "mavros/state"),
-  m_handlerGpsFix(t_nh, "mavros/global_position/global"),
   m_handlerCarrotStatus(t_nh, "carrot/status"),
   m_handlerOdometry(t_nh, "mavros/global_position/local"),
   m_handlerPatchCount(t_nh, "n_contours"),
   m_handlerBrickGlobalStatus(t_nh, "global_pickup/status"),
   m_handlerTrajectoryStatus(t_nh, "topp/status"),
   m_handlerTrajectoryPoint(t_nh, "carrot/trajectory"),
+  m_handlerBrickEnu(t_nh, "global_centroid_point"),
   m_globalToLocal(t_nh),
   m_currentState(MasterPickupStates::OFF)
 {
@@ -160,6 +161,11 @@ void run(ros::NodeHandle& t_nh)
 private:
 
 inline static void sleep_for(double duration) { ros::Duration(duration).sleep(); }
+inline bool valid_brick_position() { 
+  return m_handlerBrickEnu.getData().x != -1 
+    && m_handlerBrickEnu.getData().y != -1 
+    && m_handlerBrickEnu.getData().z != -1;
+}
 inline bool is_trajectory_active() { return m_handlerTrajectoryStatus.getData().data; }
 inline bool is_brick_visible() { return m_handlerPatchCount.getData().data > 0; }
 inline bool is_guided_active() { return m_handlerState.getData().mode == "GUIDED_NOGPS"; }
@@ -240,15 +246,21 @@ void run_internal()
   }
 
   // Check if we see any bricks
-  if (in_search_state() && !m_challengeInfo.isBrickLocationSet() && is_brick_visible()) {
+  if (in_search_state() 
+    && !m_challengeInfo.isBrickLocationSet() 
+    && is_brick_visible()
+    && valid_brick_position()) 
+  {
+    auto brickGeoPos = m_globalToLocal.toGlobal(
+      m_handlerBrickEnu.getData().x,
+      m_handlerBrickEnu.getData().y,
+      m_handlerBrickEnu.getData().z
+    );
     ROS_INFO("MasterPickupControl::state_timer - BRICK seen at [%.10f, %.10f, %.10f]",
-      m_handlerGpsFix.getData().latitude, 
-      m_handlerGpsFix.getData().longitude,
-      m_handlerGpsFix.getData().altitude);
+      brickGeoPos.x(), brickGeoPos.y(), brickGeoPos.z());
     m_challengeInfo.setBrickLocation(
       Eigen::Vector3d {
-        m_handlerGpsFix.getData().latitude, 
-        m_handlerGpsFix.getData().longitude,
+        brickGeoPos.x(), brickGeoPos.y(),
         m_handlerOdometry.getData().pose.pose.position.z
       }
     );
@@ -648,12 +660,12 @@ ros::ServiceClient m_clientArming, m_clientTakeoff,
 
 ros::Publisher m_pubTrajGen, m_pubMasterState;
 TopicHandler<mavros_msgs::State> m_handlerState;
-TopicHandler<sensor_msgs::NavSatFix> m_handlerGpsFix;
 TopicHandler<std_msgs::String> m_handlerCarrotStatus;
 TopicHandler<nav_msgs::Odometry> m_handlerOdometry;
 TopicHandler<std_msgs::Int32> m_handlerPatchCount;
 TopicHandler<std_msgs::Int32> m_handlerBrickGlobalStatus;
 TopicHandler<std_msgs::Bool> m_handlerTrajectoryStatus;
+TopicHandler<geometry_msgs::Vector3> m_handlerBrickEnu;
 TopicHandler<trajectory_msgs::MultiDOFJointTrajectoryPoint> m_handlerTrajectoryPoint;
 };
 

@@ -18,20 +18,20 @@ visual_servo:
 
   pid_x:
     x_armed:  true
-    kp:  0.5
+    kp:  1
     ki:  0.0
     kd:  0
-    lim_low: -0.75
-    lim_high: 0.75
+    lim_low: -0.5
+    lim_high: 0.5
     deadzone_x: 0
 
   pid_y:
     y_armed:  true
-    kp:  0.5
+    kp:  1
     ki:  0.0
     kd:  0
-    lim_low: -0.75
-    lim_high: 0.75
+    lim_low: -0.5
+    lim_high: 0.5
     deadzone_y: 0
 
   pid_z:  

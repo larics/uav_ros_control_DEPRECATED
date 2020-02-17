@@ -196,8 +196,7 @@ void update_state(const ros::TimerEvent& /* unused */)
 }
 
 void publish_trajectory(const ros::TimerEvent& /* unused */) 
-{  
-  ros::spinOnce();
+{
   if (m_currentStatus.isSearching() && !is_trajectory_active()) {    
     ROS_INFO("BrickPickup - generating SEARCH trajectory with radius: %.3f.", m_searchRadius);
     m_pubTrajGen.publish(
@@ -247,7 +246,6 @@ bool brick_pickup_global_cb(GeoBrickReq& request, GeoBrickResp& response)
     ROS_FATAL("BPSM::brick_pickup_global_cb - brick_pickup/global disabled");
     response.status = false;
     m_currentStatus = BrickPickupStatus();
-    clear_current_trajectory();
     toggle_visual_servo_state_machine(false);
     toggle_magnet(false);
     return true;

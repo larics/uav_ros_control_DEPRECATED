@@ -17,6 +17,7 @@
 #include <uav_ros_control_msgs/VisualServoProcessValues.h>
 #include <uav_ros_control/filters/NonlinearFilters.h>
 #include <uav_ros_control/reference/PickupStates.h>
+#include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
 
 namespace uav_reference 
 {
@@ -74,6 +75,8 @@ VisualServoStateMachine(ros::NodeHandle& nh)
         nh.subscribe("global_centroid_point", 1, &uav_reference::VisualServoStateMachine::globalCentroidPointCb, this);
     _subPatchCentroid_local = 
         nh.subscribe("local_centroid_point", 1, &uav_reference::VisualServoStateMachine::localCentroidPointCb, this);
+    _subTrajectory = 
+        nh.subscribe("carrot/trajectory", 1, &uav_reference::VisualServoStateMachine::trajCb, this);
 
     // Setup dynamic reconfigure server
 	vssm_param_t  vssmConfig;
@@ -95,6 +98,11 @@ VisualServoStateMachine(ros::NodeHandle& nh)
 
 ~VisualServoStateMachine()
 {}
+
+void trajCb(const trajectory_msgs::MultiDOFJointTrajectoryPoint& point)
+{
+    _trajPoint = point;
+}
 
 void nContoursCb(const std_msgs::Int32ConstPtr& msg)
 {
@@ -533,17 +541,21 @@ void publishVisualServoSetpoint(double dt)
     switch (_currentState)
     {
         case LocalPickupState::OFF :
-            // pass
+            if (!_trajPoint.transforms.empty()) {
+                _currVisualServoFeed.x = _trajPoint.transforms.front().translation.x;
+                _currVisualServoFeed.y = _trajPoint.transforms.front().translation.y;
+            }
             break;
         
-        case LocalPickupState::BRICK_ALIGNMENT : 
+        case LocalPickupState::BRICK_ALIGNMENT :
+            _currVisualServoFeed.x = _trajPoint.transforms.front().translation.x;
+            _currVisualServoFeed.y = _trajPoint.transforms.front().translation.y;
             _currVisualServoFeed.z = _currOdom.pose.pose.position.z + 
                 double(_descentCounterMax) / 100.0 * (_brickAlignHeight - _relativeBrickDistance_local);
             _currHeightReference  = _currVisualServoFeed.z;
             break;
         
-        case LocalPickupState::DESCENT : 
-            
+        case LocalPickupState::DESCENT :
             if (_currHeightReference < _relativeBrickDistanceGlobal_lastValid) {
                 _currVisualServoFeed.z = _relativeBrickDistanceGlobal_lastValid;
             } else {
@@ -652,6 +664,9 @@ private:
     /* Odometry subscriber */
     ros::Subscriber _subOdom;
     nav_msgs::Odometry _currOdom;
+
+    ros::Subscriber _subTrajectory;
+    trajectory_msgs::MultiDOFJointTrajectoryPoint _trajPoint;
 
     /* Yaw error subscriber */
     ros::Subscriber _subYawError;
