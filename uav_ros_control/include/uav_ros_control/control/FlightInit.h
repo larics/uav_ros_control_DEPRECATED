@@ -187,16 +187,12 @@ bool all_services_available()
 	ROS_FATAL_COND(!m_armingClient.exists(), "FI - arming service does not exist.");
 	ROS_FATAL_COND(!m_setModeClient.exists(), "FI - set mode service does not exist.");
 	ROS_FATAL_COND(!m_takeoffClient.exists(), "FI - takeoff service does not exist.");
-	ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
-	ROS_FATAL_COND(!m_initializeMsfScaleClient.exists(), "FI - msf scale service does not exist.");
 	ROS_FATAL_COND(!m_planTrajectoryClient.exists(), "FI - multi_dof_trajectory does not exist.");
 
   return m_armingClient.exists() 
     && m_setModeClient.exists()
     && m_takeoffClient.exists()
-	&& m_initializeMsfHeightClient.exists()
-	&& m_initializeMsfScaleClient.exists()
-	&& m_planTrajectoryClient.exists();
+		&& m_planTrajectoryClient.exists();
 }
 
 void fiParamCb(fi_param_t& configMsg,uint32_t level)
