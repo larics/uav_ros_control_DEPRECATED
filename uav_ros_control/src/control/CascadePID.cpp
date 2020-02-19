@@ -3,6 +3,11 @@
 #include <geometry_msgs/Vector3.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 
+#define CARROT_OFF 			"OFF"
+#define CARROT_ON_LAND  "CARROT_ON_LAND"
+#define CARROT_ON_AIR		"CARROT_ON_AIR"
+#define POS_HOLD   			"HOLD"
+
 // Define all parameter paths here
 #define PID_X_PARAM "control/pos_x"
 #define PID_Y_PARAM "control/pos_y"
@@ -10,8 +15,15 @@
 #define PID_VX_PARAM "control/vel_x"
 #define PID_VY_PARAM "control/vel_y"
 #define PID_VZ_PARAM "control/vel_z"
-#define FFGAIN_VEL_PARAM "control/ff_gain/velocity"
-#define FFGAIN_ACC_PARAM "control/ff_gain/acceleration"
+
+#define FFGAIN_VEL_X_PARAM "control/ff_gain/velocity/x"
+#define FFGAIN_VEL_Y_PARAM "control/ff_gain/velocity/y"
+#define FFGAIN_VEL_Z_PARAM "control/ff_gain/velocity/z"
+
+#define FFGAIN_ACC_X_PARAM "control/ff_gain/acceleration/x"
+#define FFGAIN_ACC_Y_PARAM "control/ff_gain/acceleration/y"
+#define FFGAIN_ACC_Z_PARAM "control/ff_gain/acceleration/z"
+
 #define HOVER_PARAM "control/hover"
 #define GRAVITY_ACCELERATION 9.8;
 
@@ -29,6 +41,7 @@ uav_controller::CascadePID::CascadePID(ros::NodeHandle& nh) :
 	_velRefPub = nh.advertise<geometry_msgs::Vector3>("carrot/velocity", 1);
 	_velCurrPub = nh.advertise<geometry_msgs::Vector3>("uav/velocity", 1);
 	_yawRefSub = nh.subscribe("carrot/yaw", 1, &uav_controller::CascadePID::yawRefCb, this);
+	_carrotStateSub = nh.subscribe("carrot/status", 1, &uav_controller::CascadePID::carrotStatusCb, this);
 
 	// Setup dynamic reconfigure server
 	uav_ros_control::PositionControlParametersConfig posConfig;
@@ -56,6 +69,16 @@ bool uav_controller::CascadePID::intResetServiceCb(std_srvs::Empty::Request& req
 	
 uav_controller::CascadePID::~CascadePID()
 {
+}
+
+bool uav_controller::CascadePID::activationPermission()
+{
+	return _carrotStatus == CARROT_ON_AIR || _carrotStatus == POS_HOLD;
+}
+
+void uav_controller::CascadePID::carrotStatusCb(const std_msgs::StringConstPtr& msg)
+{
+	_carrotStatus = msg->data;
 }
 
 void uav_controller::CascadePID::yawRefCb(const std_msgs::Float64ConstPtr& msg)
@@ -105,6 +128,14 @@ void uav_controller::CascadePID::positionParamsCb(
 	_velZPID->set_lim_high(configMsg.lim_high_vz);
 	_velZPID->set_lim_low(configMsg.lim_low_vz);
 
+	_ffGainVelocityX = configMsg.ff_vel_x;
+	_ffGainVelocityY = configMsg.ff_vel_y;
+	_ffGainVelocityZ = configMsg.ff_vel_z;
+	
+	_ffGainAccelerationX = configMsg.ff_acc_x;
+	_ffGainAccelerationY = configMsg.ff_acc_y;
+	_ffGainAccelerationZ = configMsg.ff_acc_z;
+	
 	_hoverThrust = configMsg.hover;
 }
 
@@ -137,6 +168,13 @@ void uav_controller::CascadePID::setPositionReconfigureParams(
 	config.lim_low_vz = _velZPID->get_lim_low();
 	config.lim_high_vz = _velZPID->get_lim_high();
 
+	config.ff_vel_x = _ffGainVelocityX;
+	config.ff_vel_y = _ffGainVelocityY;
+	config.ff_vel_z = _ffGainVelocityZ;
+	config.ff_acc_x = _ffGainAccelerationX;
+	config.ff_acc_y = _ffGainAccelerationY;
+	config.ff_acc_z = _ffGainAccelerationZ;
+	
 	config.hover = _hoverThrust;
 }
 
@@ -144,7 +182,7 @@ void uav_controller::CascadePID::initializeParameters(ros::NodeHandle& nh)
 {
 	ROS_WARN("CascadePID::initializeParameters()");
 
-    _posYPID->initializeParameters(nh, PID_Y_PARAM);
+  _posYPID->initializeParameters(nh, PID_Y_PARAM);
 	_velYPID->initializeParameters(nh, PID_VY_PARAM);
 	_posXPID->initializeParameters(nh, PID_X_PARAM);
 	_velXPID->initializeParameters(nh, PID_VX_PARAM);
@@ -152,11 +190,16 @@ void uav_controller::CascadePID::initializeParameters(ros::NodeHandle& nh)
 	_velZPID->initializeParameters(nh, PID_VZ_PARAM);
 
 	bool initialized = nh.getParam(HOVER_PARAM, _hoverThrust)
-		&& nh.getParam(FFGAIN_VEL_PARAM, _ffGainVelocity)
-		&& nh.getParam(FFGAIN_ACC_PARAM, _ffGainAcceleration);
+		&& nh.getParam(FFGAIN_VEL_X_PARAM, _ffGainVelocityX)
+		&& nh.getParam(FFGAIN_VEL_Y_PARAM, _ffGainVelocityY)
+		&& nh.getParam(FFGAIN_VEL_Z_PARAM, _ffGainVelocityZ)
+		&& nh.getParam(FFGAIN_ACC_X_PARAM, _ffGainAccelerationX)
+		&& nh.getParam(FFGAIN_ACC_Y_PARAM, _ffGainAccelerationY)
+		&& nh.getParam(FFGAIN_ACC_Z_PARAM, _ffGainAccelerationZ);
+
 	ROS_INFO("Hover thrust: %.2f", _hoverThrust);
-	ROS_INFO("Feed-forward velocity gain: %.2f", _ffGainVelocity);
-	ROS_INFO("Feed-forward acceleration gain: %.2f", _ffGainAcceleration);
+	ROS_INFO("Feed-forward velocity gain: [%.2f, %.2f, %.2f]", _ffGainVelocityX, _ffGainVelocityY, _ffGainVelocityZ);
+	ROS_INFO("Feed-forward acceleration gain: [%.2f, %.2f, %.2f]", _ffGainAccelerationX, _ffGainAccelerationY, _ffGainAccelerationZ);
 	if (!initialized)
 	{
 		ROS_FATAL("CascadePID::initalizeParameters() - failed to initialize parameters");
@@ -189,9 +232,9 @@ void uav_controller::CascadePID::calculateAttThrustSp(double dt)
 		getCurrentReference().transforms[0].translation.z, getCurrPosition()[2], dt);
 
 	// Add velocity feed-forward gains
-	velocityRefX += _ffGainVelocity * getCurrentReference().velocities[0].linear.x;
-	velocityRefY += _ffGainVelocity * getCurrentReference().velocities[0].linear.y;
-	velocityRefZ += _ffGainVelocity * getCurrentReference().velocities[0].linear.z;
+	velocityRefX += _ffGainVelocityX * getCurrentReference().velocities[0].linear.x;
+	velocityRefY += _ffGainVelocityY * getCurrentReference().velocities[0].linear.y;
+	velocityRefZ += _ffGainVelocityZ * getCurrentReference().velocities[0].linear.z;
 
 	// Calculate second row of PID controllers
 	double roll = - _velYPID->compute(velocityRefY, getCurrVelocity()[1], dt);
@@ -200,11 +243,11 @@ void uav_controller::CascadePID::calculateAttThrustSp(double dt)
 	thrust += _hoverThrust;
 
 	// Add acceleration feed-forward gains
-	roll += _ffGainAcceleration * 
+	roll += _ffGainAccelerationX * 
 		getCurrentReference().accelerations[0].linear.x / GRAVITY_ACCELERATION;
-	pitch += _ffGainAcceleration * 
+	pitch += _ffGainAccelerationY * 
 		getCurrentReference().accelerations[0].linear.y / GRAVITY_ACCELERATION;
-	_yawRef += _ffGainAcceleration *
+	_yawRef += _ffGainAccelerationZ *
 		getCurrentReference().accelerations[0].linear.z / GRAVITY_ACCELERATION;
 
 	// Decouple roll and pitch w.r.t. yaw
@@ -238,8 +281,12 @@ void uav_controller::runDefault(
 	while (ros::ok())
 	{
 		ros::spinOnce();
-		cascadeObj.calculateAttThrustSp(dt);
-		cascadeObj.publishAttitudeTarget(MASK_IGNORE_RPY_RATE);
+		if (cascadeObj.activationPermission()) {
+			cascadeObj.calculateAttThrustSp(dt);
+			cascadeObj.publishAttitudeTarget(MASK_IGNORE_RPY_RATE);
+		} else {
+			ROS_FATAL_THROTTLE(2, "CascadePID::runDefault - controller inactive");
+		}
 		cascadeObj.publishEulerSp();
 		loopRate.sleep();
 	}

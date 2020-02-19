@@ -9,6 +9,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <std_msgs/Float64.h>
 #include <std_srvs/Empty.h>
+#include <std_msgs/String.h>
 
 namespace uav_controller 
 {
@@ -36,7 +37,8 @@ namespace uav_controller
 		 * @oaram dt - Discretization time
 		 */
 		void calculateAttThrustSp(double dt);
-		
+		bool activationPermission();
+
 		/**
 		 * Reset all position PIDs.
 		 */
@@ -59,6 +61,7 @@ namespace uav_controller
 		 * Yaw reference callback function.
 		 */
 		void yawRefCb(const std_msgs::Float64ConstPtr&);
+		void carrotStatusCb(const std_msgs::StringConstPtr&);
 
         /**
 		 * Do all the parameter initialization here.
@@ -100,10 +103,10 @@ namespace uav_controller
 		double _hoverThrust = 0;
 
 		/** Feed-forward gain for linear velocity reference. */
-		double _ffGainVelocity = 0;
+		double _ffGainVelocityX = 0, _ffGainVelocityY = 0, _ffGainVelocityZ = 0;
 
 		/** Feed-forward gain for linear acceleration reference. */
-		double _ffGainAcceleration = 0;
+		double _ffGainAccelerationX = 0, _ffGainAccelerationY = 0, _ffGainAccelerationZ = 0;
 
 		/** Yaw reference */
 		double _yawRef = 0;
@@ -126,6 +129,8 @@ namespace uav_controller
 		
 		/** Yaw reference subscriber. */
 		ros::Subscriber _yawRefSub;
+		ros::Subscriber _carrotStateSub;
+		std::string _carrotStatus;
 	};
 
 	/**

@@ -1,10 +1,11 @@
 <launch>
-    <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
+    <arg name="namespace"       default="$(env UAV_NAMESPACE)"/>
     <arg name="odom"            default="mavros/global_position/local"/>
     <arg name="ref"             default="carrot/trajectory"/>
     <arg name="config"          default="joy_control_input.config.yaml"/>
     <arg name="carrot_index"    default="5"/>
     <arg name="carrot_enable"   default="1"/>
+    <arg name="manual_takeoff"  default="false"/>
 
     <group ns="$(arg namespace)">
         <!-- Load joy configuration file-->
@@ -22,13 +23,15 @@
             <!-- Private parameters -->
             <param name="carrot_index" value="$(arg carrot_index)" />
             <param name="carrot_enable" value="$(arg carrot_enable)"/>
+            <param name="manual_takeoff" value="$(arg manual_takeoff)"/>
 
             <!-- Topic remapping -->
             <remap from="carrot/trajectory" to="$(arg ref)"/>
             <remap from="odometry"          to="$(arg odom)"/>
         </node>
 
-        <!-- include file="$(find uav_ros_control)/launch/joy.launch"/ -->
     </group>
 
+    <!--Include file for multirotor_transformations rc_to_joy-->
+    <include file="$(find multirotor_transformations)/launch/rc_to_joy.launch"/>
 </launch>
