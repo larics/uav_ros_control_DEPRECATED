@@ -5,12 +5,18 @@ pursuit:
     uav_distance_offset: 7.0
     ball_distance_offset: 5.0
     z_offset: 0.0
+    yaw_deadzone: 0.0
+    settle_threshold: 0.2
 
     search:
       desired_height: 10.0
-      x_size: 100.0
-      y_size: 40.0
+      x_size: 5.0
+      y_size: 1.0
       x_offset: 0.0
       y_offset: 0.0
+      yaw_offset: 0.0
       x_takeOff: 0.0
       y_takeOff: 0.0
+
+    interception:
+      z_offset: -3.0
