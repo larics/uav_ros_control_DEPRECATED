@@ -258,16 +258,17 @@ void cartographerPoseCb(const geometry_msgs::PoseStampedPtr& msg)
 			if (ros::Time::now() - m_timer > ros::Duration(m_timeForInit))
 			{
 				// Enough time pass --> map is initialize 
+				// d = distance from current odom to center
 				double d = sqrt(pow(m_homeOdom.pose.pose.position.x
 					- m_currentOdom.pose.pose.position.x, 2)
 				+ pow(m_homeOdom.pose.pose.position.y
 					- m_currentOdom.pose.pose.position.y, 2)
 				+ pow(m_takeoffHeight
 					- m_currentOdom.pose.pose.position.z, 2));
-				ROS_INFO("Map initialized. %.2f", d);
 				if (d < 0.4) {
 					m_ready.data = true;
 					m_mapInitializedFlag = true;
+					ROS_INFO("Map initialized and home position reached, offset: %.2f", d);
 					for (int i = 0; i < 5; i++)
 					{
 						m_pubReadyForExploration.publish(m_ready);	
@@ -459,7 +460,6 @@ void generateWaypoints(
 	// CIRCLE around UAV
 	for (double angle = 0; angle < m_executeTrajectoryNum * 360; angle += angle_inc)
 	{
-		ROS_INFO("for");
 		m_point.x = m_current_position.x + 
 			(m_radiusInit * cos(angle * DEGTORAD));
 		m_point.y = m_current_position.y + 
