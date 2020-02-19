@@ -18,6 +18,9 @@ visual_servo:
     yaw:
       rate_limiter_R: 0.1
       rate_limiter_T: 0.02
+    main:
+      rate_limiter_R: 1.0
+      rate_limiter_T: 0.02
 
   pid_x:
     x_armed:  false

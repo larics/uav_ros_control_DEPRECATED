@@ -163,13 +163,14 @@ class TrajectoryPointPublisher:
                 continue
             
             if not self.trajectory.points:
-                print("TrajectoryPointPublisher - No trajectory available")
+                #print("TrajectoryPointPublisher - No trajectory available")
                 self.publish_trajectory_status(False)
                 rospy.sleep(0.01)
                 continue
             if not self.publish_trajectory:
-                print("TrajectoryPointPublisher - Do not have a permission to publish trajectory.")
+                #print("TrajectoryPointPublisher - Do not have a permission to publish trajectory.")
                 self.publish_trajectory_status(False)
+                self.trajectory = MultiDOFJointTrajectory()
                 #rospy.sleep(0.5)
                 continue
 
