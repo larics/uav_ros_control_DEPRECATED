@@ -25,6 +25,7 @@
 #include <std_msgs/String.h>
 #include <std_srvs/Empty.h>
 #include <std_msgs/Bool.h>
+#include <mavros_msgs/RCIn.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
@@ -85,8 +86,10 @@ public:
 			"mavros/global_position/local", 1, 
 			&flight_init::FlightInit::odometryCb, this);
 		m_subState = nh.subscribe(
-				"mavros/state", 1, 
-				&flight_init::FlightInit::stateCb, this);
+			"mavros/state", 1, 
+			&flight_init::FlightInit::stateCb, this);
+		m_subRcIn = nh.subscribe("mavros/rc/in", 1,
+			&flight_init::FlightInit::rcInCallback, this);
 		m_subCartographerPose = nh.subscribe("uav/cartographer/pose", 1,
 			&flight_init::FlightInit::cartographerPoseCb, this);
 		m_subMsfOdometry = nh.subscribe("msf_core/odometry", 1,
@@ -167,7 +170,7 @@ bool healthyNumberOfPublishers()
 {
     ROS_FATAL_COND(!m_subOdometry.getNumPublishers() > 0, "IF - 'mavros odometry' topic publisher missing");
     ROS_FATAL_COND(!m_subState.getNumPublishers() > 0, "IF - 'mavros state' topic publisher missing");
-    ROS_FATAL_COND(!m_subCartographerPose.getNumPublishers() > 0, "IF - 'cartographer pose' topic publisher missing");
+		ROS_FATAL_COND(!m_subCartographerPose.getNumPublishers() > 0, "IF - 'cartographer pose' topic publisher missing");
 
     return m_subOdometry.getNumPublishers() > 0 
       && 	m_subState.getNumPublishers() > 0
@@ -181,17 +184,19 @@ bool stateMachineDisableConditions()
 
 bool all_services_available()
 {
-  ROS_FATAL_COND(!m_armingClient.exists(), "FI - arming service does not exist.");
-  ROS_FATAL_COND(!m_setModeClient.exists(), "FI - set mode service does not exist.");
-  ROS_FATAL_COND(!m_takeoffClient.exists(), "FI - takeoff service does not exist.");
-  //ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
-  //ROS_FATAL_COND(!m_initializeMsfScaleClient.exists(), "FI - msf scale service does not exist.");
-  //ROS_FATAL_COND(!m_planTrajectoryClient.exists(), "FI - multi_dof_trajectory does not exist.");
+	ROS_FATAL_COND(!m_armingClient.exists(), "FI - arming service does not exist.");
+	ROS_FATAL_COND(!m_setModeClient.exists(), "FI - set mode service does not exist.");
+	ROS_FATAL_COND(!m_takeoffClient.exists(), "FI - takeoff service does not exist.");
+	ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
+	ROS_FATAL_COND(!m_initializeMsfScaleClient.exists(), "FI - msf scale service does not exist.");
+	ROS_FATAL_COND(!m_planTrajectoryClient.exists(), "FI - multi_dof_trajectory does not exist.");
 
   return m_armingClient.exists() 
     && m_setModeClient.exists()
     && m_takeoffClient.exists()
-    && m_planTrajectoryClient.exists();
+	&& m_initializeMsfHeightClient.exists()
+	&& m_initializeMsfScaleClient.exists()
+	&& m_planTrajectoryClient.exists();
 }
 
 void fiParamCb(fi_param_t& configMsg,uint32_t level)
@@ -217,6 +222,11 @@ void stateCb(const mavros_msgs::State::ConstPtr& msg)
 {
 	m_currentState = *msg;
 	m_timeLastState = ros::Time::now().toSec();
+}
+
+void rcInCallback(const mavros_msgs::RCIn& msg)
+{
+	m_rcInput = msg.channels[4]; 
 }
 
 void cartographerPoseCb(const geometry_msgs::PoseStampedPtr& msg)
@@ -256,12 +266,22 @@ void cartographerPoseCb(const geometry_msgs::PoseStampedPtr& msg)
 			if (ros::Time::now() - m_timer > ros::Duration(m_timeForInit))
 			{
 				// Enough time pass --> map is initialize 
-				ROS_INFO("Map initialized.");
-				m_ready.data = true;
-				m_mapInitializedFlag = true;
-				for (int i = 0; i < 5; i++)
-				{
-					m_pubReadyForExploration.publish(m_ready);	
+				// d = distance from current odom to center
+				double d = sqrt(pow(m_homeOdom.pose.pose.position.x
+					- m_currentOdom.pose.pose.position.x, 2)
+				+ pow(m_homeOdom.pose.pose.position.y
+					- m_currentOdom.pose.pose.position.y, 2)
+				+ pow(m_takeoffHeight
+					- m_currentOdom.pose.pose.position.z, 2));
+				std::cout << "Current offset: " << d << std::endl;
+				if (d < 1.4) {
+					m_ready.data = true;
+					m_mapInitializedFlag = true;
+					ROS_INFO("Map initialized and home position reached, offset: %.2f", d);
+					for (int i = 0; i < 5; i++)
+					{
+						m_pubReadyForExploration.publish(m_ready);	
+					}
 				}
 			}
 		}
@@ -321,7 +341,8 @@ bool armAndTakeOffCb(
 	}
 
 	ros::Duration(TAKEOFF_DURATION).sleep();
-	
+	// Ensure last odom msg
+	ros::spinOnce();
 	// Assume takeoff is successful at this point
 	ROS_INFO("TakeoffCb - request approved, TAKEOFF successful");
 	m_takeoffFlag = true;
@@ -344,26 +365,31 @@ bool modeGuided()
 {
 	mavros_msgs::SetMode offb_set_mode;
 	offb_set_mode.request.custom_mode = "GUIDED_NOGPS";
-	
-	if (m_currentState.mode != "GUIDED_NOGPS")
+	std::cout << "Rc in: " << m_rcInput << std::endl;
+	if (m_rcInput > 1750)
 	{
-		if (m_setModeClient.call(offb_set_mode))
+		if (m_currentState.mode != "GUIDED_NOGPS")
 		{
-			ros::Duration(2.0).sleep();
-			if (offb_set_mode.response.mode_sent)
+			if (m_setModeClient.call(offb_set_mode))
 			{
-			std::cout << "STATE: " << m_currentState.mode << std::endl;
-			ROS_INFO ("modeGuided - GUIDED_NOGPS enabled");
-			return true;
+				ros::Duration(2.0).sleep();
+				if (offb_set_mode.response.mode_sent)
+				{
+				std::cout << "STATE: " << m_currentState.mode << std::endl;
+				ROS_INFO ("modeGuided - GUIDED_NOGPS enabled");
+				return true;
+				}
+			ROS_FATAL("modeGuided - Setting mode GUIDED_NOGPS failed.");
+			return false;
 			}
-		ROS_FATAL("modeGuided - Setting mode GUIDED_NOGPS failed.");
-		return false;
+			ROS_FATAL("modeGuided - Setting mode GUIDED_NOGPS failed.");
+			return false;
 		}
-		ROS_FATAL("modeGuided - Setting mode GUIDED_NOGPS failed.");
-		return false;
+		ROS_WARN("modeGuided - GUIDED_NOGPS mode already set.");
+		return true;
 	}
-	ROS_WARN("modeGuided - GUIDED_NOGPS mode already set.");
-	return true;
+	ROS_FATAL("mode Guided, RC/IN - Can not enter GUIDED_NOGPS mode. Check futaba!");
+	return false;
 } 
 
 bool armUAV()
@@ -443,6 +469,9 @@ void generateWaypoints(
 	std::vector<geometry_msgs::Point> &m_vectorWaypoints)
 {
 	geometry_msgs::Point m_point;
+	m_point.z = m_currentOdom.pose.pose.position.z;
+	std::cout<<"Mpoint z: "<<m_point.z<<std::endl;
+	std::cout<<"odom z: "<<m_currentOdom.pose.pose.position.z<<std::endl;
 	// Current UAV position
 	geometry_msgs::Point m_current_position = m_currentOdom.pose.pose.position;
 	double angle_inc = 180 / m_radiusInit;
@@ -453,11 +482,17 @@ void generateWaypoints(
 			(m_radiusInit * cos(angle * DEGTORAD));
 		m_point.y = m_current_position.y + 
 			(m_radiusInit * sin(angle * DEGTORAD));
-		m_point.z = m_currentOdom.pose.pose.position.z;
 		m_vectorWaypoints.push_back(m_point);
 	}
-	std::cout << "vector:" << m_vectorWaypoints.size() << std::endl;	
-	
+	m_point.x = m_current_position.x;
+	m_point.y = m_current_position.y;
+	m_vectorWaypoints.push_back(m_point);
+	std::cout << "vector:" << m_vectorWaypoints.size() << std::endl;
+
+	for (int i = 0; i < m_vectorWaypoints.size(); i++)
+	{
+		std::cout<<"Vector z: "<<m_vectorWaypoints[i].z<<std::endl;
+	}
  }
 
 double quaternion2Yaw(geometry_msgs::Quaternion quaternion)
@@ -491,7 +526,7 @@ bool publishTrajectory (
 	m_srv.request.waypoints.points.push_back(m_trajectory_point);
 
 	// Create another points from generated vector of points
-	for (int i = 0; i < m_vectorOfPoints.size() - 1; i++)
+	for (int i = 0; i < m_vectorOfPoints.size() - 2; i++)
 	{
 		m_points_arr = {
 			m_vectorOfPoints[i].x,
@@ -504,13 +539,23 @@ bool publishTrajectory (
 		m_srv.request.waypoints.points.push_back(m_trajectory_point);
 	}
 		
-	// Append last point with orientation from the first point
+	// Append second last point with orientation from the first point
+	m_points_arr = {
+		m_vectorOfPoints[m_vectorOfPoints.size()-2].x,
+		m_vectorOfPoints[m_vectorOfPoints.size()-2].y, 
+		m_vectorOfPoints[m_vectorOfPoints.size()-2].z,
+		atan2(( m_vectorOfPoints[1].y - m_vectorOfPoints[0].y),
+		( m_vectorOfPoints[1].x - m_vectorOfPoints[0].x))};
+	m_trajectory_point.positions.clear();
+	m_trajectory_point.positions = m_points_arr;
+	m_srv.request.waypoints.points.push_back(m_trajectory_point);
+
+	// Append last point with orientation from home position
 	m_points_arr = {
 		m_vectorOfPoints[m_vectorOfPoints.size()-1].x,
 		m_vectorOfPoints[m_vectorOfPoints.size()-1].y, 
 		m_vectorOfPoints[m_vectorOfPoints.size()-1].z,
-		atan2(( m_vectorOfPoints[1].y - m_vectorOfPoints[0].y),
-		( m_vectorOfPoints[1].x - m_vectorOfPoints[0].x))};
+		quaternion2Yaw(m_currentOdom.pose.pose.orientation)};
 	m_trajectory_point.positions.clear();
 	m_trajectory_point.positions = m_points_arr;
 	m_srv.request.waypoints.points.push_back(m_trajectory_point);
@@ -612,11 +657,12 @@ void run()
 {
   ros::Rate loopRate(m_rate);
 	// Call service to set path and trajectory flags
+	double t_0 = ros::Time::now().toSec();
 	while (ros::ok())
 	{
 		ros::spinOnce();
 		startMission();
-        loopRate.sleep();
+    loopRate.sleep();
 	}
 }
 
@@ -627,12 +673,14 @@ double m_timeLastOdometry = 0,
   m_timeLastCartographer = 0;
 std_msgs::Int32 m_executingTrajectory;
 int m_executeTrajectoryNum;
+int m_rcInput;
 mavros_msgs::State m_currentState;
 sensor_msgs::NavSatFix m_currentGlobalPosition;
 geometry_msgs::Point m_currGoal;
 geometry_msgs::PoseStamped m_previousCartographerPose, m_currentCartographerPose;
 nav_msgs::Odometry m_currentOdom, m_homeOdom;
-ros::Subscriber m_subState, m_subOdometry, m_subCartographerPose, m_subMsfOdometry;
+ros::Subscriber m_subState, m_subOdometry, m_subCartographerPose, m_subMsfOdometry,
+	m_subRcIn;
 ros::Publisher m_pubTrajectory, m_pubReadyForExploration;
 ros::Time m_timer;
 bool m_takeoffFlag = false;
