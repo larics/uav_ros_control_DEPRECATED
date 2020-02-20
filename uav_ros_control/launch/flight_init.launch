@@ -8,10 +8,10 @@
     <group ns="$(arg namespace)">
     <node pkg="uav_ros_control" type="flight_init_node" name="flight_init_node" output="screen">
         <param name="time_for_init" value="60" />
-        <param name="takeoff_height" value="3" />
+        <param name="takeoff_height" value="5" />
         <param name="rate" value="20" />
         <param name="map_frame" value="$(arg namespace)/map"/>
-        <param name="radius_init" value="2.0" />
+        <param name="radius_init" value="5.0" />
         <param name="execute_trajectory_num" value="3.0" />
     </node>
     </group>

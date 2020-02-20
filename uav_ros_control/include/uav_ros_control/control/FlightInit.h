@@ -160,21 +160,21 @@ bool subscribedTopicsActive()
     static constexpr double MAX_DT = 0.2;
     ROS_FATAL_COND(dt_odom > MAX_DT,        	"FI - odometry timeout reached.");
    //ROS_FATAL_COND(dt_state > MAX_DT,     		"FI - mavros state timeout reached.");
-    ROS_FATAL_COND(dt_cartographer > MAX_DT,  "FI - cartographer pose timeout reached.");
+    //ROS_FATAL_COND(dt_cartographer > MAX_DT,  "FI - cartographer pose timeout reached.");
     
-    return dt_odom < MAX_DT 
-        && dt_cartographer < MAX_DT;
+    return dt_odom < MAX_DT; 
+        //&& dt_cartographer < MAX_DT;
 }
 
 bool healthyNumberOfPublishers() 
 {
     ROS_FATAL_COND(!m_subOdometry.getNumPublishers() > 0, "IF - 'mavros odometry' topic publisher missing");
     ROS_FATAL_COND(!m_subState.getNumPublishers() > 0, "IF - 'mavros state' topic publisher missing");
-		ROS_FATAL_COND(!m_subCartographerPose.getNumPublishers() > 0, "IF - 'cartographer pose' topic publisher missing");
+		//ROS_FATAL_COND(!m_subCartographerPose.getNumPublishers() > 0, "IF - 'cartographer pose' topic publisher missing");
 
     return m_subOdometry.getNumPublishers() > 0 
-      && 	m_subState.getNumPublishers() > 0
-			&& 	m_subCartographerPose.getNumPublishers() > 0;
+      && 	m_subState.getNumPublishers() > 0;
+			//&& 	m_subCartographerPose.getNumPublishers() > 0;
 }
 
 bool stateMachineDisableConditions()
@@ -270,7 +270,7 @@ void cartographerPoseCb(const geometry_msgs::PoseStampedPtr& msg)
 				+ pow(m_takeoffHeight
 					- m_currentOdom.pose.pose.position.z, 2));
 				std::cout << "Current offset: " << d << std::endl;
-				if (d < 1.4) {
+				if (d < 0.4) {
 					m_ready.data = true;
 					m_mapInitializedFlag = true;
 					ROS_INFO("Map initialized and home position reached, offset: %.2f", d);
@@ -653,7 +653,6 @@ void run()
 {
   ros::Rate loopRate(m_rate);
 	// Call service to set path and trajectory flags
-	double t_0 = ros::Time::now().toSec();
 	while (ros::ok())
 	{
 		ros::spinOnce();
