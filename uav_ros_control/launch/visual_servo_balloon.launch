@@ -32,31 +32,5 @@
             file="$(find uav_ros_control)/config/reference/visual_servo_pursuit.yaml" />
         
         <!-- Visual servo node -->
-        <node
-            pkg="uav_ros_control"
-            type="visual_servo_node"
-            name="visual_servo_node"
-            output="screen">
-
-            <!-- Topic remapping -->
-            <remap from="x_error" to="sm_pursuit/x_err"/>
-            <remap from="y_error" to="sm_pursuit/y_err"/>
-            <remap from="z_error" to="sm_pursuit/z_err"/>
-            <remap from="yaw_error" to="sm_pursuit/yaw_err"/>
-            <remap from="odometry" to="$(arg odom)"/>
-            <remap from="imu" to="/mavros/imu/data"/>
-
-            <!-- State machine topics -->
-            <remap from="x_offset" to="$(arg x_offset)"/>
-            <remap from="y_offset" to="$(arg y_offset)"/>
-            <remap from="z_offset" to="$(arg z_offset)"/>
-            <remap from="visual_servo/x_error" to="$(arg x_target_error)"/>
-            <remap from="visual_servo/y_error" to="$(arg y_target_error)"/>
-            <remap from="visual_servo/z_error" to="$(arg z_target_error)"/>
-            <remap from="VisualServoProcessValueTopic" to="$(arg process_value)"/>
-
-
-        </node>
-        
     </group>
 </launch>
