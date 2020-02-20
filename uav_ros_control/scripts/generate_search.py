@@ -205,19 +205,19 @@ class RequestSearchTrajectory():
         # Turn and move along y axis
         line2 = self.generateLine(takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_offset,
                      takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
-                     radians(90 + self.uav_yaw),  # Todo check this out, together with the other angles
+                     radians(0 + self.uav_yaw),  # Todo check this out, together with the other angles
                      self.numPoints / 2)
 
         # Turn and return along the x axis
         line3 = self.generateLine(takeoff_point.x + self.x_size - self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
                      takeoff_point.x + self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
-                     radians(180 + self.uav_yaw),
+                     radians(0 + self.uav_yaw),
                      self.numPoints)
 
         # Turn and return along the y axis
         line4 = self.generateLine(takeoff_point.x + self.x_offset, takeoff_point.y + self.y_size - self.y_offset,
                      takeoff_point.x + self.x_offset, takeoff_point.y + self.y_offset,
-                     radians(-90 + self.uav_yaw),
+                     radians(0 + self.uav_yaw),
                      self.numPoints / 2)
 
         for i in range(self.numPoints):

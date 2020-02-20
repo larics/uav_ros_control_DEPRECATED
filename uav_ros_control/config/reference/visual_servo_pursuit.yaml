@@ -7,7 +7,7 @@ visual_servo:
 
   rate_limiters:
     distance:
-      rate_limiter_R: 1.0
+      rate_limiter_R: 0.5
       rate_limiter_F: -2.0
       rate_limiter_T: 0.02
 
@@ -48,7 +48,7 @@ visual_servo:
 
   pid_yaw:
     yaw_armed: true
-    kp:  0.2
+    kp:  0.3
     ki:  0.0
     kd:  0
     lim_low: -0.5
