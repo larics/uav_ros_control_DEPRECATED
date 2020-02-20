@@ -166,6 +166,8 @@ void update_state(const ros::TimerEvent& /* unused */)
       m_currentStatus.m_dropoffPos.z() = m_handlerOdometry.getData().pose.pose.position.z;
       m_currentStatus.m_localBrick.z() = m_handlerOdometry.getData().pose.pose.position.z;
 
+      // Refresh dropoff position
+      set_dropoff_position( m_currentStatus.m_dropoffPos.z()); 
       ROS_INFO("BrickPickup::update_state - brick is picked up, DROPOFF state activated.");
       m_currentStatus.m_status = GlobalPickupStates::DROPOFF;
 
@@ -257,6 +259,18 @@ bool brick_pickup_global_cb(GeoBrickReq& request, GeoBrickResp& response)
       request.latitude, request.longitude, request.altitude_relative, true), 
     GlobalPickupStates::APPROACH);
 
+  set_dropoff_position(request.altitude_relative);
+  ROS_INFO("Current brick goal: [%.3f, %.3f, %.3f]", 
+    m_currentStatus.m_localBrick.x(), m_currentStatus.m_localBrick.y(), 
+    m_currentStatus.m_localBrick.z());
+
+  clear_current_trajectory();
+  response.status = true;
+  return true;
+}
+
+void set_dropoff_position(double altitude)
+{
   double dropoffLat, dropoffLon;
   bool gotLat = m_nh.getParam("brick_dropoff/lat", dropoffLat);
   bool gotLon = m_nh.getParam("brick_dropoff/lon", dropoffLon);
@@ -266,23 +280,15 @@ bool brick_pickup_global_cb(GeoBrickReq& request, GeoBrickResp& response)
     // If brick_dropoff is available set its position
     m_currentStatus.setDropoffPosition(
       m_global2Local.toLocal(
-        dropoffLat, dropoffLon, request.altitude_relative, true
+        dropoffLat, dropoffLon, altitude, true
       )
     );
   } else {
     // Otherwise set dropoff to zero - TODO: Have a better backupf
     m_currentStatus.setDropoffPosition(
-      Eigen::Vector3d(0, 0, request.altitude_relative)
+      Eigen::Vector3d(0, 0, altitude)
     );
   }
-
-  ROS_INFO("Current brick goal: [%.3f, %.3f, %.3f]", 
-    m_currentStatus.m_localBrick.x(), m_currentStatus.m_localBrick.y(), 
-    m_currentStatus.m_localBrick.z());
-
-  clear_current_trajectory();
-  response.status = true;
-  return true;
 }
 
 void initialize_parameters(ros::NodeHandle& nh) {
