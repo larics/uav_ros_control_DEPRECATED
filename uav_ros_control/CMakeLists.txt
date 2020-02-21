@@ -88,6 +88,10 @@ target_link_libraries(visual_servo_idle reference_lib)
 add_executable(visual_servo_sm nodes/reference/VisualServoStateNode.cpp)
 target_link_libraries(visual_servo_sm ${catkin_LIBRARIES} nfilt)
 
+# balloon state machine
+add_executable(balloon_state_machine nodes/reference/BalloonStateNode.cpp)
+target_link_libraries(balloon_state_machine ${catkin_LIBRARIES})
+
 # Global pickup state machine
 add_executable(brick_pickup_sm nodes/reference/GlobalPickupStateNode.cpp)
 target_link_libraries(brick_pickup_sm ${catkin_LIBRARIES} nfilt ${GeographicLib_LIBRARIES})
