@@ -5,6 +5,10 @@
 #include <geometry_msgs/Vector3.h>
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/SetBool.h>
+#include <uav_ros_control_msgs/TakeOff.h>
+#include <mavros_msgs/State.h>
+#include <uav_ros_control/filters/Util.h>
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
 
 namespace uav_reference 
@@ -105,6 +109,12 @@ namespace uav_reference
 		bool posHoldServiceCb(std_srvs::Empty::Request& request, 
 			std_srvs::Empty::Response& response);
 
+		bool takeoffServiceCb(uav_ros_control_msgs::TakeOff::Request& request, 
+			uav_ros_control_msgs::TakeOff::Response& response);
+
+		bool landServiceCb(std_srvs::SetBool::Request& request,
+			std_srvs::SetBool::Response& response);
+
 		/**
 		 * Callback function for Position reference. Works only during position hold mode.
 		 */
@@ -140,7 +150,9 @@ namespace uav_reference
 		int _carrotEnabledValue = 1;
 
 		/* First pass flag - set carrot to odometry */
-		bool _firstPass = true;	
+		bool _firstPass = true;
+		bool _manualTakeoffEnabled = true;
+		bool _carrotOnLand = false, _takeoffHappened = false;
 
 		/** Define all Publishers */
 		ros::Publisher _pubCarrotTrajectorySp;
@@ -152,12 +164,13 @@ namespace uav_reference
 		/** Define all Subscribers. */
 		ros::Subscriber _subOdom;
 		ros::Subscriber _subPosHoldRef;
+		ros_util::TopicHandler<mavros_msgs::State> m_handlerState;
 
 		/** Define all the services */
-		ros::ServiceServer _servicePoisitionHold;
+		ros::ServiceServer _servicePoisitionHold, _serviceTakeoff, _serviceLand;
 
 		/* Reset integrator client */
-		ros::ServiceClient _intResetClient;
+		ros::ServiceClient _intResetClient, _setModeToLandClient;
 	};
 
 	/**

@@ -1,0 +1,7 @@
+bool enable
+string brick_color
+float32 latitude
+float32 longitude
+float32 altitude_relative
+---
+bool status

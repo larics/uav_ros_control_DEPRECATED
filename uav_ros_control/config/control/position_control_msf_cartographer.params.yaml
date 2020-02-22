@@ -4,8 +4,14 @@ control:
   hover: 0.47
 
   ff_gain:
-    velocity: 0.0
-    acceleration: 0.0
+    velocity:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    acceleration:
+      x: 0.0
+      y: 0.0
+      z: 0.0
 
   pos_x:  
     kp: 1.25
