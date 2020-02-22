@@ -117,8 +117,8 @@ void AddLocalWaypoint(double latitude, double longitude, double yaw_requested){
     tmp_pose.pose.orientation.y = q.y();
     tmp_pose.pose.orientation.z = q.z();
     _local_waypoints.push(tmp_pose);
-    ROS_WARN("x: %f, y: %f, yaw: %f\n", tmp_pose.pose.position.x, tmp_pose.pose.position.y,
-             util::calculateYaw(q.x(), q.y(), q.z(), q.w()));
+    //ROS_WARN("x: %f, y: %f, yaw: %f\n", tmp_pose.pose.position.x, tmp_pose.pose.position.y,
+    //         util::calculateYaw(q.x(), q.y(), q.z(), q.w()));
 
     _last_waypoint_x = local.x();
     _last_waypoint_y = local.y();
@@ -179,6 +179,7 @@ void AddLocalWaypoint(double latitude, double longitude, double yaw_requested){
 // }
 
 void FullRotationArroundZAxis(double x, double y){
+    // rewrite
 
     ROS_INFO("Generating spinning! \n");
     geometry_msgs::PoseStamped tmp_pose = geometry_msgs::PoseStamped() ;
@@ -235,20 +236,6 @@ void FullRotationArroundZAxis(double x, double y){
     tmp_pose = geometry_msgs::PoseStamped() ;
     tmp_pose.pose.position.x = x;
     tmp_pose.pose.position.y = y;
-    // tmp_pose.pose.position.z = local.z();
-    tmp_pose.pose.position.z = _global_z;
-    q.setRPY(0, 0, 2);
-    q.normalize();
-    tmp_pose.pose.orientation.w = q.w();
-    tmp_pose.pose.orientation.x = q.x();
-    tmp_pose.pose.orientation.y = q.y();
-    tmp_pose.pose.orientation.z = q.z();
-    _spinning_waypoints.push(tmp_pose);
-
-
-    tmp_pose = geometry_msgs::PoseStamped() ;
-    tmp_pose.pose.position.x = x;
-    tmp_pose.pose.position.y = y;
     tmp_pose.pose.position.z = _global_z;
 
     if(!_local_waypoints.empty()) {
@@ -300,7 +287,7 @@ void publishCurrGoal(geometry_msgs::PoseStamped point)
     ROS_WARN("Pub goal\n");
     _pubGoal.publish(point);
     auto q = point.pose.orientation;
-    ROS_WARN("x: %f, y: %f, yaw: %f\n", point.pose.position.x, point.pose.position.y,
+    ROS_WARN("x: %f, y: %f, z: %f yaw: %f\n", point.pose.position.x, point.pose.position.y, point.pose.position.z,
             util::calculateYaw(q.x, q.y, q.z, q.w));
 }
 
@@ -323,7 +310,6 @@ bool should_i_spin(){
 }
 
 void publish_spinning_points(){
-    ROS_INFO("Publish spinning points\n");
 
     while (!_spinning_waypoints.empty()){
         ros::spinOnce();
@@ -356,7 +342,7 @@ void stateAction(){
             break;
         case State::GETNEXTPOINT:
 
-            ROS_WARN("[Balloon_sm] Get next point\n");
+            ROS_WARN("[Balloon_sm] Get next point\n Points left: %d", _local_waypoints.size());
 
                 publishCurrGoal(_local_waypoints.front());
                 _tmp_position = _local_waypoints.front().pose.position;
@@ -376,12 +362,14 @@ void stateAction(){
         case State::POINTREACHED:
 
             ROS_WARN("[Balloon_sm] Point reached\n");
+            _saved_x = _tmp_position.x;
+            _saved_y = _tmp_position.y;
 
             _local_waypoints.pop();
             if (should_i_spin()){
-                ROS_INFO("We should spinn\n");
+                ROS_INFO("We should spinn\n x: %f \n y:%f \n", _saved_x, _saved_y);
                 _currentState = State::SPINNING;
-                FullRotationArroundZAxis(_tmp_position.x, _tmp_position.y);
+                FullRotationArroundZAxis(_saved_x, _saved_y);
                 break;
             }
             else{
@@ -391,6 +379,7 @@ void stateAction(){
                     _currentState = State::LAND;
                 }
             }
+
             break;
 
         case State::SPINNING:
@@ -409,8 +398,12 @@ void stateAction(){
             // Generate trajectory towards the balloon
 
             // The trajectory should wait at the balloon and then move up - down, and wait
-
-            _currentState = State::GETNEXTPOINT;
+            if(_local_waypoints.empty()){
+                _currentState = State::LAND;
+            }
+            else {
+                _currentState = State::GETNEXTPOINT;
+            }
             break;
 
 
@@ -487,12 +480,11 @@ private:
 
     const double _lat_start_help = -35.3632631, _long_start_help=149.165247;
 
-    const double _lat_start = -35.3632631, _long_start =149.165347;
-    const double _lat_mid_1 = -35.3632631, _long_mid_1 =149.165447;
-    const double _lat_mid_2 = -35.3632631, _long_mid_2 =149.165547;
-    const double _lat_end = -35.3632631, _long_end =149.165647;
-    const double _lat_end2 = -35.3632631, _long_end2 =149.165627;
-    const double _global_alt = 100;
+    const double _lat_start = -35.3632631, _long_start =149.165287;
+    const double _lat_mid_1 = -35.3632631, _long_mid_1 =149.165327;
+    const double _lat_mid_2 = -35.3632631, _long_mid_2 =149.165367;
+    const double _lat_end = -35.3632631, _long_end =149.165407;
+    const double _lat_end2 = -35.3632631, _long_end2 =149.165387;
 
 
 
@@ -504,7 +496,7 @@ private:
     // const double _lat_end = 24.41756, _long_end = 54.43626;
     // const double _global_alt = 100;
 
-    double _global_z, _yaw;
+    double _global_z, _yaw, _saved_x, _saved_y;
 
     geometry_msgs::Vector3 _currentReference;
 

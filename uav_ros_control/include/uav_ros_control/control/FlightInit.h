@@ -400,7 +400,7 @@ namespace flight_init
         dynamic_reconfigure::Server<fi_param_t>::CallbackType m_fiParamCallback;
 
         static constexpr double ARM_DURATION = 3.0;
-        static constexpr double TAKEOFF_DURATION = 30.0;
+        static constexpr double TAKEOFF_DURATION = 10.0;
         static constexpr double GRASPER_DURATION = 30.0;
     };
 
