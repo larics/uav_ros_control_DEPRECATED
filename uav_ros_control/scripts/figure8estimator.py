@@ -68,18 +68,21 @@ class Tfm_Aprox():
         self.hausdorff_counter = 0
 
         self.hausdorff = -1.0
-        self.num_of_pts_hausdorff = 100
+        self.num_of_pts_hausdorff = 50
 
-        self.hausdorff_threshold = 0.35
+        self.hausdorff_threshold = 0.6
+        self.max_a = 30.0
+        self.min_a = 15.0
+ 
+        self.direction_estimation_data_size = 7
+        self.direction_estimation_min_time_diff = 0.62
 
-        self.direction_estimation_data_size = 10
-        self.direction_estimation_min_time_diff = 0.3
-
-        self.num_of_estimated_pts = 500
+        self.num_of_estimated_pts = 1000
 
         self.z_offset = 0.0
         self.estimator_state = False
         self.goal_setpoint = PoseStamped()
+        self.goal_point = PoseStamped()
 
         self.goal_x_l = 0.0
         self.goal_y_l = 0.0
@@ -126,6 +129,9 @@ class Tfm_Aprox():
 
     def set_uav_setpoint_publisher(self, publisher):
         self.uav_setpoint_publisher = publisher
+
+    def set_uav_backup_setpoint_publisher(self, publisher):
+        self.uav_backup_setpoint_publisher = publisher
 
     def set_path_g_publisher(self, publisher):
         self.path_g_publisher = publisher
@@ -233,9 +239,54 @@ class Tfm_Aprox():
 
         return quaternion
 
+    def estimateSetpoint2(self, real_data, estimated_data, time_vector):
+        found_flag = False
+        index = 0
+
+        for i in range(len(real_data) - self.direction_estimation_data_size):
+            counter = 0
+
+            for j in range(self.direction_estimation_data_size):
+                diff = math.fabs(time_vector[i+j]-time_vector[i+j+1])
+
+                if (diff < self.direction_estimation_min_time_diff):
+                    counter = counter + 1
+
+            if (counter == self.direction_estimation_data_size):
+                index = i
+                found_flag = True
+                break
+
+        if (found_flag):
+
+            pt1 = real_data[index]
+            pt2 = real_data[index+self.direction_estimation_data_size - 1]
+
+            self.goal_point = PoseStamped()
+            self.goal_point.header.stamp = rospy.get_rostime()
+            self.goal_point.header.frame_id = "world"
+            self.goal_point.pose.position.x = pt2[0]
+            self.goal_point.pose.position.y = pt2[1]
+            self.goal_point.pose.position.z = pt2[2] + self.z_offset
+
+            dx = pt1[0] - pt2[0]
+            dy = pt1[1] - pt2[1]
+            yaw = math.atan2(dy, dx)
+
+            euler = [0.0, 0.0, yaw]
+            quaternion = self.euler2quaternion(euler)
+
+            self.goal_point.pose.orientation.x = quaternion[1]
+            self.goal_point.pose.orientation.y = quaternion[2]
+            self.goal_point.pose.orientation.z = quaternion[3]
+            self.goal_point.pose.orientation.w = quaternion[0]
+
+
+            self.uav_backup_setpoint_publisher.publish(self.goal_point)
+
     def estimateDirection(self, real_data, estimated_data, time_vector):
         index = 0
-        found_flag = True
+        found_flag = False
         index_list = []
         sign = 0
         
@@ -334,10 +385,11 @@ class Tfm_Aprox():
                     p = np.asarray(self.p)
                     self.hausdorff = self.get_hausdorff_distance(p, p_reconstructed)
                     self.hausdorff_counter = 0
-                    print(self.hausdorff, self.hausdorff/self.a, 'hausdorff')
+                    #print(self.hausdorff, self.hausdorff/self.a, 'hausdorff')
 
                     #gledamo s 1/4 pi prema 3/4 pi
                     direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
+                    self.estimateSetpoint2(p, p_reconstructed, self.time_vector)
 
                     self.goal_x_l = 0.0
                     self.goal_y_l = 0.0
@@ -397,7 +449,7 @@ class Tfm_Aprox():
                     self.goal_setpoint.pose.orientation.w = quaternion[0]
 
 
-                    if (self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.estimator_state):
+                    if (self.a < self.max_a and self.a > self.min_a and self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.estimator_state):
                         self.estimator_state = True
                         
                         #self.plot()
@@ -512,6 +564,7 @@ class Tfm_Aprox():
         plt3d.scatter(self.xcoord, self.ycoord, self.zcoord, color='r', marker="_") #3d stvarno
         plt3d.scatter(self.goal_x_g, self.goal_y_g, self.goal_z_g, color='c', marker="+", s=1000) #3d stvarno
         plt3d.scatter(self.target_x_g, self.target_y_g, self.target_z_g, color='r', marker="+", s=1000) #3d stvarno
+        plt3d.scatter(self.goal_point.pose.position.x, self.goal_point.pose.position.y, self.goal_point.pose.position.z, color='b', marker="+", s=1000) #3d stvarno
 
         plt.show()
 
@@ -663,13 +716,14 @@ if __name__ == '__main__':
     rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
     # rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
 
-    rospy.Subscriber('/red/mavros/global_position/local', Odometry, figure8.odometry_callback)
+    rospy.Subscriber('/mavros/global_position/local', Odometry, figure8.odometry_callback)
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
     rospy.Service('plot', Empty, figure8.plot_callback)
 
     uav_position = rospy.Publisher('/red/target_uav/position_estimated', PointStamped, queue_size=1)
     uav_setpoint = rospy.Publisher('/red/target_uav/setpoint_estimated', PoseStamped, queue_size=1)
+    uav_backup_setpoint = rospy.Publisher('/red/target_uav/backup_setpoint_estimated', PoseStamped, queue_size=1)
 
     estimated_figure_pub = rospy.Publisher('/red/figure8_estimated', Path, queue_size=1)
     received_points_pub = rospy.Publisher('/red/figure8_received', Path, queue_size=1)
@@ -679,6 +733,7 @@ if __name__ == '__main__':
 
     figure8.set_uav_position_publisher(uav_position)
     figure8.set_uav_setpoint_publisher(uav_setpoint)
+    figure8.set_uav_backup_setpoint_publisher(uav_backup_setpoint)
     figure8.set_path_g_publisher(estimated_figure_pub)
     figure8.set_path_coord_publisher(received_points_pub)
     figure8.set_estimator_state_publisher(estimator_state_pub)
