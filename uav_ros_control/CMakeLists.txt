@@ -10,10 +10,26 @@ find_package(catkin REQUIRED COMPONENTS
     dynamic_reconfigure
     sensor_msgs
 	mav_msgs
+	mavros
 	geometry_msgs
 	trajectory_msgs
 	message_generation
-	tf)
+	tf
+	uav_object_tracking)
+
+
+list(INSERT CMAKE_MODULE_PATH 0 "/usr/share/cmake/geographiclib/")
+find_package(GeographicLib REQUIRED)
+
+## Find Eigen
+find_package(Eigen3)
+if(NOT EIGEN3_FOUND)
+  # Fallback to cmake_modules
+  find_package(cmake_modules REQUIRED)
+  find_package(Eigen REQUIRED)
+  set(EIGEN3_INCLUDE_DIRS ${EIGEN_INCLUDE_DIRS})
+  set(EIGEN3_LIBRARIES ${EIGEN_LIBRARIES})
+endif()
 
 find_package(cmake_modules REQUIRED)
 
@@ -39,11 +55,12 @@ generate_messages(DEPENDENCIES std_msgs geometry_msgs)
 catkin_package(
 	INCLUDE_DIRS include
 	LIBRARIES pid nfilt kalman
-	CATKIN_DEPENDS uav_ros_control_msgs topp_ros)
+	CATKIN_DEPENDS uav_ros_control_msgs topp_ros uav_object_tracking)
 
 include_directories(
 	include
-	${catkin_INCLUDE_DIRS})
+	${catkin_INCLUDE_DIRS}
+	${GeographicLib_INCLUDE_DIRS})
 
 # PID controller library
 add_library(pid src/control/PID.cpp)
@@ -81,7 +98,7 @@ target_link_libraries(visual_servo_sm ${catkin_LIBRARIES} nfilt)
 
 # visual servo PURSUIT state machine
 add_executable(visual_servo_sm_pursuit nodes/reference/VisualServoStatePursuitNode.cpp)
-target_link_libraries(visual_servo_sm_pursuit ${catkin_LIBRARIES} nfilt reference_lib)
+target_link_libraries(visual_servo_sm_pursuit ${catkin_LIBRARIES} nfilt reference_lib ${GeographicLib_LIBRARIES})
 
 # PID cascade node
 add_executable(pid_cascade_node nodes/control/PositionControlNode.cpp)

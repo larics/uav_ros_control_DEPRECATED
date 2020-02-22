@@ -1,4 +1,4 @@
-#include <uav_ros_control/reference/VisualServoPursuitStateMachine.h>
+#include <uav_ros_control/reference/VisualServoPursuitStateMachine_vol2.h>
 
 int main(int argc, char **argv)
 {
