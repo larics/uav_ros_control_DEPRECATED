@@ -66,7 +66,7 @@ target_link_libraries(my_kalman ${catkin_LIBRARIES})
 # References library
 file(GLOB_RECURSE reference_SRC "src/reference/*.cpp")
 add_library(reference_lib ${reference_SRC})
-target_link_libraries(reference_lib ${catkin_LIBRARIES} nfilt my_pid)
+target_link_libraries(reference_lib ${catkin_LIBRARIES} nfilt my_pid yaml-cpp)
 
 # Controller library
 file(GLOB_RECURSE controllers_SRC "src/control/*.cpp")
@@ -111,6 +111,10 @@ target_link_libraries(distance_control_node control_lib nfilt)
 # Flight init node
 add_executable(flight_init_node nodes/control/FlightInitNode.cpp)
 target_link_libraries(flight_init_node control_lib nfilt)
+
+# Geo-fencing node
+add_executable(geo_fence_node nodes/reference/GeoFenceNode.cpp)
+target_link_libraries(geo_fence_node reference_lib ${catkin_LIBRARIES} nfilt)
 
 install(DIRECTORY include/${PROJECT_NAME}/
         DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
