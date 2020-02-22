@@ -1,0 +1,54 @@
+pursuit:
+  state_machine:
+    
+    rate: 50
+    uav_distance_offset: 7.0
+    ball_distance_offset: 5.0
+    z_offset: 0.0
+    yaw_deadzone: 0.0
+    settle_threshold: 0.2
+    gps_num_points: 3
+    collect_timeout: 5.0
+    after_takeoff_height : 10.0
+
+    search:
+      desired_height: 10.0
+      x_size: 5.0
+      y_size: 1.0
+      x_offset: 0.0
+      y_offset: 0.0
+      yaw_offset: 0.0
+      x_takeOff: 0.0
+      y_takeOff: 0.0
+
+    interception:
+      z_offset: -3.0
+
+  gps_points:
+    '1':
+      lat:
+        -35.3631267
+      lon:
+        149.1657241
+      alt:
+        10.0 #613.439423405
+      hdg:
+        3.926990817
+    '2':
+      lat:
+        -35.3633974
+      lon:
+        149.1657234
+      alt:
+        10.0 #613.399094617
+      hdg:
+        2.3561944902
+    '3':
+      lat:
+        -35.3633957
+      lon:
+        149.164736
+      alt:
+        10.0 #613.387834659
+      hdg:
+        0.7853981634
