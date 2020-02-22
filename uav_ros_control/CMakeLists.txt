@@ -15,7 +15,8 @@ find_package(catkin REQUIRED COMPONENTS
 	color_filter
 	larics_motion_planning
 	uav_search
-	mbzirc_mission_control)
+	mbzirc_mission_control
+		visualization_msgs)
 
 
 list(INSERT CMAKE_MODULE_PATH 0 "/usr/share/cmake/geographiclib/")
@@ -90,7 +91,7 @@ target_link_libraries(visual_servo_sm ${catkin_LIBRARIES} nfilt)
 
 # balloon state machine
 add_executable(balloon_state_machine nodes/reference/BalloonStateNode.cpp)
-target_link_libraries(balloon_state_machine ${catkin_LIBRARIES})
+target_link_libraries(balloon_state_machine ${catkin_LIBRARIES} nfilt)
 
 # Global pickup state machine
 add_executable(brick_pickup_sm nodes/reference/GlobalPickupStateNode.cpp)

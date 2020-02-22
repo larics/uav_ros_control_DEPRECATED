@@ -1,0 +1,27 @@
+<launch>
+    <arg name="namespace"   default="$(env UAV_NAMESPACE)"/>
+    <arg name="odom"        default="mavros/global_position/local"/>
+
+    <group ns="$(arg namespace)">
+        
+        <!-- Balloon state machine node -->
+        <node
+            pkg="uav_ros_control"
+            type="balloon_state_machine"
+            name="balloon_state_machine"
+            output="screen">
+
+            <remap from="odometry" to="$(arg odom)"/>
+
+        </node>
+
+    </group>
+
+    <!-- trajectory-->
+    <remap from="trajectory_point" to="position_hold/trajectory" />
+    <remap from="exploration_sm/goal" to="balloon_sm/goal"/>
+    <remap from="exploration_sm/point_reached" to="point_reached" />
+    <!--include file="$(find frontier_exploration_3d)/launch/planner.launch"/-->
+    <!--include file="$(find frontier_exploration_3d)/launch/execute_trajectory.launch"/-->
+
+</launch>

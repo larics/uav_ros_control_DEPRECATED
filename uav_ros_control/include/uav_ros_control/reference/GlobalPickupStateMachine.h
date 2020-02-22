@@ -190,7 +190,7 @@ void update_state(const ros::TimerEvent& /* unused */)
   }
 
   if (m_currentStatus.isDropOff() && is_brick_picked_up() && is_close_to_dropoff()) {
-    ROS_INFO("BrickPickup::updateState - at DROPOFF position");
+    ROS_INFO("BrickPickup::stateTransition - at DROPOFF position");
     toggle_magnet(false);
     clear_current_trajectory();
     return;
