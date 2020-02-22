@@ -64,6 +64,8 @@ BalloonStateMachine(ros::NodeHandle& nh) : _globalToLocal(nh)
 
     _carrot_subscriber = nh.subscribe("carrot/trajectory", 1, &BalloonStateMachine::carrotCb, this);
 
+    _landClient = nh.serviceClient<std_srvs::SetBool>("land");
+
     ros::Duration(1.0).sleep();
     ros::spinOnce();
 
@@ -415,9 +417,21 @@ void stateAction(){
 
         case State::LAND:
 
+            ros::Duration(2.0).sleep();
+            ROS_INFO("calling land.");
+            land_srv.data = true;
+            _landClient.call(land_srv, service_success);
+            if (service_success.success) {
+                ROS_INFO("Landed.");
+                ROS_WARN("[Balloon_sm] Land\n");
+                _currentState = State::DONE;
+            }
+            else{
+                ROS_ERROR("[Balloon SM] Calling land failed.\n Message: %s",service_success.message.data());
+                _currentState = State::LAND;
+            }
 
-            ROS_WARN("[Balloon_sm] Land\n");
-            _currentState = State::DONE;
+
             break;
     }
 
@@ -440,6 +454,11 @@ void run()
 }
 
 private:
+
+    std_srvs::SetBoolRequest land_srv;
+    std_srvs::SetBoolResponse service_success;
+
+    ros::ServiceClient _landClient;
 
     double _rate = 50;
 
