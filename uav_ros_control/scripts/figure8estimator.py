@@ -5,7 +5,7 @@ import rospy
 from geometry_msgs.msg import PointStamped, PoseStamped, PoseArray, Pose
 from uav_object_tracking.msg import object
 from sensor_msgs.msg import CameraInfo
-from std_msgs.msg import Header, Bool
+from std_msgs.msg import Header, Bool, Float32
 from nav_msgs.msg import Odometry, Path
 import math
 import numpy as np
@@ -66,6 +66,7 @@ class Tfm_Aprox():
         self.path_coord = Path()
 
         self.hausdorff_counter = 0
+        self.num_of_received_points = 0
 
         self.hausdorff = -1.0
         self.num_of_pts_hausdorff = 100
@@ -135,6 +136,9 @@ class Tfm_Aprox():
 
     def set_estimator_state_publisher(self, publisher):
         self.estimator_state_publisher = publisher
+
+    def set_num_of_points_publisher(self, publisher):
+        self.num_of_received_points_publisher = publisher
 
     def find_min_time_diff_data(self, data, time_s):
         min_value = 0.0
@@ -287,6 +291,9 @@ class Tfm_Aprox():
             if self.new_distance_data and self.new_detection_data and self.new_odometry_data:
 
                 self.hausdorff_counter = self.hausdorff_counter + 1
+                self.num_of_received_points = self.num_of_received_points +1
+
+                self.num_of_received_points_publisher.publish(self.num_of_received_points)
 
                 detection_data = self.find_min_time_diff_data(self.detection_data_list, self.distance_data.header.stamp.to_sec())
                 odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.distance_data.header.stamp.to_sec())
@@ -660,20 +667,21 @@ if __name__ == '__main__':
 
     rospy.Subscriber('/uav_object_tracking/uav/distance_kf_header', PointStamped, figure8.distance_callback)
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
-    rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
-    # rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
+    #rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
+    rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
 
-    rospy.Subscriber('/red/mavros/global_position/local', Odometry, figure8.odometry_callback)
+    rospy.Subscriber('mavros/global_position/local', Odometry, figure8.odometry_callback)
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
     rospy.Service('plot', Empty, figure8.plot_callback)
 
-    uav_position = rospy.Publisher('/red/target_uav/position_estimated', PointStamped, queue_size=1)
-    uav_setpoint = rospy.Publisher('/red/target_uav/setpoint_estimated', PoseStamped, queue_size=1)
+    uav_position = rospy.Publisher('target_uav/position_estimated', PointStamped, queue_size=1)
+    uav_setpoint = rospy.Publisher('target_uav/setpoint_estimated', PoseStamped, queue_size=1)
 
-    estimated_figure_pub = rospy.Publisher('/red/figure8_estimated', Path, queue_size=1)
-    received_points_pub = rospy.Publisher('/red/figure8_received', Path, queue_size=1)
-    estimator_state_pub = rospy.Publisher('/red/figure8_state', Bool, queue_size=1)
+    estimated_figure_pub = rospy.Publisher('figure8_estimated', Path, queue_size=1)
+    received_points_pub = rospy.Publisher('figure8_received', Path, queue_size=1)
+    estimator_state_pub = rospy.Publisher('figure8_state', Bool, queue_size=1)
+    num_of_received_points_pub = rospy.Publisher('figure_estimator/num_of_pts', Float32, queue_size=1)
 
 
 
@@ -682,6 +690,7 @@ if __name__ == '__main__':
     figure8.set_path_g_publisher(estimated_figure_pub)
     figure8.set_path_coord_publisher(received_points_pub)
     figure8.set_estimator_state_publisher(estimator_state_pub)
+    figure8.set_num_of_points_publisher(num_of_received_points_pub)
 
 
     figure8.run(50)
