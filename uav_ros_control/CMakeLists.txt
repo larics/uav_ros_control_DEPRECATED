@@ -14,7 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
 	geometry_msgs
 	trajectory_msgs
 	message_generation
-	tf)
+	tf
+	uav_object_tracking)
 
 
 list(INSERT CMAKE_MODULE_PATH 0 "/usr/share/cmake/geographiclib/")
@@ -53,7 +54,7 @@ generate_messages(DEPENDENCIES std_msgs geometry_msgs)
 catkin_package(
 	INCLUDE_DIRS include
 	LIBRARIES pid nfilt kalman
-	CATKIN_DEPENDS uav_ros_control_msgs topp_ros)
+	CATKIN_DEPENDS uav_ros_control_msgs topp_ros uav_object_tracking)
 
 include_directories(
 	include
