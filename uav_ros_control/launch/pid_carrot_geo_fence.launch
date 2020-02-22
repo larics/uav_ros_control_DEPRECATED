@@ -4,7 +4,7 @@
     <arg name="pid_in"          default="carrot_geofenced/trajectory"/>
     <arg name="odometry"            default="mavros/global_position/local"/>
     <arg name="msf_callback_enable"     default="false"/>
-    <arg name="ch_num"    default="1"/>
+    <arg name="ch_num"    default="0"/>
 
     <!-- PID Carrot stack -->
     <include file="$(find uav_ros_control)/launch/pid_carrot.launch">
