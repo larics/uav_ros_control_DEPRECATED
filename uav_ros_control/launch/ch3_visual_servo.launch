@@ -9,6 +9,7 @@
     <arg name="process_value" default="visual_servo/process_value"/>
     <arg name="status"      default="visual_servo/is_enabled"/>
     <arg name="patch_centroid" default="pointcloud_filter/pc_filter/patch_centroid"/>
+    <arg name="n_contour_topic" default="red_color_filter/nContours"/>
 
     <group ns="$(arg namespace)">
         
@@ -35,7 +36,7 @@
             <remap from="visual_servo/y_error" to="$(arg y_target_error)"/>
             <remap from="VisualServoProcessValueTopic" to="$(arg process_value)"/>
             <!--remap from="brick/distance" to="pointcloud_filter/brick/filtered_distance"/-->
-            <remap from="centroid_point" to="pointcloud_filter/pc_filter/patch_centroid/filtered" />
+            <remap from="centroid_point" to="$(arg patch_centroid)" />
 
         </node>
 
@@ -52,7 +53,7 @@
 
             <remap from="odometry" to="$(arg odom)"/>
             <remap from="visual_servo/status" to="$(arg status)"/>
-            <remap from="n_contours" to="red_color_filter/nContours"/>
+            <remap from="n_contours" to="$(arg n_contour_topic)"/>
             <remap from="visual_servo/yaw_error" to="red_color_filter/orientation_err"/>
             <!--remap from="brick/distance" to="pointcloud_filter/brick/filtered_distance"/-->
             <remap from="global_centroid_point" to="visual_servo/centroid/transformed" />
