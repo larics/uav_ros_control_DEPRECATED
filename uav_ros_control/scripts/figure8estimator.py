@@ -17,7 +17,9 @@ import threading
 import thread
 
 from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import Axes3
+
+from uav_ros_control.srv import GetLocalConstraints
 
 class Tfm_Aprox():
     def __init__(self):
@@ -101,6 +103,37 @@ class Tfm_Aprox():
         self.target_y_g = 0.0
         self.target_z_g = 0.0
 
+        # Get the corners of the arena in local frame
+        self.local_corners = None
+        try:
+            rospy.wait_for_service("get_local_constraints")
+            get_constraints = rospy.ServiceProxy("get_local_constraints", GetLocalConstraints)
+            resp = get_constraints()
+            self.local_corners = resp.constraints
+        except (rospy.ServiceException, rospy.ROSException) as e:
+            rospy.logerr("Couldn't get the local arena constraints. Service call failed with error: %s", e)
+        self.disable_boundary_check = rospy.get_param('disable_boundary_check', False)
+
+
+    def check_inside_2d(self, point):
+        if self.local_corners is None:
+            rospy.logwarn_once("I don't have arena corners. Assuming all points are valid.")
+            return True
+
+        def is_left(P0, P1, P2):
+            return (P1.x - P0.x) * (P2.y - P0.y) - (P2.x -  P0.x) * (P1.y - P0.y)
+
+        wn = 0
+        for i in range(len(self.local_corners) - 1):
+            if self.local_corners[i].y <= point.y:
+                if self.local_corners[i + 1].y > point.y:
+                    if is_left(self.local_corners[i], self.local_corners[i + 1], point) > 0:
+                        wn += 1
+            elif self.local_corners[i + 1].y <= point.y:
+                if is_left(self.local_corners[i], self.local_corners[i + 1], point) < 0:
+                    wn -= 1
+
+        return wn > 0
 
     def distance_callback(self, data):
         self.new_distance_data = True
@@ -341,10 +374,6 @@ class Tfm_Aprox():
             odometry_data = Odometry()
             if self.new_distance_data and self.new_detection_data and self.new_odometry_data:
 
-                self.hausdorff_counter = self.hausdorff_counter + 1
-                self.num_of_received_points = self.num_of_received_points +1
-
-                self.num_of_received_points_publisher.publish(self.num_of_received_points)
 
                 detection_data = self.find_min_time_diff_data(self.detection_data_list, self.distance_data.header.stamp.to_sec())
                 odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.distance_data.header.stamp.to_sec())
@@ -384,8 +413,14 @@ class Tfm_Aprox():
                 uav_position.point.y = Tworld_uav1[1,3]
                 uav_position.point.z = Tworld_uav1[2,3]
 
-                if (not self.estimator_state):
-                    self.estimatefigure8(uav_position)
+                if self.check_inside_2d(uav_position.point) or self.disable_boundary_check:
+                    self.hausdorff_counter = self.hausdorff_counter + 1
+                    self.num_of_received_points = self.num_of_received_points + 1
+
+                    self.num_of_received_points_publisher.publish(self.num_of_received_points)
+
+                    if (not self.estimator_state):
+                        self.estimatefigure8(uav_position)
 
                 if (self.hausdorff_counter > self.num_of_pts_hausdorff):
                     p_reconstructed = np.asarray(self.p_reconstructed)#, dtype=None, order=None)
