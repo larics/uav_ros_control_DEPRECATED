@@ -18,12 +18,5 @@
         <remap from="trajectory_flag" to="$(arg trajectory_flag)"/>
     </node>
 
-    <node name="generate_search" pkg="uav_ros_control" type="generate_search.py" output="screen" ns="$(arg namespace)" >
-        <remap from="odom" to="$(arg odom)"/>
-    </node>
-
-    <node name="generate_interception" pkg="uav_ros_control" type="generate_interception.py" output="screen" ns="$(arg namespace)" >
-        <remap from="odom" to="$(arg odom)"/>
-    </node>
 
 </launch>
