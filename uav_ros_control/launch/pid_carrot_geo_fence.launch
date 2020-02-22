@@ -7,7 +7,7 @@
     <arg name="ch_num"    default="1"/>
 
     <include file="$(find uav_ros_control)/launch/carrot_reference.launch">
-        <arg name="namespace" value="$(arg nam espace)"/>
+        <arg name="namespace" value="$(arg namespace)"/>
         <arg name="ref" value="$(arg carrot_out)"/>
         <arg name="odom" value="$(arg odometry)"/>
     </include>
