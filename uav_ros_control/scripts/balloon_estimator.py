@@ -142,11 +142,10 @@ class BalloonEstimator():
     def give_me_balloon_callback(self, req):
         res = GiveMeBalloonPositionResponse()
         res.status = False
-        min_dist = -1
+        min_dist = -1.0
+        index = 0
 
         for i in range(len(self.balloons)):
-            min_dist = -1
-            index = 0
             if (len(self.balloons[i]) > self.min_balloon_measurements):
                 odometry = self.odometry_data_list[-1]
 
@@ -159,7 +158,7 @@ class BalloonEstimator():
                 if (min_dist < 0.0):
                     min_dist = distance
                     index = i
-
+                
                 if (distance < min_dist):
                     min_dist = distance
                     index = i
@@ -167,6 +166,7 @@ class BalloonEstimator():
         if (min_dist > 0.0):
             res.status = True
             res.balloon_position = self.balloons_average[index]
+            res.balloon_position.point.z = res.balloon_position.point.z + self.z_offset
             self.balloons.pop(index)
             self.balloons_average.pop(index)
 
@@ -250,8 +250,6 @@ class BalloonEstimator():
                             self.balloons_average[i].point.z = avg_z
 
                             new_balloon_meas = True
-                            print "Broj merenja"
-                            print len(self.balloons[i])
 
                             break
 
@@ -265,9 +263,6 @@ class BalloonEstimator():
                 self.new_odometry_data = False
                 
                 self.uav_setpoint_publisher.publish(balloon_position)
-
-                print "Broj balona:"
-                print len(self.balloons)
 
             r.sleep()
 
