@@ -1,11 +1,23 @@
 #ifndef TRAJECTORY_GENERATOR_H
 #define TRAJECOTRY_GENERATOR_H
+
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
+#include <trajectory_msgs/MultiDOFJointTrajectory.h>
 #include <nav_msgs/Odometry.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <list>
 
 namespace uav_reference { namespace traj_gen {
+
+static const tf2::Quaternion getHeadingQuaternion(
+  const double t_xStart, const double t_yStart,
+  const double t_xEnd, const double t_yEnd)
+{
+  tf2::Quaternion q;
+  double yaw = atan2(t_yEnd - t_yStart, t_xEnd - t_xStart);
+  q.setRPY(0, 0, yaw);
+  return q;
+}
 
 static trajectory_msgs::MultiDOFJointTrajectoryPoint 
 toTrajectoryPointMsg(const double x, const double y, const double z, 
@@ -99,6 +111,141 @@ static std::list<trajectory_msgs::MultiDOFJointTrajectoryPoint> generateLinearTr
     itZ++;
   }
   return points;
+}
+
+static trajectory_msgs::MultiDOFJointTrajectory
+generateLinearTrajectory_topp(const double x, const double y, const double z, 
+    const nav_msgs::Odometry& odom)
+{
+  trajectory_msgs::MultiDOFJointTrajectory trajectory;
+  trajectory.header.stamp = ros::Time::now();
+  trajectory.points.push_back(
+    toTrajectoryPointMsg(
+      odom.pose.pose.position.x,
+      odom.pose.pose.position.y,
+      odom.pose.pose.position.z,
+      odom.pose.pose.orientation.x,
+      odom.pose.pose.orientation.y,
+      odom.pose.pose.orientation.z,
+      odom.pose.pose.orientation.w
+    )
+  );
+
+  tf2::Quaternion q = getHeadingQuaternion(
+    odom.pose.pose.position.x,odom.pose.pose.position.y, x, y);
+
+  trajectory.points.push_back(
+    toTrajectoryPointMsg(
+      odom.pose.pose.position.x,
+      odom.pose.pose.position.y,
+      odom.pose.pose.position.z,
+      q.getX(), q.getY(), q.getZ(), q.getW()
+    )
+  );
+
+  trajectory.points.push_back(
+    toTrajectoryPointMsg(x, y, z, q.getX(), q.getY(), q.getZ(), q.getW())
+  );
+  return trajectory;
+}
+
+static trajectory_msgs::MultiDOFJointTrajectory
+generateLinearTrajectory_topp(const double x, const double y, const double z, 
+    const trajectory_msgs::MultiDOFJointTrajectoryPoint& currentPoint)
+{
+  trajectory_msgs::MultiDOFJointTrajectory trajectory;
+  trajectory.header.stamp = ros::Time::now();
+  trajectory.points.push_back(
+    toTrajectoryPointMsg(
+      currentPoint.transforms[0].translation.x,
+      currentPoint.transforms[0].translation.y,
+      currentPoint.transforms[0].translation.z,
+      currentPoint.transforms[0].rotation.x,
+      currentPoint.transforms[0].rotation.y,
+      currentPoint.transforms[0].rotation.z,
+      currentPoint.transforms[0].rotation.w
+    )
+  );
+
+  tf2::Quaternion q = getHeadingQuaternion(
+    currentPoint.transforms[0].translation.x,
+    currentPoint.transforms[0].translation.y, 
+    x, y);
+
+  trajectory.points.push_back(
+    toTrajectoryPointMsg(
+      currentPoint.transforms[0].translation.x,
+      currentPoint.transforms[0].translation.y,
+      currentPoint.transforms[0].translation.z,
+      q.getX(), q.getY(), q.getZ(), q.getW()
+    )
+  );
+
+  trajectory.points.push_back(
+    toTrajectoryPointMsg(x, y, z, q.getX(), q.getY(), q.getZ(), q.getW())
+  );
+  return trajectory;
+}
+
+static trajectory_msgs::MultiDOFJointTrajectory
+generateCircleTrajectory_topp(const double t_x, const double t_y, const double t_z,
+   const trajectory_msgs::MultiDOFJointTrajectoryPoint& currentPoint, 
+   const int t_numberOfPoints = 10, const int t_circleRadius = 1) 
+{
+  trajectory_msgs::MultiDOFJointTrajectory trajectory;
+  trajectory.header.stamp = ros::Time::now();
+  trajectory.points.push_back(currentPoint);
+
+  const double DEG_TO_RAD = M_PI / 180.0;
+  double angleInc = 360.0 / t_numberOfPoints * DEG_TO_RAD;
+  for(int i = 0; i <= t_numberOfPoints; i ++) {
+    const double newX = t_x + t_circleRadius * cos(i * angleInc);
+    const double newY = t_y + t_circleRadius * sin(i * angleInc);
+
+    trajectory.points.push_back(toTrajectoryPointMsg(
+      newX, newY, t_z,
+      currentPoint.transforms[0].rotation.x,
+      currentPoint.transforms[0].rotation.y,
+      currentPoint.transforms[0].rotation.z,
+      currentPoint.transforms[0].rotation.w
+    ));
+  }
+  return trajectory;
+}
+
+static trajectory_msgs::MultiDOFJointTrajectory
+generateCircleTrajectory_topp(const double t_x, const double t_y, const double t_z,
+   const nav_msgs::Odometry& odom, const int t_numberOfPoints = 10, const int t_circleRadius = 1) 
+{
+  trajectory_msgs::MultiDOFJointTrajectory trajectory;
+  trajectory.header.stamp = ros::Time::now();
+  trajectory.points.push_back(
+    toTrajectoryPointMsg(
+      odom.pose.pose.position.x,
+      odom.pose.pose.position.y,
+      odom.pose.pose.position.z,
+      odom.pose.pose.orientation.x,
+      odom.pose.pose.orientation.y,
+      odom.pose.pose.orientation.z,
+      odom.pose.pose.orientation.w
+    )
+  );
+
+  const double DEG_TO_RAD = M_PI / 180.0;
+  double angleInc = 360.0 / t_numberOfPoints * DEG_TO_RAD;
+  for(int i = 0; i <= t_numberOfPoints; i ++) {
+    const double newX = t_x + t_circleRadius * cos(i * angleInc);
+    const double newY = t_y + t_circleRadius * sin(i * angleInc);
+
+    trajectory.points.push_back(toTrajectoryPointMsg(
+      newX, newY, t_z,
+      odom.pose.pose.orientation.x,
+      odom.pose.pose.orientation.y,
+      odom.pose.pose.orientation.z,
+      odom.pose.pose.orientation.w
+    ));
+  }
+  return trajectory;
 }
 
 }

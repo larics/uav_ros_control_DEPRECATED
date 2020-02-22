@@ -65,6 +65,8 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
   bool initialized = 
     nh.getParam("visual_servo/compensate_roll_and_pitch", _compensate_roll_and_pitch) &&
     nh.getParam("visual_servo/yaw_added_offset", _yawAddedOffset) &&
+    nh.getParam("visual_servo/rate_limit", _rateLimit) &&
+
     nh.getParam("visual_servo/pid_x/x_armed", x_armed) &&
     nh.getParam("visual_servo/pid_y/y_armed", y_armed) &&
     nh.getParam("visual_servo/pid_z/z_armed", z_armed) &&
@@ -150,6 +152,7 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     cfg.deadzone_yaw = _deadzone_yaw;
   }
 
+  cfg.rate_limit = _rateLimit;
   cfg.compensate_roll_and_pitch = _compensate_roll_and_pitch;
   cfg.yaw_added_offset = _yawAddedOffset;
   cfg.camera_x = _cameraPose.position.x;
@@ -245,7 +248,8 @@ void VisualServo::visualServoParamsCb(uav_ros_control::VisualServoParametersConf
   _cameraPose.orientation.x = configMsg.camera_qx;
   _cameraPose.orientation.y = configMsg.camera_qy;
   _cameraPose.orientation.z = configMsg.camera_qz;
-  _cameraPose.orientation.w = configMsg.camera_qw;  
+  _cameraPose.orientation.w = configMsg.camera_qw;
+  _rateLimit = configMsg.rate_limit;
 }
 
 void VisualServo::odomCb(const nav_msgs::OdometryConstPtr& odom) {
@@ -403,23 +407,67 @@ void VisualServo::targetCentroidCb(const geometry_msgs::PointStamped &msg)
     _targetCentroid.point.z = transformedTarget.getZ();
 }
 
+static double signum (double val) {
+  if (val >= 0) {
+    return 1;
+  }
+  else {
+    return -1;
+  }
+}
+
 void VisualServo::updateSetpoint() {
 
   double move_forward = 0.0;
   double move_left = 0.0;
   double change_yaw = 0.0;
 
-  // x and y are in the UAV reference frame
-  if(!_x_frozen) move_forward = _x_axis_PID.compute(_targetCentroid.point.x, _uavOdom.pose.pose.position.x, 1 / _rate);
-  if(!_y_frozen) move_left = _y_axis_PID.compute(_targetCentroid.point.y, _uavOdom.pose.pose.position.y, 1 / _rate);
-  if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
-
   if (_targetCentroid.point.x != -1 
       && _targetCentroid.point.y != -1
       && _targetCentroid.point.z != -1) {
-    _setpointPosition[0] = _uavPos[0] + move_forward;
-    _setpointPosition[1] = _uavPos[1] + move_left;
+
+    // x and y are in the UAV reference frame
+    if(!_x_frozen) move_forward = _x_axis_PID.compute(_targetCentroid.point.x, _uavOdom.pose.pose.position.x, 1 / _rate);
+    if(!_y_frozen) move_left = _y_axis_PID.compute(_targetCentroid.point.y, _uavOdom.pose.pose.position.y, 1 / _rate);
+    if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
+
+    // Do some basic rate limiter
+    const double newSetpoint_0 = _uavPos[0] + move_forward;
+    const double newSetpoint_1 = _uavPos[1] + move_left;
+
+    static constexpr double DT = 0.02;
+
+    double rate_0 = fabs(newSetpoint_0 - _setpointPosition[0]) / DT;
+    double rate_1 = fabs(newSetpoint_1 - _setpointPosition[1]) / DT;  
+    
+    if (rate_0 > _rateLimit) {
+      rate_0 = _rateLimit;
+      _setpointPosition[0] = _setpointPosition[0] + signum(newSetpoint_0 - _setpointPosition[0]) * _rateLimit * DT;
+    }
+    else {
+      _setpointPosition[0] = newSetpoint_0;
+    }
+
+    if (rate_1 > _rateLimit ) {
+      rate_1 = _rateLimit;
+      _setpointPosition[1] = _setpointPosition[1] + signum(newSetpoint_1 - _setpointPosition[1]) * _rateLimit * DT;
+    }
+    else {
+      _setpointPosition[1] = newSetpoint_1;
+    }
+
+    //_setpointPosition[0] = _uavPos[0] + move_forward;
+    //_setpointPosition[1] = _uavPos[1] + move_left;
+  } 
+  else {
+    _setpointPosition[0] = _uavPos[0];
+    _setpointPosition[1] = _uavPos[1];
+
+    double rate_0 = 0;
+    double rate_1 = 0;
   }
+
+
   _setpointPosition[2] = _uavPos[2];
   _setpointYaw = _uavYaw + change_yaw;
 

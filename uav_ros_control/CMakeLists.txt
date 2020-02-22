@@ -10,10 +10,27 @@ find_package(catkin REQUIRED COMPONENTS
 	sensor_msgs
 	mav_msgs
 	tf
+	sensor_fusion_comm
+	mavros
+	color_filter
 	larics_motion_planning
-	sensor_fusion_comm)
+	uav_search
+	mbzirc_mission_control)
 
+
+list(INSERT CMAKE_MODULE_PATH 0 "/usr/share/cmake/geographiclib/")
+find_package(GeographicLib REQUIRED)
 find_package(cmake_modules REQUIRED)
+
+## Find Eigen
+find_package(Eigen3)
+if(NOT EIGEN3_FOUND)
+  # Fallback to cmake_modules
+  find_package(cmake_modules REQUIRED)
+  find_package(Eigen REQUIRED)
+  set(EIGEN3_INCLUDE_DIRS ${EIGEN_INCLUDE_DIRS})
+  set(EIGEN3_LIBRARIES ${EIGEN_LIBRARIES})
+endif()
 
 generate_dynamic_reconfigure_options(
 	config/control/PositionControlParameters.cfg
@@ -21,33 +38,35 @@ generate_dynamic_reconfigure_options(
 	config/control/FlightInitParameters.cfg
 	config/reference/VisualServoParameters.cfg
 	config/reference/VisualServoStateMachineParameters.cfg
-)
+	config/reference/GlobalPickupStateMachineParameters.cfg
+	config/reference/MasterPickupStateMachineParameters.cfg)
 
 catkin_package(
 	INCLUDE_DIRS include
-	LIBRARIES pid nfilt kalman
+	LIBRARIES my_pid nfilt my_kalman
 	CATKIN_DEPENDS uav_ros_control_msgs)
 
 include_directories(
 	include
-	${catkin_INCLUDE_DIRS})
+	${catkin_INCLUDE_DIRS}
+  ${GeographicLib_INCLUDE_DIRS})
 
 # PID controller library
-add_library(pid src/control/PID.cpp)
-target_link_libraries(pid ${catkin_LIBRARIES})
+add_library(my_pid src/control/PID.cpp)
+target_link_libraries(my_pid ${catkin_LIBRARIES})
 
 # Nonlinear filters library
 add_library(nfilt src/filters/NonlinearFilters.cpp)
 target_link_libraries(nfilt ${catkin_LIBRARIES})
 
 # Kalman filter library
-add_library(kalman src/filters/KalmanFilter.cpp)
-target_link_libraries(kalman ${catkin_LIBRARIES})
+add_library(my_kalman src/filters/KalmanFilter.cpp)
+target_link_libraries(my_kalman ${catkin_LIBRARIES})
 
 # References library
 file(GLOB_RECURSE reference_SRC "src/reference/*.cpp")
 add_library(reference_lib ${reference_SRC})
-target_link_libraries(reference_lib ${catkin_LIBRARIES} nfilt pid)
+target_link_libraries(reference_lib ${catkin_LIBRARIES} nfilt my_pid)
 
 # Controller library
 file(GLOB_RECURSE controllers_SRC "src/control/*.cpp")
@@ -69,9 +88,17 @@ target_link_libraries(visual_servo_idle reference_lib)
 add_executable(visual_servo_sm nodes/reference/VisualServoStateNode.cpp)
 target_link_libraries(visual_servo_sm ${catkin_LIBRARIES} nfilt)
 
-# pickup state machine
-add_executable(pickup_sm nodes/reference/PickupStateNode.cpp)
+# Global pickup state machine
+add_executable(brick_pickup_sm nodes/reference/GlobalPickupStateNode.cpp)
+target_link_libraries(brick_pickup_sm ${catkin_LIBRARIES} nfilt ${GeographicLib_LIBRARIES})
+
+# pickup state machine - with trajectories
+add_executable(pickup_sm nodes/reference/PickupStateNode_trajectory.cpp)
 target_link_libraries(pickup_sm ${catkin_LIBRARIES} nfilt)
+
+# master pickup state machnie
+add_executable(master_brick_pickup nodes/reference/MasterPickupControlNode.cpp)
+target_link_libraries(master_brick_pickup ${catkin_LIBRARIES} nfilt)
 
 # PID cascade node
 add_executable(pid_cascade_node nodes/control/PositionControlNode.cpp)

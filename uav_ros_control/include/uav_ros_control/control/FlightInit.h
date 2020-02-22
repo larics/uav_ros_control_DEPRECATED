@@ -96,6 +96,8 @@ public:
 			&flight_init::FlightInit::msfOdometryCb, this);
 
 		// Initialize publishers 
+		m_pubGoalsMarker = nh.advertise<visualization_msgs::MarkerArray>(
+			"flight_init/goals_marker", 20);
 		m_pubTrajectory = nh.advertise<trajectory_msgs::JointTrajectory> (
 			"joint_trajectory", 1);
 		m_pubReadyForExploration = nh.advertise<std_msgs::Bool> (
@@ -235,6 +237,7 @@ void cartographerPoseCb(const geometry_msgs::PoseStampedPtr& msg)
 		if (first_time)
 		{
 			first_time = false;
+			//TODO provjeri s anom!!
 			m_previousCartographerPose = *msg;
 			m_currentCartographerPose = *msg;
 			// Set timer for map initialization
@@ -560,6 +563,7 @@ bool publishTrajectory (
 	m_srv.request.publish_trajectory = false;
 	m_srv.request.plan_path = false;
 	m_srv.request.plan_trajectory = true;
+	
 	// Call the service
 	bool m_service_succes = m_planTrajectoryClient.call(m_srv);
 		
@@ -595,33 +599,33 @@ void msfInitializeHeight()
 		m_msfInitializedHeightFlag = true;
 	}
 	else
-			{
+	{
 		ROS_FATAL("msfInitHeight: call failed.");
 		m_msfInitializedHeightFlag = true;
 	}
 }
-				
+
 
 void msfInitializeScale()
-				{
+{
 	sensor_fusion_comm::InitScale m_init_scale;
 	m_init_scale.request.scale = 1.0;
 	// Call msf init height
 
 	if (m_initializeMsfScaleClient.call(m_init_scale))
-					{
+	{
 		ros::Duration(0.2).sleep();
 		
 		ROS_INFO("msfInitScale: successfully called.");
 		m_msfInitializedScaleFlag = true;
-					}
-					else
-					{
+	}
+	else
+	{
 		ROS_FATAL("msfInitScale: call failed.");
 		m_msfInitializedScaleFlag = true;
 	}
-					}
-					
+}
+
 void startMission()
 {
 	// In every iteration check
@@ -674,9 +678,10 @@ sensor_msgs::NavSatFix m_currentGlobalPosition;
 geometry_msgs::Point m_currGoal;
 geometry_msgs::PoseStamped m_previousCartographerPose, m_currentCartographerPose;
 nav_msgs::Odometry m_currentOdom, m_homeOdom;
+
 ros::Subscriber m_subState, m_subOdometry, m_subCartographerPose, m_subMsfOdometry,
 	m_subRcIn;
-ros::Publisher m_pubTrajectory, m_pubReadyForExploration;
+ros::Publisher m_pubGoalsMarker, m_pubTrajectory, m_pubReadyForExploration;
 ros::Time m_timer;
 bool m_takeoffFlag = false;
 bool m_startFlightFlag = false;

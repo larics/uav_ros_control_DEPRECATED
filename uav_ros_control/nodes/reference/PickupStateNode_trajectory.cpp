@@ -6,6 +6,5 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
 
     std::shared_ptr<uav_reference::PickupStateMachine> vssmObj{new uav_reference::PickupStateMachine(nh)};
-    //vssmObj->run();
     ros::spin();
 }

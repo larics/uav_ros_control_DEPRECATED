@@ -5,6 +5,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/SetBool.h>
 #include <uav_ros_control_msgs/TakeOff.h>
 #include <mavros_msgs/State.h>
 #include <uav_ros_control/filters/Util.h>
@@ -111,8 +112,8 @@ namespace uav_reference
 		bool takeoffServiceCb(uav_ros_control_msgs::TakeOff::Request& request, 
 			uav_ros_control_msgs::TakeOff::Response& response);
 
-		bool landServiceCb(std_srvs::Empty::Request& request,
-			std_srvs::Empty::Response& response);
+		bool landServiceCb(std_srvs::SetBool::Request& request,
+			std_srvs::SetBool::Response& response);
 
 		/**
 		 * Callback function for Position reference. Works only during position hold mode.
