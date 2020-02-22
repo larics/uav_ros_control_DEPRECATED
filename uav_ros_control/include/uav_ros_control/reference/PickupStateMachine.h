@@ -77,6 +77,8 @@ explicit PickupStateMachine(ros::NodeHandle& t_nh) :
   initializeStateActions();
   initializeStateTransitions();
 
+  m_heightSet = false;
+
   m_pubPickupState = t_nh.advertise<std_msgs::Int32>("pickup_sm/state", 1);
   m_pubTrajPointGen = t_nh.advertise<Traj>("generator/trajectory", 1);
   m_pubTrajectoryPoint = t_nh.advertise<TrajPoint>("trajectory_point", 1);
@@ -93,6 +95,9 @@ explicit PickupStateMachine(ros::NodeHandle& t_nh) :
 }
 
 private:
+
+bool m_heightSet;
+double m_servoHeight;
 
 inline bool isPickupActive() const {
   return m_currentState != PickupState::OFF;
@@ -202,6 +207,11 @@ void loopCallback(const ros::TimerEvent&)
           servoSetpoint -  (-m_handlerLocalCentroid.getData().z));
   };
   
+  if (!m_heightSet) {
+    ROS_INFO("setting height- ", m_heightSet);
+    m_servoHeight = m_handlerOdometry.getData().pose.pose.position.z;
+    m_heightSet = true;
+  }
   // Publish some trajectory points
   switch (m_currentState) {
     
@@ -211,9 +221,18 @@ void loopCallback(const ros::TimerEvent&)
 
     case PickupState::ALIGNMENT:
 
+      if (!m_heightSet){
+        ROS_WARN("height not set!!");
+        break;
+      }
+      if (abs(m_servoHeight - m_handlerOdometry.getData().pose.pose.position.z) > 0.5 )
+      {
+        ROS_WARN("too much z offset!!");
+        break;
+      }
       m_currentTrajectoryPoint = traj_gen::toTrajectoryPointMsg(
         near_brick_x(), near_brick_y(), 
-        height_servo_ref(m_handlerParams->getData().brick_alignment_height),
+        m_servoHeight,
         near_brick_yaw());
       m_pubTrajectoryPoint.publish(m_currentTrajectoryPoint);
       break;

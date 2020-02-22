@@ -71,7 +71,7 @@ namespace uav_reference {
         * Odometry callback function for extracting the UAV's pose.
         */
       void odomCb(const nav_msgs::OdometryConstPtr&);
-      void yawErrorCb(const std_msgs::Float32&);
+      //void yawErrorCb(const std_msgs::Float32&);
       void VisualServoProcessValuesCb(const uav_ros_control_msgs::VisualServoProcessValues&);
       void xOffsetCb(const std_msgs::Float32&);
       void yOffsetCb(const std_msgs::Float32&);
@@ -79,7 +79,7 @@ namespace uav_reference {
       void targetCentroidCb(const geometry_msgs::PointStamped&);
 
       // X and Y axes of the image coordinate frame.
-      PID _x_axis_PID{"x-axis"}, _y_axis_PID{"y-axis"}, _z_axis_PID{"z-axis"}, _yaw_PID{"yaw"};
+      PID _x_axis_PID{"x-axis"}, _y_axis_PID{"y-axis"}, _z_axis_PID{"z-axis"}; // _yaw_PID{"yaw"};
 
       int _n_contours = 0;
       std::array<double, 3> _uavPos{0.0, 0.0, 0.0};
@@ -87,13 +87,13 @@ namespace uav_reference {
       geometry_msgs::PointStamped _targetCentroid;
       geometry_msgs::Pose _cameraPose;
       nav_msgs::Odometry _uavOdom;
-      double _error_x = 0, _error_y = 0, _error_z = 0, _error_yaw = 0, _offset_x = 0;
+      double _error_x = 0, _error_y = 0, _error_z = 0, _offset_x = 0;
       double _offset_y = 0, _offset_z = 0,  _deadzone_x = 0, _deadzone_y = 0, _deadzone_z = 0, _deadzone_yaw = 0;
       double  _qx, _qy, _qz, _qw, _uavYaw, _uavRoll, _uavPitch, _setpointYaw, _yawAddedOffset;
       double _rate, _rateLimit;
       
       bool _visualServoEnabled = false,  _compensate_roll_and_pitch = false;
-      bool _x_frozen = false, _y_frozen = false, _yaw_frozen = false;
+      bool _x_frozen = false, _y_frozen = false; // _yaw_frozen = false;
       bool _compensate_camera_nonlinearity = false;
 
       /** Publishers */
@@ -105,11 +105,11 @@ namespace uav_reference {
       std_msgs::Bool _boolMsg;
 
       // Topics for direct rotor control
-      ros::Publisher _pubMoveLeft, _pubMoveForward, _pubChangeYaw;
-      std_msgs::Float32 _moveLeftMsg, _moveForwardMsg, _changeYawMsg;
+      ros::Publisher _pubMoveLeft, _pubMoveForward; //, _pubChangeYaw;
+      std_msgs::Float32 _moveLeftMsg, _moveForwardMsg; // _changeYawMsg;
 
       // Topics for debugging
-      ros::Publisher _pubUavYawDebug, _pubChangeYawDebug, _pubYawErrorDebug;
+      //ros::Publisher _pubUavYawDebug, _pubChangeYawDebug, _pubYawErrorDebug;
       ros::Publisher _pubUavRollDebug, _pubUavPitchDebug;
       ros::Publisher _pubTransformedTarget, _pubTransformedTarget_local, _pubTransformedTargetComp_local;
       std_msgs::Float32 _floatMsg;

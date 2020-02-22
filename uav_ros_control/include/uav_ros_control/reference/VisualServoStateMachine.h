@@ -67,8 +67,8 @@ VisualServoStateMachine(ros::NodeHandle& nh)
         nh.subscribe("odometry", 1, &uav_reference::VisualServoStateMachine::odomCb, this);
     // Note from past Lovro : This is changed to debug/yaw_error because that holds actual information about the yaw_error
     // TODO: Change this to make more sense
-    _subYawError = 
-        nh.subscribe("debug/yaw_error", 1, &uav_reference::VisualServoStateMachine::yawErrorCb, this); 
+    //_subYawError = 
+    //    nh.subscribe("debug/yaw_error", 1, &uav_reference::VisualServoStateMachine::yawErrorCb, this); 
     _subNContours =
         nh.subscribe("n_contours", 1, &uav_reference::VisualServoStateMachine::nContoursCb, this);
     _subPatchCentroid_global =
@@ -170,13 +170,13 @@ bool healthyNumberOfPublishers()
     ROS_FATAL_COND(!_subOdom.getNumPublishers() > 0, "VSSM - 'odometry' topic publisher missing");
     ROS_FATAL_COND(!_subPatchCentroid_global.getNumPublishers() > 0, "VSSM - 'centroid_global' topic publisher missing");
     ROS_FATAL_COND(!_subPatchCentroid_local.getNumPublishers() > 0, "VSSM - 'centroid_local' topic publisher missing");
-    ROS_FATAL_COND(!_subYawError.getNumPublishers() > 0, "VSSM - 'yaw_error' topic publisher missing");
+    //ROS_FATAL_COND(!_subYawError.getNumPublishers() > 0, "VSSM - 'yaw_error' topic publisher missing");
     
     return _subNContours.getNumPublishers() > 0 
         && _subOdom.getNumPublishers() > 0
         && _subPatchCentroid_global.getNumPublishers() > 0
-        && _subPatchCentroid_local.getNumPublishers() > 0
-        && _subYawError.getNumPublishers() > 0;
+        && _subPatchCentroid_local.getNumPublishers() > 0;
+        //&& _subYawError.getNumPublishers() > 0;
 }
 
 bool brickPickupServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::Response& response)
@@ -250,7 +250,7 @@ void vssmParamCb(vssm_param_t& configMsg,uint32_t level)
 {
     ROS_WARN("VisualServoStateMachine::vssmParamCb()");
     _minTargetError = configMsg.min_error;
-    _minYawError = configMsg.min_yaw_error;
+    //_minYawError = configMsg.min_yaw_error;
     _touchdownHeight = configMsg.touchdown_height;
     _magnetOffset = configMsg.magnet_offset;
     _touchdownSpeed = configMsg.touchdown_speed;
@@ -270,7 +270,7 @@ void vssmParamCb(vssm_param_t& configMsg,uint32_t level)
 void setVSSMParameters(vssm_param_t& config)
 {
     config.min_error = _minTargetError;
-    config.min_yaw_error = _minYawError;
+    //config.min_yaw_error = _minYawError;
     config.magnet_offset = _magnetOffset;
     config.touchdown_speed = _touchdownSpeed;
     config.touchdown_height = _touchdownHeight;
@@ -291,8 +291,8 @@ void initializeParameters(ros::NodeHandle& nh)
 {
     ROS_INFO("VisualServoStateMachine::initializeParameters()");
     bool initialized = 
-        nh.getParam(PARAM_MIN_YAW_ERROR, _minYawError)
-        && nh.getParam(PARAM_MIN_TD_TAR_ERROR_XY, _minTouchdownTargetPositionError_xy)
+        //nh.getParam(PARAM_MIN_YAW_ERROR, _minYawError)
+        nh.getParam(PARAM_MIN_TD_TAR_ERROR_XY, _minTouchdownTargetPositionError_xy)
         && nh.getParam(PARAM_MIN_TD_UAV_VEL_ERROR_XY, _minTouchdownUavVelocityError_xy)
         && nh.getParam(PARAM_MIN_TD_TAR_ERROR_Z, _minTouchdownTargetPositionError_z)
         && nh.getParam(PARAM_MIN_TD_UAV_VEL_ERROR_Z, _minTouchdownUavVelocityError_z)
@@ -311,7 +311,7 @@ void initializeParameters(ros::NodeHandle& nh)
 
     _afterTouchdownHeight_GPS = _afterTouchdownHeight;
     ROS_INFO("Node rate: %.2f", _rate);
-    ROS_INFO("Minimum yaw error: %.2f", _minYawError);
+    //ROS_INFO("Minimum yaw error: %.2f", _minYawError);
     ROS_INFO("Brick alignment height: %.2f", _brickAlignHeight);
     ROS_INFO("Min target error %.2f", _minTargetError);
     ROS_INFO("Touchdown position target error [%.2f, %.2f, %.2f]", 
@@ -400,11 +400,11 @@ void updateState()
     }
 
     // Update the transition counter
-    if (_currentState == LocalPickupState::BRICK_ALIGNMENT &&
+    /*if (_currentState == LocalPickupState::BRICK_ALIGNMENT &&
         isTargetInThreshold(_minTargetError, _minTargetError, _minTargetError, _brickAlignHeight) &&
-        fabs(_currYawError) < _minYawError) {
-        _descentTransitionCounter++;
-    }
+        //fabs(_currYawError) < _minYawError) {
+        //_descentTransitionCounter++;
+    }*/
 
     // If brick alignemnt is activated and target error is withing range start descent
     if (_currentState == LocalPickupState::BRICK_ALIGNMENT &&
@@ -508,20 +508,21 @@ bool subscribedTopicsActive()
     double dt_contour = currentTime - _timeLastContour;
     double dt_centGlobal = currentTime - _timeLastCentroidGlobal;
     double dt_centLocal = currentTime - _timeLastCentroidLocal;
-    double dt_yaw = currentTime - _timeLastYawError;
+    //double dt_yaw = currentTime - _timeLastYawError;
     
     static constexpr double MAX_DT = 0.5;
+    static constexpr double MAX_DT_SERVO = 1;
     ROS_FATAL_COND(dt_odom > MAX_DT,        "VSSM - odometry timeout reached.");
     ROS_FATAL_COND(dt_contour > MAX_DT,     "VSSM - contour timeout reached.");
-    ROS_FATAL_COND(dt_centGlobal > MAX_DT,  "VSSM - centroid global timeout reached.");
-    ROS_FATAL_COND(dt_centLocal > MAX_DT,   "VSSM - centroid local timeout reached.");
-    ROS_FATAL_COND(dt_yaw > MAX_DT,         "VSSM - yaw error timeout reached.");
+    ROS_FATAL_COND(dt_centGlobal > MAX_DT_SERVO,  "VSSM - centroid global timeout reached.");
+    ROS_FATAL_COND(dt_centLocal > MAX_DT_SERVO,   "VSSM - centroid local timeout reached.");
+    //ROS_FATAL_COND(dt_yaw > MAX_DT,         "VSSM - yaw error timeout reached.");
     
     return dt_odom < MAX_DT 
         && dt_contour < MAX_DT 
-        && dt_centGlobal < MAX_DT
-        && dt_centLocal < MAX_DT
-        && dt_yaw < MAX_DT;
+        && dt_centGlobal < MAX_DT_SERVO
+        && dt_centLocal < MAX_DT_SERVO;
+        //&& dt_yaw < MAX_DT;
 }
 
 void publishVisualServoSetpoint(double dt)
@@ -548,49 +549,8 @@ void publishVisualServoSetpoint(double dt)
         case LocalPickupState::BRICK_ALIGNMENT :
             _currVisualServoFeed.x = _trajPoint.transforms.front().translation.x;
             _currVisualServoFeed.y = _trajPoint.transforms.front().translation.y;
-            _currVisualServoFeed.z = _currOdom.pose.pose.position.z + 
-                double(_descentCounterMax) / 100.0 * (_brickAlignHeight - _relativeBrickDistance_local);
+            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
             _currHeightReference  = _currVisualServoFeed.z;
-            break;
-        
-        case LocalPickupState::DESCENT :
-            if (_currHeightReference < _relativeBrickDistanceGlobal_lastValid) {
-                _currVisualServoFeed.z = _relativeBrickDistanceGlobal_lastValid;
-            } else {
-                _currVisualServoFeed.z = _currHeightReference - _descentSpeed * dt;
-            }
-            _currHeightReference = _currVisualServoFeed.z;
-            _currVisualServoFeed.yaw = 0;
-            break;
-        
-        case LocalPickupState::TOUCHDOWN_ALIGNMENT :
-            _currVisualServoFeed.z = _currOdom.pose.pose.position.z + 
-                double(_descentCounterMax) / 100.0 * (_touchdownHeight - _relativeBrickDistance_local);
-            _currHeightReference  = _currVisualServoFeed.z;
-            _currVisualServoFeed.yaw = 0;
-            _touchdownAlignDuration += dt;
-            break;
-
-        case LocalPickupState::TOUCHDOWN :
-            if (_relativeBrickDistance_local < _visualServoDisableHeight) {
-                _currVisualServoFeed.x = 0;
-                _currVisualServoFeed.y = 0;
-            }
-
-            if (_touchdownTime < _touchdownDuration) {
-                
-                if (_currHeightReference < _relativeBrickDistanceGlobal_lastValid) {
-                    _currVisualServoFeed.z = _relativeBrickDistanceGlobal_lastValid;
-                } else {
-                    _currVisualServoFeed.z = _currHeightReference - _touchdownSpeed * dt;
-                }
-
-            } else {
-                _currVisualServoFeed.z = _currHeightReference + _ascentSpeed * dt;
-            }
-            _currHeightReference = _currVisualServoFeed.z;
-            _currVisualServoFeed.yaw = 0;
-            _touchdownTime += dt;
             break;
     }
 
@@ -609,11 +569,11 @@ void odomCb(const nav_msgs::OdometryConstPtr& msg)
     _timeLastOdometry = ros::Time::now().toSec();
 }
 
-void yawErrorCb(const std_msgs::Float32ConstPtr& msg)
+/*void yawErrorCb(const std_msgs::Float32ConstPtr& msg)
 {
     _currYawError = msg->data;
     _timeLastYawError = ros::Time::now().toSec();
-}
+}*/
 
 void run()
 {
@@ -667,9 +627,9 @@ private:
     trajectory_msgs::MultiDOFJointTrajectoryPoint _trajPoint;
 
     /* Yaw error subscriber */
-    ros::Subscriber _subYawError;
-    double _currYawError = 1e5, _currUavVelError = 1e5;
-    double _minYawError, _minTargetError,   
+    //ros::Subscriber _subYawError;
+    double _currUavVelError = 1e5;
+    double _minTargetError,   
         _minTouchdownTargetPositionError_xy, _minTouchdownUavVelocityError_xy,
         _minTouchdownTargetPositionError_z, _minTouchdownUavVelocityError_z,
         _minTouchdownAlignDuration, _brickAlignHeight;
@@ -693,8 +653,8 @@ private:
     double _timeLastContour = 0,
         _timeLastOdometry = 0,
         _timeLastCentroidGlobal = 0,
-        _timeLastCentroidLocal = 0,
-        _timeLastYawError = 0;
+        _timeLastCentroidLocal = 0;
+        //_timeLastYawError = 0;
 
     /* Define Dynamic Reconfigure parameters */
     boost::recursive_mutex _vssmConfigMutex;
