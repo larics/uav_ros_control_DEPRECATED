@@ -1,0 +1,13 @@
+gps_constraints:
+  - lat: 24.4172756  # dolje-lijevo-2
+    lon: 54.437045
+    alt: 19
+  - lat: 24.4171652  # dolje-desno-2
+    lon: 54.4374894
+    alt: 19
+  - lat: 24.417351  # gore-desno-2
+    lon: 54.43755
+    alt: 19
+  - lat: 24.4174668  # gore-lijevo-2
+    lon: 54.4371347
+    alt: 19
