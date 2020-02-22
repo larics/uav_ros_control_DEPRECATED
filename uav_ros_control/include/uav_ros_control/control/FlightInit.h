@@ -94,7 +94,7 @@ public:
 		m_pubTrajectory = nh.advertise<trajectory_msgs::JointTrajectory> (
 			"joint_trajectory", 1);
 		m_pubReadyForExploration = nh.advertise<std_msgs::Bool> (
-			"ready_for_exploration", 1);
+			"ready_for_exploration", 1, true);
 		m_pubDynamixelState = nh.advertise<std_msgs::String>("dynamixel_workbench/set_state", 1);
 	
 		// Advertise service
@@ -234,19 +234,25 @@ bool armAndTakeOffCb(
 	std_srvs::SetBool::Request& request, 
 	std_srvs::SetBool::Response& response)
 {
+  	std_msgs::Bool t_ready_msg;
+	t_ready_msg.data = false;
+
 	const auto set_response = [&response] (bool success) { response.success = success; };
 	if (stateMachineDisableConditions() || !healthyNumberOfPublishers() || !all_services_available())
   {
+
     if (!healthyNumberOfPublishers())
 		{
       ROS_FATAL("IF::armAndTakeoffCb - check connected publishers.");
 			set_response(false);
+			m_pubReadyForExploration.publish(t_ready_msg);
 			return true;
 		}
 		if (!all_services_available())
 		{
       ROS_FATAL("IF::armAndTakeoffCb - check services.");
 			set_response(false);
+			m_pubReadyForExploration.publish(t_ready_msg);
 			return true;			
 		}
 	}
@@ -255,13 +261,15 @@ bool armAndTakeOffCb(
 	{
 		ROS_FATAL("TakeoffCb - request denied, not in GUIDED_NOGPS");
 		set_response(false);
+		m_pubReadyForExploration.publish(t_ready_msg);
 		return true;
 	}
 	
 	if (!armUAV())
 	{
-		 ROS_FATAL("TakeoffCb - request denied, ARMING failed.");
+		ROS_FATAL("TakeoffCb - request denied, ARMING failed.");
 		set_response(false);
+		m_pubReadyForExploration.publish(t_ready_msg);
 		return true;
 	}
 
@@ -271,18 +279,21 @@ bool armAndTakeOffCb(
 	{
 		ROS_FATAL("TakeoffCb - request denied, TAKEOFF unsuccessful");
 		set_response(false);
+		m_pubReadyForExploration.publish(t_ready_msg);
 		return true;
 	}
 
 	ros::Duration(TAKEOFF_DURATION).sleep();
 	// Ensure last odom msg
+	t_ready_msg.data = true;
+	m_pubReadyForExploration.publish(t_ready_msg);
 	ros::spinOnce();
 	// Open the GRASPER
-	std_msgs::String msg;
-	msg.data = "unwinding";
-	m_pubDynamixelState.publish(msg);
-	ros::spinOnce();
-	ros::Duration(GRASPER_DURATION).sleep();
+	// std_msgs::String msg;
+	// msg.data = "unwinding";
+	// m_pubDynamixelState.publish(msg);
+	// ros::spinOnce();
+	// ros::Duration(GRASPER_DURATION).sleep();
 	// Assume takeoff is successful at this point
 	ROS_INFO("TakeoffCb - request approved, TAKEOFF successful");
 	m_takeoffFlag = true;
