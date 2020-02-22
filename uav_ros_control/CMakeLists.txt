@@ -33,6 +33,13 @@ if(NOT EIGEN3_FOUND)
   set(EIGEN3_LIBRARIES ${EIGEN_LIBRARIES})
 endif()
 
+add_service_files(
+		FILES
+		GiveMeBalloonPosition.srv
+)
+
+generate_messages(DEPENDENCIES std_msgs geometry_msgs)
+
 generate_dynamic_reconfigure_options(
 	config/control/PositionControlParameters.cfg
 	config/control/DistanceControlParameters.cfg

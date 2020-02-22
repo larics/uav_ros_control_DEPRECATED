@@ -27,6 +27,8 @@
 #include <queue>
 
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
+#include <uav_ros_control/GiveMeBalloonPosition.h>
+#include <geometry_msgs/PointStamped.h>
 
 
  namespace uav_reference
@@ -40,7 +42,6 @@ enum State {
     POINTREACHED,
     SPINNING,
     POPPING,
-    RETURN_TO_TRAJECTORY,
     LAND,
     DONE
 };
@@ -65,6 +66,7 @@ BalloonStateMachine(ros::NodeHandle& nh) : _globalToLocal(nh)
     _carrot_subscriber = nh.subscribe("carrot/trajectory", 1, &BalloonStateMachine::carrotCb, this);
 
     _landClient = nh.serviceClient<std_srvs::SetBool>("land");
+    _giveMeBalloonClient = nh.serviceClient<uav_ros_control::GiveMeBalloonPosition>("/give_me_balloon");
 
     ros::Duration(1.0).sleep();
     ros::spinOnce();
@@ -90,13 +92,10 @@ void AddLocalWaypoint(double latitude, double longitude, double yaw_requested){
     Eigen::Vector3d local = _globalToLocal.toLocal(latitude, longitude, _global_z, true);
     auto odom_q= _currOdom.pose.pose.orientation;
 
-
-
     // calculate yaw
     double yaw = yaw_requested; // - util::calculateYaw(odom_q.x, odom_q.y, odom_q.z, odom_q.w);
 
-    // calculate yaw from curent reference and next point
-
+    // calculate yaw from curent references and next point
 
     if (_prva){
         _prva = false;
@@ -129,56 +128,6 @@ void AddLocalWaypoint(double latitude, double longitude, double yaw_requested){
     void carrotCb(trajectory_msgs::MultiDOFJointTrajectoryPoint trajectory){
     _currentReference = trajectory.transforms[0].translation;
 }
-
-// void publishGeneratedWaypoints()
-// {
-//         // std::vector<geometry_msgs::PoseStamped> m_vectorOfPointsOutdoor)
-//         visualization_msgs::MarkerArray Markerarr;
-//         visualization_msgs::Marker Marker;
-//         Markerarr.markers.resize(_local_waypoints.size());
-//         std::queue<geometry_msgs::PoseStamped> tmp_queue;
-//
-//         ROS_INFO("Create markerarray");
-//         int i = 0;
-//         while (!_local_waypoints.empty())
-//         {
-//             geometry_msgs::PoseStamped tmp_pose = _local_waypoints.front();
-//             tmp_queue.push(tmp_pose);
-//
-//
-//             Marker.header.frame_id = "world";
-//             Marker.header.stamp = ros::Time::now();
-//             Marker.id = i++;
-//             Marker.ns = "goals";
-//             Marker.type = visualization_msgs::Marker::SPHERE;
-//             Marker.pose.position.x = tmp_pose.pose.position.x;
-//             Marker.pose.position.y = tmp_pose.pose.position.y;
-//             Marker.pose.position.z = tmp_pose.pose.position.z;
-//             Marker.pose.orientation.x = 0;
-//             Marker.pose.orientation.y = 0;
-//             Marker.pose.orientation.z = 0;
-//             Marker.pose.orientation.w = 1;
-//
-//             Marker.scale.x = 0.25;
-//             Marker.scale.y = 0.25;
-//             Marker.scale.z = 0.1;
-//             Marker.color.a = 1.0;
-//             Marker.color.r = 0.0;
-//             Marker.color.g = 1.0;
-//             Marker.color.b = 0.0;
-//             Marker.lifetime = ros::Duration(360);
-//
-//             Markerarr.markers.push_back(Marker);
-//
-//             ROS_INFO("Finally publishing markers!");
-//
-//             _pubGoalsMarker.publish(Markerarr);
-//
-//             _local_waypoints.pop();
-//         }
-//
-//         // Refil points
-// }
 
 void FullRotationArroundZAxis(double x, double y){
     // rewrite
@@ -324,6 +273,44 @@ void publish_spinning_points(){
     }
 }
 
+void destroy(geometry_msgs::PointStamped target_point){
+
+    ROS_INFO("Destroy!");
+    ROS_ERROR("DESTROY!");
+    ROS_INFO("Destroy!");
+
+    geometry_msgs::PoseStamped target_pose;
+    // Odi metar iznad
+    double z_offset = 0.5;
+    target_pose.pose.position.x = target_point.point.x;
+    target_pose.pose.position.y = target_point.point.y;
+    target_pose.pose.position.z = target_point.point.z + z_offset;
+
+    // Todo orientation
+
+    publishCurrGoal(target_pose);
+    _isPointReached = false;
+
+    while(!_isPointReached){
+        ros::Duration(0.2).sleep();
+        ros::spinOnce();
+    }
+
+    // Vrati se na saved_x, saved_z, global_z, (yaw prema _local_waypoint.front(), ako postoji)
+    target_pose.pose.position.x = _saved_x;
+    target_pose.pose.position.y = _saved_y;
+    target_pose.pose.position.z = _global_z;
+    target_pose.pose.orientation = _tmp_orientation;
+    publishCurrGoal(target_pose);
+    _isPointReached = false;
+    while(!_isPointReached){
+        ros::Duration(0.2).sleep();
+        ros::spinOnce();
+    }
+
+}
+
+
 /******************************************************************************************************************
  * **********************************************State machine****************************************************
  *
@@ -348,6 +335,7 @@ void stateAction(){
 
                 publishCurrGoal(_local_waypoints.front());
                 _tmp_position = _local_waypoints.front().pose.position;
+                _tmp_orientation = _local_waypoints.front().pose.orientation;
                 _currentState = State::GOTOPOINT;
 
             break;
@@ -394,12 +382,20 @@ void stateAction(){
 
             break;
         case State::POPPING :
-
             ROS_WARN("[Balloon_sm] Popping\n");
 
-            // Generate trajectory towards the balloon
+            // Check for balloons
 
-            // The trajectory should wait at the balloon and then move up - down, and wait
+            _giveMeBalloonClient.call(_giveMeBalloonRequest, _giveMeBalloonResponse);
+            if(_giveMeBalloonResponse.status){
+                while(_giveMeBalloonResponse.status) {
+                    ROS_INFO("Balloon found");
+                    // Todo spin i delay su u destroy
+                    destroy(_giveMeBalloonResponse.balloon_position);
+                    _giveMeBalloonClient.call(_giveMeBalloonRequest, _giveMeBalloonResponse);
+                }
+            }
+
             if(_local_waypoints.empty()){
                 _currentState = State::LAND;
             }
@@ -408,12 +404,6 @@ void stateAction(){
             }
             break;
 
-
-        case State::RETURN_TO_TRAJECTORY:
-
-            ROS_WARN("[Balloon_sm] Return to trajectory\n");
-            // Generate trajectory towards the last search waypoint and execute it.
-            break;
 
         case State::LAND:
 
@@ -458,7 +448,10 @@ private:
     std_srvs::SetBoolRequest land_srv;
     std_srvs::SetBoolResponse service_success;
 
-    ros::ServiceClient _landClient;
+    ros::ServiceClient _landClient, _giveMeBalloonClient;
+    uav_ros_control::GiveMeBalloonPositionRequest  _giveMeBalloonRequest;
+    uav_ros_control::GiveMeBalloonPositionResponse _giveMeBalloonResponse;
+
 
     double _rate = 50;
 
@@ -516,6 +509,7 @@ private:
     // const double _global_alt = 100;
 
     double _global_z, _yaw, _saved_x, _saved_y;
+    geometry_msgs::Quaternion _tmp_orientation;
 
     geometry_msgs::Vector3 _currentReference;
 
