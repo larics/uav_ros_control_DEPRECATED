@@ -61,6 +61,7 @@ VisualServoStateMachine(ros::NodeHandle& nh)
     _pubVelError = nh.advertise<geometry_msgs::Vector3>("visual_servo_sm/velocity_error", 1);
     _pubTargetError = nh.advertise<geometry_msgs::Vector3>("visual_servo_sm/pos_error", 1);
     _pubLoopStatus = nh.advertise<std_msgs::Int32>("visual_servo_sm/loop_status", 1);
+    _pubVisualServoSuccess = nh.advertise<std_msgs::Bool>("visual_servo_sm/success", 1);
 
     // Define Subscribers
     _subOdom =
@@ -111,6 +112,9 @@ void nContoursCb(const std_msgs::Int32ConstPtr& msg)
         _currentState != LocalPickupState::OFF)
     {
         ROS_FATAL("VSSM - patch count is 0.");
+        std_msgs::Bool success;
+        success.data = false;
+        _pubVisualServoSuccess.publish(success);
         turnOffVisualServo();
     }
     _timeLastContour = ros::Time::now().toSec();
@@ -146,6 +150,9 @@ void globalCentroidPointCb(const geometry_msgs::Vector3& msg)
     {  
         ROS_FATAL("VSSM - new centroid [%.2f, %.2f, %.2f] is not old [%.2f, %.2f, %.2f]",
             msg.x, msg.y, msg.z, _globalCentroid.x, _globalCentroid.y, _globalCentroid.z);
+        std_msgs::Bool success;
+        success.data = false;
+        _pubVisualServoSuccess.publish(success);
         turnOffVisualServo();
     }
 
@@ -373,14 +380,15 @@ bool stateMachineDisableConditions()
 void updateState()
 {
     if (_currentState != LocalPickupState::OFF && !_brickPickupActivated ||  // If visual servo is 
-        _currentState == LocalPickupState::DESCENT && stateMachineDisableConditions() ||
-        _currentState == LocalPickupState::BRICK_ALIGNMENT && stateMachineDisableConditions() ||
-        _currentState == LocalPickupState::TOUCHDOWN_ALIGNMENT && stateMachineDisableConditions())
+        _currentState == LocalPickupState::BRICK_ALIGNMENT && stateMachineDisableConditions())
     {
         // deactivate state machine
         ROS_WARN_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - Visual servo is inactive.");
         _currentState = LocalPickupState::OFF;
         _brickPickupActivated = false;
+        std_msgs::Bool success;
+        success.data = false;
+        _pubVisualServoSuccess.publish(success);
         turnOffVisualServo();
         ROS_WARN_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - OFF State activated.");
         return;
@@ -399,66 +407,23 @@ void updateState()
         return;
     }
 
-    // Update the transition counter
-    /*if (_currentState == LocalPickupState::BRICK_ALIGNMENT &&
-        isTargetInThreshold(_minTargetError, _minTargetError, _minTargetError, _brickAlignHeight) &&
-        //fabs(_currYawError) < _minYawError) {
-        //_descentTransitionCounter++;
-    }*/
+    if (_currentState == LocalPickupState::BRICK_ALIGNMENT && 
+        isTargetInThreshold(_minTargetError, _minTargetError, _minTargetError, _brickAlignHeight))
+    {
+        _descentTransitionCounter++;
+        ROS_INFO("VSSM::updateStatus aligned: %d", _descentTransitionCounter);
+    }
 
     // If brick alignemnt is activated and target error is withing range start descent
     if (_currentState == LocalPickupState::BRICK_ALIGNMENT &&
         _descentTransitionCounter > _descentCounterMax)
     {
-        _currentState = LocalPickupState::DESCENT;
-        _relativeBrickDistanceGlobal_lastValid = _relativeBrickDistance_global;
-        ROS_INFO("VSSM::updateStatus - DESCENT state activated");
-        return;
-    }
-
-    // When brick alignment passes touchdown height, start alignmennt.
-    if (_currentState == LocalPickupState::DESCENT && 
-        isRelativeDistanceValid(_relativeBrickDistance_local) &&
-        _relativeBrickDistance_local <= _touchdownHeight)
-    {
-        _afterTouchdownHeight_GPS = _currOdom.pose.pose.position.z + 
-            (_afterTouchdownHeight - _relativeBrickDistance_local);
-        _currentState = LocalPickupState::TOUCHDOWN_ALIGNMENT;
-        _currHeightReference = _currOdom.pose.pose.position.z;
-        _touchdownAlignDuration = 0.1;
-        ROS_INFO("VSSM::updateStatus - TOUCHDOWN_ALIGNMENT state activated");
-    }
-
-    // if height is below touchdown treshold start touchdown
-    bool enabled = isUavVelcityInThreshold();
-    enabled = isTargetInThreshold(
-            _minTouchdownTargetPositionError_xy, 
-            _minTouchdownTargetPositionError_xy,
-            _minTouchdownTargetPositionError_z,
-            _touchdownHeight) & enabled;
-    if (_currentState == LocalPickupState::TOUCHDOWN_ALIGNMENT &&
-        isRelativeDistanceValid(_relativeBrickDistance_local) && 
-        enabled &&
-        _touchdownAlignDuration >= _minTouchdownAlignDuration)
-    {
-        _currentState = LocalPickupState::TOUCHDOWN;
-        _touchdownTime = 0;
-        _touchdownDelta = _touchdownHeight // _relativeBrickDistance_local
-            //- fabs(_currHeightReference - _currOdom.pose.pose.position.z)   // Take into account position tracking error
-            - _magnetOffset;                                                // Take into account magnet offset  
-        _relativeBrickDistanceGlobal_lastValid = _relativeBrickDistance_global;
-        _touchdownDuration = _touchdownDelta / _touchdownSpeed;
-        ROS_INFO("VSSM::UpdateStatus - TOUCHDOWN state activated - [delta, duration] = [%.4f, %.4f]", _touchdownDelta, _touchdownDuration);
-        return;
-    }
-
-    // If touchdown time is exceeded, touchdown state is considered finished
-    if (_currentState == LocalPickupState::TOUCHDOWN &&
-        _currHeightReference >= _afterTouchdownHeight_GPS &&
-	    _touchdownTime >  _touchdownDuration)
-    {
-        ROS_INFO("VSSM::updateStatus - Touchdown duration finished.");
+        std_msgs::Bool success;
+        success.data = true;
+        _pubVisualServoSuccess.publish(success);
         turnOffVisualServo();
+        ROS_INFO("VSSM::updateStatus - ALIGNED!");
+        return;
     }
 }   
 
@@ -482,18 +447,18 @@ bool isUavVelcityInThreshold()
 bool isTargetInThreshold(const double minX, const double minY, const double minZ, const double targetDistance)
 {
     double tarx = fabs(_localCentroid.x),
-        tary = fabs(_localCentroid.y),
-        tarz = fabs(_relativeBrickDistance_local - targetDistance);
+        tary = fabs(_localCentroid.y);
+        //tarz = fabs(_relativeBrickDistance_local - targetDistance);
     
     geometry_msgs::Vector3 msg;
     msg.x = tarx;
     msg.y = tary;
-    msg.z = tarz;
+    msg.z = 0;
     _pubTargetError.publish(msg);
 
     return tarx < minX 
-        && tary < minY
-        && tarz < minZ;
+        && tary < minY;
+        //&& tarz < minZ;
 }
 
 bool isRelativeDistanceValid(const double checkDistance)
@@ -617,6 +582,7 @@ private:
     ros::Publisher _pubRelativeDistance_local;
     ros::Publisher _pubVelError, _pubTargetError;
     ros::Publisher _pubLoopStatus;
+    ros::Publisher _pubVisualServoSuccess;
     uav_ros_control_msgs::VisualServoProcessValues _currVisualServoFeed;
 
     /* Odometry subscriber */
