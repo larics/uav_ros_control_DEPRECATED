@@ -80,7 +80,7 @@ class Tfm_Aprox():
 
         self.num_of_estimated_pts = 1000
 
-        self.z_offset = 0.0
+        self.z_offset = -2.0
         self.estimator_state = False
         self.goal_setpoint = PoseStamped()
         self.goal_point = PoseStamped()
