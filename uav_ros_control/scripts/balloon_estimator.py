@@ -33,7 +33,7 @@ class BalloonEstimator():
         self.balloons_average = []
 
         self.camera_info.K = [674.0643310546875, 0.0, 655.4468994140625, 0.0, 674.0643310546875, 368.7719421386719, 0.0, 0.0, 1.0]
-        self.z_offset = 1.5
+        self.z_offset = 1.0
         self.max_allowed_distance = 5.0
         self.min_balloon_measurements = 30
 
