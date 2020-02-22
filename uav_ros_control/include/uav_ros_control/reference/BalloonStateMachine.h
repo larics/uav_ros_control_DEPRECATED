@@ -59,6 +59,7 @@ BalloonStateMachine(ros::NodeHandle& nh) : _globalToLocal(nh)
     // Define Subscribers
     _subOdom = nh.subscribe("odometry", 1, &BalloonStateMachine::odomCb, this);
     _subPointReached = nh.subscribe("point_reached", 1, &BalloonStateMachine::pointReachedCallback, this);
+    _subReadyForExploration = nh.subscribe("ready_for_exploration", 1, &BalloonStateMachine::readyForExplorationCallback, this);
     _pubGoalsMarker = nh.advertise<visualization_msgs::MarkerArray>("balloon_sm/goals_marker", 20);
 
     _carrot_subscriber = nh.subscribe("carrot/trajectory", 1, &BalloonStateMachine::carrotCb, this);
@@ -66,16 +67,9 @@ BalloonStateMachine(ros::NodeHandle& nh) : _globalToLocal(nh)
     ros::Duration(1.0).sleep();
     ros::spinOnce();
 
-    _global_z = _currentReference.z;
-
-    for (auto glob_waypoint : _global_waypoints){
-
-        AddLocalWaypoint(glob_waypoint.first, glob_waypoint.second, 0);
-        // FullRotationArroundZAxis(glob_waypoint.first, glob_waypoint.second, 0);
-    }
 
     // Set initial state
-    _currentState = State::GETNEXTPOINT;
+    _currentState = State::TAKE_OFF;
 
     // publishGeneratedWaypoints();
 
@@ -84,10 +78,14 @@ BalloonStateMachine(ros::NodeHandle& nh) : _globalToLocal(nh)
 ~BalloonStateMachine()
 {}
 
+void readyForExplorationCallback(std_msgs::Bool msg){
+    _ready = msg.data;
+}
+
 void AddLocalWaypoint(double latitude, double longitude, double yaw_requested){
     // Za svaki lat,long dodaj točku za goto + tri točke za spin
 
-    Eigen::Vector3d local = _globalToLocal.toLocal(latitude, longitude, _global_alt);
+    Eigen::Vector3d local = _globalToLocal.toLocal(latitude, longitude, _global_z, true);
     auto odom_q= _currOdom.pose.pose.orientation;
 
 
@@ -182,6 +180,7 @@ void AddLocalWaypoint(double latitude, double longitude, double yaw_requested){
 
 void FullRotationArroundZAxis(double x, double y){
 
+    ROS_INFO("Generating spinning! \n");
     geometry_msgs::PoseStamped tmp_pose = geometry_msgs::PoseStamped() ;
     tmp_pose.pose.position.x = x;
     tmp_pose.pose.position.y = y;
@@ -212,26 +211,74 @@ void FullRotationArroundZAxis(double x, double y){
     tmp_pose.pose.orientation.z = q.z();
     _spinning_waypoints.push(tmp_pose);
 
-            util::calculateYaw(q.x(), q.y(),q.z(), q.w()));
+    tmp_pose = geometry_msgs::PoseStamped() ;
+    tmp_pose.pose.position.x = x;
+    tmp_pose.pose.position.y = y;
+    // tmp_pose.pose.position.z = local.z();
+
+    ROS_WARN("x: %f, y: %f, yaw: %f\n", tmp_pose.pose.position.x, tmp_pose.pose.position.y,
+             util::calculateYaw(q.x(), q.y(),q.z(), q.w()));
 
     tmp_pose = geometry_msgs::PoseStamped() ;
     tmp_pose.pose.position.x = x;
     tmp_pose.pose.position.y = y;
     // tmp_pose.pose.position.z = local.z();
     tmp_pose.pose.position.z = _global_z;
-    q.setRPY(0, 0, 6); // intentionally don't use eigen_pi. Not a full rotation is needed.
+    q.setRPY(0, 0, 6);
     q.normalize();
     tmp_pose.pose.orientation.w = q.w();
     tmp_pose.pose.orientation.x = q.x();
     tmp_pose.pose.orientation.y = q.y();
     tmp_pose.pose.orientation.z = q.z();
     _spinning_waypoints.push(tmp_pose);
-    ROS_WARN("x: %f, y: %f, yaw: %f\n", tmp_pose.pose.position.x, tmp_pose.pose.position.y,
-            util::calculateYaw(q.x(), q.y(), q.z(), q.w()));
-    ROS_ERROR("POINT_GENERATED \n");
 
+    tmp_pose = geometry_msgs::PoseStamped() ;
+    tmp_pose.pose.position.x = x;
+    tmp_pose.pose.position.y = y;
+    // tmp_pose.pose.position.z = local.z();
+    tmp_pose.pose.position.z = _global_z;
+    q.setRPY(0, 0, 2);
+    q.normalize();
+    tmp_pose.pose.orientation.w = q.w();
+    tmp_pose.pose.orientation.x = q.x();
+    tmp_pose.pose.orientation.y = q.y();
+    tmp_pose.pose.orientation.z = q.z();
+    _spinning_waypoints.push(tmp_pose);
+
+
+    tmp_pose = geometry_msgs::PoseStamped() ;
+    tmp_pose.pose.position.x = x;
+    tmp_pose.pose.position.y = y;
+    tmp_pose.pose.position.z = _global_z;
+
+    if(!_local_waypoints.empty()) {
+        // Get yaw of next waypoint
+        auto quat = _local_waypoints.front().pose.orientation;
+        tmp_pose.pose.orientation.w = quat.w;
+        tmp_pose.pose.orientation.x = quat.x;
+        tmp_pose.pose.orientation.y = quat.y;
+        tmp_pose.pose.orientation.z = quat.z;
+
+        double yaw_next = util::calculateYaw(quat.x, quat.y, quat.z, quat.w);
+        if (abs(yaw_next) < 0.1){
+            if (yaw_next > 0) yaw_next = 0.2;
+            if (yaw_next <=0) yaw_next = -0.2;
+            q.setRPY(0,0,yaw_next);
+            tmp_pose.pose.orientation.w = q.w();
+            tmp_pose.pose.orientation.x = q.x();
+            tmp_pose.pose.orientation.y = q.y();
+            tmp_pose.pose.orientation.z = q.z();
+            ROS_WARN("x: %f, y: %f, yaw: %f\n", tmp_pose.pose.position.x, tmp_pose.pose.position.y,
+                     util::calculateYaw(q.x(), q.y(), q.z(), q.w()));
+            _spinning_waypoints.push(tmp_pose);
+        }
+        else {
+            _spinning_waypoints.push(tmp_pose);
+            ROS_WARN("x: %f, y: %f, yaw: %f\n", tmp_pose.pose.position.x, tmp_pose.pose.position.y,
+                     util::calculateYaw(quat.x, quat.y, quat.z, quat.w));
+        }
+    }
 }
-
 
 void pointReachedCallback(const std_msgs::Bool msg) {
     _isPointReached = msg.data;
@@ -265,21 +312,55 @@ double distance(geometry_msgs::Point point, Eigen::Vector3d vector){
             );
 }
 
+bool should_i_spin(){
+    _helper_position_1 = _globalToLocal.toLocal(_lat_home, _long_home, _global_z, true);
+    _helper_position_2 = _globalToLocal.toLocal(_lat_start_help, _long_start_help, _global_z, true);
+    _helper_position_3 = _globalToLocal.toLocal(_lat_end2, _long_end2, _global_z, true);
+
+    return !(distance(_tmp_position, _helper_position_1) < 1 ||
+             distance(_tmp_position, _helper_position_2) < 1 ||
+             distance(_tmp_position, _helper_position_3) < 1);
+}
+
+void publish_spinning_points(){
+    ROS_INFO("Publish spinning points\n");
+
+    while (!_spinning_waypoints.empty()){
+        ros::spinOnce();
+
+        if (_isPointReached) {
+            publishCurrGoal(_spinning_waypoints.front());
+            _isPointReached = false;
+            _spinning_waypoints.pop();
+        }
+    }
+}
+
+/******************************************************************************************************************
+ * **********************************************State machine****************************************************
+ *
+ */
 void stateAction(){
     switch(_currentState){
+        case State::TAKE_OFF:
 
+            if (_ready){
+                ROS_INFO("Ready for action\n");
+                _global_z = _currentReference.z;
+                for (auto glob_waypoint : _global_waypoints){
+                    AddLocalWaypoint(glob_waypoint.first, glob_waypoint.second, 0);
+                }
+                _currentState = State::GETNEXTPOINT;
+            }
+
+            break;
         case State::GETNEXTPOINT:
 
             ROS_WARN("[Balloon_sm] Get next point\n");
 
-            if (_spinning){
-                publishCurrGoal(_spinning_waypoints.front());
-            }
-            else {
                 publishCurrGoal(_local_waypoints.front());
+                _tmp_position = _local_waypoints.front().pose.position;
                 _currentState = State::GOTOPOINT;
-
-            }
 
             break;
 
@@ -288,8 +369,6 @@ void stateAction(){
 
             if (_isPointReached){
                 _currentState = State::POINTREACHED;
-
-                _spinning = true;
             }
 
            break;
@@ -298,22 +377,31 @@ void stateAction(){
 
             ROS_WARN("[Balloon_sm] Point reached\n");
 
-            if (_spinning){
-                _spinning_waypoints.pop();
-                if(_spinning_waypoints.empty()){
-                    _spinning = false;
-                }
-                else break;
-            }
-
             _local_waypoints.pop();
-            if (!_local_waypoints.empty()) {
-                _currentState = State::GETNEXTPOINT;
-            } else {
-                _currentState = State::LAND;
+            if (should_i_spin()){
+                ROS_INFO("We should spinn\n");
+                _currentState = State::SPINNING;
+                FullRotationArroundZAxis(_tmp_position.x, _tmp_position.y);
+                break;
+            }
+            else{
+                if (!_local_waypoints.empty()) {
+                    _currentState = State::GETNEXTPOINT;
+                } else {
+                    _currentState = State::LAND;
+                }
+            }
+            break;
+
+        case State::SPINNING:
+
+            publish_spinning_points();
+
+            if (_isPointReached) {
+                _currentState = State::POPPING;
             }
 
-
+            break;
         case State::POPPING :
 
             ROS_WARN("[Balloon_sm] Popping\n");
@@ -321,7 +409,11 @@ void stateAction(){
             // Generate trajectory towards the balloon
 
             // The trajectory should wait at the balloon and then move up - down, and wait
+
+            _currentState = State::GETNEXTPOINT;
             break;
+
+
         case State::RETURN_TO_TRAJECTORY:
 
             ROS_WARN("[Balloon_sm] Return to trajectory\n");
@@ -329,6 +421,7 @@ void stateAction(){
             break;
 
         case State::LAND:
+
 
             ROS_WARN("[Balloon_sm] Land\n");
             _currentState = State::DONE;
@@ -364,6 +457,10 @@ private:
     bool _prva = true;
     bool _spinning = false;
     bool _new_spinning = false;
+    bool _ready = false;
+    bool _takeoff_success = false;
+
+    double _temp_yaw;
 
     double _last_waypoint_x, _last_waypoint_y;
 
@@ -400,7 +497,7 @@ private:
 
 
 
-         // vani
+    // vani
     // const double _lat_start = 24.41772, _long_start = 54.43562;
     // const double _lat_mid_1 = 24.41767, _long_mid_1 = 54.43582;
     // const double _lat_mid_2 = 24.4176, _long_mid_2 = 54.4361;
@@ -445,9 +542,10 @@ private:
 
     Global2Local _globalToLocal;
     ros::Publisher _pubGoalsMarker;
+    ros::Subscriber _subReadyForExploration;
 
     geometry_msgs::Point _tmp_position;
-    Eigen::Vector3d _helper_position_1, _helper_position_2;
+    Eigen::Vector3d _helper_position_1, _helper_position_2, _helper_position_3;
 };
 }
 
