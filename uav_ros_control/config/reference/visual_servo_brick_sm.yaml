@@ -10,11 +10,11 @@ visual_servo:
     min_touchdown_uav_velocity_error_z: 0.05
     min_touchdown_align_duration: 5
     min_yaw_error: 0.05
-    touchdown_height: 2.5
-    magnet_offset: 0.5
+    touchdown_height: 2.3
+    magnet_offset: 0.425
     touchdown_speed: 1
     after_touchdown_height: 4
-    disable_visual_servo_touchdown_height: 1.6
+    disable_visual_servo_touchdown_height: 1.5
     descent_speed: 0.2
     ascent_speed: 1
     detection_counter: 25
