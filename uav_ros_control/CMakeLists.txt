@@ -29,6 +29,7 @@ add_service_files(
   FILES
   GenerateSearch.srv
   GenerateInterception.srv
+  GiveMeBalloonPosition.srv
 )
 
 generate_messages(DEPENDENCIES std_msgs geometry_msgs)
