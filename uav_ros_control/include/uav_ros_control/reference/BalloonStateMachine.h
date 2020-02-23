@@ -292,6 +292,7 @@ void stateAction(){
     switch(_currentState){
         case State::TAKE_OFF:
 
+            _was_detected = false;
             if (_ready){
                 ROS_INFO("Ready for action\n");
                 _global_z = _currentReference.z;
@@ -371,12 +372,22 @@ void stateAction(){
                     // Todo spin i delay su u destroy
                     destroy(_giveMeBalloonResponse.balloon_position);
                     _giveMeBalloonClient.call(_giveMeBalloonRequest, _giveMeBalloonResponse);
+                    _was_detected = true;
+                    runs_without_detection = 0;
                 }
             }
 
             if(_local_waypoints.empty()){
-                ROS_INFO("[Balloon_sm] Transition to LAND");
-                _currentState = State::LAND;
+                if (!_was_detected){
+                    runs_without_detection++;
+                }
+                if (runs_without_detection == 2) {
+                    ROS_INFO("[Balloon_sm] Transition to LAND");
+                    _currentState = State::LAND;
+                } else {
+                    ROS_INFO("Redo trajectory");
+                    _currentState = State::TAKE_OFF;
+                }
             }
             else {
                 ROS_INFO("[Balloon_sm] Transition to GETNEXTPOINT");
@@ -538,6 +549,8 @@ private:
     double _tmp_spinning_yaw;
     double _sleep_duration = 5;
     Eigen::Vector3d _helper_position_1, _helper_position_2, _helper_position_3;
+    int runs_without_detection = 0;
+    bool _was_detected = false;
 };
 }
 
