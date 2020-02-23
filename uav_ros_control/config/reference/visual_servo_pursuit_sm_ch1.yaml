@@ -7,8 +7,8 @@ pursuit:
     z_offset: 0.0
     yaw_deadzone: 0.0
     settle_threshold: 0.2
-    gps_num_points: 3
-    collect_timeout: 5.0
+    gps_num_points: 5
+    collect_timeout: 120.0
     after_takeoff_height : 10.0
 
     search:
@@ -24,31 +24,57 @@ pursuit:
     interception:
       z_offset: -3.0
 
+    gps_land:
+      lat:
+        24.417669
+      lon:
+        54.4359772
+      height:
+        7.0
+
   gps_points:
     '1':
       lat:
-        -35.3631267
+        24.4177322
       lon:
-        149.1657241
+        54.4357988
       alt:
-        10.0 #613.439423405
+        10.0
       hdg:
-        3.926990817
+        4.36332313
     '2':
       lat:
-        -35.3633974
+        24.4178097
       lon:
-        149.1657234
+        54.43568
       alt:
-        10.0 #613.399094617
+        10.0
       hdg:
-        2.3561944902
+        4.8869219056
     '3':
       lat:
-        -35.3633957
+        24.4177399
       lon:
-        149.164736
+        54.4357013
       alt:
-        10.0 #613.387834659
+        10.0
       hdg:
-        0.7853981634
+        4.7123889804
+    '4':
+      lat:
+        24.41769
+      lon:
+        54.43597
+      alt:
+        10.0
+      hdg:
+        4.7123889804
+    '5':
+      lat:
+        24.4176727
+      lon:
+        54.4361584
+      alt:
+        10.0
+      hdg:
+        4.36332313

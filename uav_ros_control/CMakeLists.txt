@@ -46,6 +46,7 @@ add_service_files(
   GenerateSearch.srv
   GenerateInterception.srv
   GiveMeBalloonPosition.srv
+  GetLocalConstraints.srv
 )
 
 generate_messages(DEPENDENCIES std_msgs geometry_msgs)

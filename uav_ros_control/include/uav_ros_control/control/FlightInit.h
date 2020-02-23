@@ -95,7 +95,7 @@ public:
 			"joint_trajectory", 1);
 		m_pubReadyForExploration = nh.advertise<std_msgs::Bool> (
 			"ready_for_exploration", 1, true);
-		m_pubDynamixelState = nh.advertise<std_msgs::String>("dynamixel_workbench/set_state", 1);
+		m_pubDynamixelState = nh.advertise<std_msgs::String>("/dynamixel_workbench/set_state", 1);
 	
 		// Advertise service
     	m_serviceTakeOff = nh.advertiseService(
@@ -282,18 +282,18 @@ bool armAndTakeOffCb(
 		m_pubReadyForExploration.publish(t_ready_msg);
 		return true;
 	}
-
-	ros::Duration(TAKEOFF_DURATION).sleep();
-	// Ensure last odom msg
+	// Sleep before grasper
+	ros::Duration(10.0).sleep();
+	// Open the GRASPER
+	std_msgs::String msg;
+	msg.data = "unwinding";
+	m_pubDynamixelState.publish(msg);
+	// Sleep to stabilize before State Machine
+	ros::Duration(20.0).sleep();
+	// Tell SM that TakeOff is successful
 	t_ready_msg.data = true;
 	m_pubReadyForExploration.publish(t_ready_msg);
 	ros::spinOnce();
-	// Open the GRASPER
-	// std_msgs::String msg;
-	// msg.data = "unwinding";
-	// m_pubDynamixelState.publish(msg);
-	// ros::spinOnce();
-	// ros::Duration(GRASPER_DURATION).sleep();
 	// Assume takeoff is successful at this point
 	ROS_INFO("TakeoffCb - request approved, TAKEOFF successful");
 	m_takeoffFlag = true;

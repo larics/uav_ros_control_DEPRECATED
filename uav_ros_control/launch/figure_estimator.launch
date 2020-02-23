@@ -2,14 +2,23 @@
     <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
 
     <arg name="camera_info" default="/camera/color/camera_info"/>
+    
+    <arg name="ch1_gps_constraints" default="$(find uav_ros_control)/config/reference/ch1_gps_constraints.yaml"/>
 <!--     <arg name="camera_info" default="/zedm/zed_node/left/camera_info"/>
  -->
+    <param name="$(arg namespace)/disable_boundary_check" type="bool" value="true" />
+
+    <param name="$(arg namespace)/gps_constraints_filename" value= "$(arg ch1_gps_constraints)"/>
 
     <!-- Figure estimator-->
     <node name="figure_estimator" pkg="uav_ros_control" type="figure8estimator.py" 
         output="screen" ns="$(arg namespace)">
         <remap from="/zedm/zed_node/left/camera_info" to="$(arg camera_info)"/>
+    </node>
 
+
+    <node name="geofencing" pkg="uav_ros_control" type="geo_fence_local_check_node" 
+        output="screen" ns="$(arg namespace)">
     </node>
 
 

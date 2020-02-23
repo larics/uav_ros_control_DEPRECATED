@@ -17,7 +17,7 @@ import threading
 import thread
 
 from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3
+from mpl_toolkits.mplot3d import Axes3D
 
 from uav_ros_control.srv import GetLocalConstraints
 
@@ -33,6 +33,7 @@ class Tfm_Aprox():
         self.new_detection_data = False
         self.new_odometry_data = False
 
+        self.start_estimator = False
 
         self.Tuav_cam[0, 2] = 1.0
         self.Tuav_cam[1, 0] = -1.0
@@ -77,8 +78,8 @@ class Tfm_Aprox():
         self.max_a = 30.0
         self.min_a = 15.0
  
-        self.direction_estimation_data_size = 7
-        self.direction_estimation_min_time_diff = 0.62
+        self.direction_estimation_data_size = 5
+        self.direction_estimation_min_time_diff = 1.0
 
         self.num_of_estimated_pts = 1000
 
@@ -113,6 +114,8 @@ class Tfm_Aprox():
         except (rospy.ServiceException, rospy.ROSException) as e:
             rospy.logerr("Couldn't get the local arena constraints. Service call failed with error: %s", e)
         self.disable_boundary_check = rospy.get_param('disable_boundary_check', False)
+
+        print self.disable_boundary_check
 
 
     def check_inside_2d(self, point):
@@ -157,6 +160,9 @@ class Tfm_Aprox():
         else:
             self.odometry_data_list.append(data)
             self.odometry_data_list.pop(0)
+
+    def start_estimator_callback(self, data):
+        self.start_estimator  = data
 
     def set_uav_position_publisher(self, publisher):
         self.uav_position_publisher = publisher
@@ -369,180 +375,183 @@ class Tfm_Aprox():
         r = rospy.Rate(rate)
 
         while not rospy.is_shutdown():
-            global_position = PointStamped()
-            detection_data = object()
-            odometry_data = Odometry()
-            if self.new_distance_data and self.new_detection_data and self.new_odometry_data:
+            if (self.start_estimator):
+                global_position = PointStamped()
+                detection_data = object()
+                odometry_data = Odometry()
+                if self.new_distance_data and self.new_detection_data and self.new_odometry_data:
 
 
-                detection_data = self.find_min_time_diff_data(self.detection_data_list, self.distance_data.header.stamp.to_sec())
-                odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.distance_data.header.stamp.to_sec())
+                    detection_data = self.find_min_time_diff_data(self.detection_data_list, self.distance_data.header.stamp.to_sec())
+                    odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.distance_data.header.stamp.to_sec())
 
-                x = (detection_data.x - self.camera_info.K[2]) / self.camera_info.K[0]
-                y = (detection_data.y - self.camera_info.K[5]) / self.camera_info.K[4]
+                    x = (detection_data.x - self.camera_info.K[2]) / self.camera_info.K[0]
+                    y = (detection_data.y - self.camera_info.K[5]) / self.camera_info.K[4]
 
-                z_m = self.distance_data.point.x / (math.sqrt(1 + x*x + y*y))
+                    z_m = self.distance_data.point.x / (math.sqrt(1 + x*x + y*y))
 
-                x_m = x * z_m
-                y_m = y * z_m
+                    x_m = x * z_m
+                    y_m = y * z_m
 
-                #treba transformirati iz kamere u globalni sustav
+                    #treba transformirati iz kamere u globalni sustav
 
-                Tcam_uav1 = np.zeros((4, 4))
-                Tcam_uav1[0, 0] = 1.0
-                Tcam_uav1[0, 3] = x_m
-                Tcam_uav1[1, 1] = 1.0
-                Tcam_uav1[1, 3] = y_m
-                Tcam_uav1[2, 2] = 1.0
-                Tcam_uav1[2, 3] = z_m
-                Tcam_uav1[3, 3] = 1.0
+                    Tcam_uav1 = np.zeros((4, 4))
+                    Tcam_uav1[0, 0] = 1.0
+                    Tcam_uav1[0, 3] = x_m
+                    Tcam_uav1[1, 1] = 1.0
+                    Tcam_uav1[1, 3] = y_m
+                    Tcam_uav1[2, 2] = 1.0
+                    Tcam_uav1[2, 3] = z_m
+                    Tcam_uav1[3, 3] = 1.0
 
-                quaternion = [odometry_data.pose.pose.orientation.w, odometry_data.pose.pose.orientation.x, odometry_data.pose.pose.orientation.y, odometry_data.pose.pose.orientation.z]
-                euler = self.quaternion2euler(quaternion)
-                position = [odometry_data.pose.pose.position.x, odometry_data.pose.pose.position.y, odometry_data.pose.pose.position.z]
+                    quaternion = [odometry_data.pose.pose.orientation.w, odometry_data.pose.pose.orientation.x, odometry_data.pose.pose.orientation.y, odometry_data.pose.pose.orientation.z]
+                    euler = self.quaternion2euler(quaternion)
+                    position = [odometry_data.pose.pose.position.x, odometry_data.pose.pose.position.y, odometry_data.pose.pose.position.z]
 
-                Tworld_uav = self.getRotationTranslationMatrix(euler, position)
+                    Tworld_uav = self.getRotationTranslationMatrix(euler, position)
 
-                Tuav_uav1 = np.dot(self.Tuav_cam, Tcam_uav1)
+                    Tuav_uav1 = np.dot(self.Tuav_cam, Tcam_uav1)
 
-                Tworld_uav1 = np.dot(Tworld_uav, Tuav_uav1)
+                    Tworld_uav1 = np.dot(Tworld_uav, Tuav_uav1)
 
-                uav_position = PointStamped()
-                uav_position.header = self.distance_data.header
-                uav_position.point.x = Tworld_uav1[0,3]
-                uav_position.point.y = Tworld_uav1[1,3]
-                uav_position.point.z = Tworld_uav1[2,3]
+                    uav_position = PointStamped()
+                    uav_position.header = self.distance_data.header
+                    uav_position.point.x = Tworld_uav1[0,3]
+                    uav_position.point.y = Tworld_uav1[1,3]
+                    uav_position.point.z = Tworld_uav1[2,3]
 
-                if self.check_inside_2d(uav_position.point) or self.disable_boundary_check:
-                    self.hausdorff_counter = self.hausdorff_counter + 1
-                    self.num_of_received_points = self.num_of_received_points + 1
+                    if self.check_inside_2d(uav_position.point) or self.disable_boundary_check:
+                        self.hausdorff_counter = self.hausdorff_counter + 1
+                        self.num_of_received_points = self.num_of_received_points + 1
 
-                    self.num_of_received_points_publisher.publish(self.num_of_received_points)
+                        self.num_of_received_points_publisher.publish(self.num_of_received_points)
 
-                    if (not self.estimator_state):
-                        self.estimatefigure8(uav_position)
-
-                if (self.hausdorff_counter > self.num_of_pts_hausdorff):
-                    p_reconstructed = np.asarray(self.p_reconstructed)#, dtype=None, order=None)
-                    p = np.asarray(self.p)
-                    self.hausdorff = self.get_hausdorff_distance(p, p_reconstructed)
-                    self.hausdorff_counter = 0
-                    #print(self.hausdorff, self.hausdorff/self.a, 'hausdorff')
-
-                    #gledamo s 1/4 pi prema 3/4 pi
-                    direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
-                    self.estimateSetpoint2(p, p_reconstructed, self.time_vector)
-
-                    self.goal_x_l = 0.0
-                    self.goal_y_l = 0.0
-                    self.goal_z_l = 0.0
-
-                    self.target_x_l = 0.0
-                    self.target_y_l = 0.0
-                    self.target_z_l = 0.0
-
-                    if (direction < 0.0):
-                        t = 1.0 * pi / 4.0
+                        if (not self.estimator_state):
+                            self.estimatefigure8(uav_position)
                     else:
-                        t = 3.0 * pi / 4.0
+                        rospy.logwarn("Receieved point not inside GEO Fence.")
 
-                    self.goal_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
-                    self.goal_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
+                    if (self.hausdorff_counter > self.num_of_pts_hausdorff):
+                        p_reconstructed = np.asarray(self.p_reconstructed)#, dtype=None, order=None)
+                        p = np.asarray(self.p)
+                        self.hausdorff = self.get_hausdorff_distance(p, p_reconstructed)
+                        self.hausdorff_counter = 0
+                        #print(self.hausdorff, self.hausdorff/self.a, 'hausdorff')
 
-                    if (direction < 0.0):
-                        t = 3.0 * pi / 4.0
-                    else:
-                        t = 1.0 * pi / 4.0
-                        
-                    self.target_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
-                    self.target_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
+                        #gledamo s 1/4 pi prema 3/4 pi
+                        direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
+                        self.estimateSetpoint2(p, p_reconstructed, self.time_vector)
 
-                    pp = np.asarray(self.p)
-                    T = self.get_transform(pp)
+                        self.goal_x_l = 0.0
+                        self.goal_y_l = 0.0
+                        self.goal_z_l = 0.0
 
-                    p_in = np.asarray([[self.goal_x_l], [self.goal_y_l], [self.goal_z_l], [1]])
-                    p_out = np.dot(T, p_in)
-                    self.goal_x_g = p_out[0]
-                    self.goal_y_g = p_out[1]
-                    self.goal_z_g = p_out[2]
+                        self.target_x_l = 0.0
+                        self.target_y_l = 0.0
+                        self.target_z_l = 0.0
 
-                    p_in = np.asarray([[self.target_x_l], [self.target_y_l], [self.target_z_l], [1]])
-                    p_out = np.dot(T, p_in)
-                    self.target_x_g = p_out[0]
-                    self.target_y_g = p_out[1]
-                    self.target_z_g = p_out[2]
+                        if (direction < 0.0):
+                            t = 1.0 * pi / 4.0
+                        else:
+                            t = 3.0 * pi / 4.0
 
-                    self.goal_setpoint.header.stamp = rospy.get_rostime()
-                    self.goal_setpoint.header.frame_id = "world"
-                    self.goal_setpoint.pose.position.x = self.goal_x_g
-                    self.goal_setpoint.pose.position.y = self.goal_y_g
-                    self.goal_setpoint.pose.position.z = self.goal_z_g + self.z_offset
+                        self.goal_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
+                        self.goal_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
 
-                    dx = self.target_x_g - self.goal_x_g
-                    dy = self.target_y_g - self.goal_y_g
-                    yaw = math.atan2(dy, dx)
+                        if (direction < 0.0):
+                            t = 3.0 * pi / 4.0
+                        else:
+                            t = 1.0 * pi / 4.0
+                            
+                        self.target_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
+                        self.target_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
 
-                    euler = [0.0, 0.0, yaw]
-                    quaternion = self.euler2quaternion(euler)
+                        pp = np.asarray(self.p)
+                        T = self.get_transform(pp)
 
-                    self.goal_setpoint.pose.orientation.x = quaternion[1]
-                    self.goal_setpoint.pose.orientation.y = quaternion[2]
-                    self.goal_setpoint.pose.orientation.z = quaternion[3]
-                    self.goal_setpoint.pose.orientation.w = quaternion[0]
+                        p_in = np.asarray([[self.goal_x_l], [self.goal_y_l], [self.goal_z_l], [1]])
+                        p_out = np.dot(T, p_in)
+                        self.goal_x_g = p_out[0]
+                        self.goal_y_g = p_out[1]
+                        self.goal_z_g = p_out[2]
+
+                        p_in = np.asarray([[self.target_x_l], [self.target_y_l], [self.target_z_l], [1]])
+                        p_out = np.dot(T, p_in)
+                        self.target_x_g = p_out[0]
+                        self.target_y_g = p_out[1]
+                        self.target_z_g = p_out[2]
+
+                        self.goal_setpoint.header.stamp = rospy.get_rostime()
+                        self.goal_setpoint.header.frame_id = "world"
+                        self.goal_setpoint.pose.position.x = self.goal_x_g
+                        self.goal_setpoint.pose.position.y = self.goal_y_g
+                        self.goal_setpoint.pose.position.z = self.goal_z_g + self.z_offset
+
+                        dx = self.target_x_g - self.goal_x_g
+                        dy = self.target_y_g - self.goal_y_g
+                        yaw = math.atan2(dy, dx)
+
+                        euler = [0.0, 0.0, yaw]
+                        quaternion = self.euler2quaternion(euler)
+
+                        self.goal_setpoint.pose.orientation.x = quaternion[1]
+                        self.goal_setpoint.pose.orientation.y = quaternion[2]
+                        self.goal_setpoint.pose.orientation.z = quaternion[3]
+                        self.goal_setpoint.pose.orientation.w = quaternion[0]
 
 
-                    if (self.a < self.max_a and self.a > self.min_a and self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.estimator_state):
-                        self.estimator_state = True
-                        
-                        #self.plot()
+                        if (self.a < self.max_a and self.a > self.min_a and self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.estimator_state):
+                            self.estimator_state = True
+                            
+                            #self.plot()
 
-                self.uav_position_publisher.publish(uav_position)
+                    self.uav_position_publisher.publish(uav_position)
 
-                self.new_distance_data = False
+                    self.new_distance_data = False
 
-            self.uav_setpoint_publisher.publish(self.goal_setpoint)
+                self.uav_setpoint_publisher.publish(self.goal_setpoint)
 
-            estimator_state_msg = Bool()
-            estimator_state_msg.data = self.estimator_state
-            self.estimator_state_publisher.publish(estimator_state_msg)
+                estimator_state_msg = Bool()
+                estimator_state_msg.data = self.estimator_state
+                self.estimator_state_publisher.publish(estimator_state_msg)
 
-            # plot publish
-            self.path_g = Path()
-            for i in range(len(self.x_g)):
-                temp_pose = PoseStamped()
-                temp_pose.pose.position.x = self.x_g[i]
-                temp_pose.pose.position.y = self.y_g[i]
-                temp_pose.pose.position.z = self.z_g[i]
+                # plot publish
+                self.path_g = Path()
+                for i in range(len(self.x_g)):
+                    temp_pose = PoseStamped()
+                    temp_pose.pose.position.x = self.x_g[i]
+                    temp_pose.pose.position.y = self.y_g[i]
+                    temp_pose.pose.position.z = self.z_g[i]
 
-                temp_header = Header()
-                temp_header.stamp = rospy.Time.now()
-                temp_header.frame_id = "world"
+                    temp_header = Header()
+                    temp_header.stamp = rospy.Time.now()
+                    temp_header.frame_id = "world"
 
-                temp_pose.header = temp_header
+                    temp_pose.header = temp_header
 
-                self.path_g.poses.append(temp_pose)
+                    self.path_g.poses.append(temp_pose)
 
-            self.path_g.header.frame_id = "world"
+                self.path_g.header.frame_id = "world"
 
-            self.path_coord = Path()
-            for i in range(len(self.xcoord)):
-                temp_pose = PoseStamped()
-                temp_pose.pose.position.x = self.xcoord[i]
-                temp_pose.pose.position.y = self.ycoord[i]
-                temp_pose.pose.position.z = self.zcoord[i]
+                self.path_coord = Path()
+                for i in range(len(self.xcoord)):
+                    temp_pose = PoseStamped()
+                    temp_pose.pose.position.x = self.xcoord[i]
+                    temp_pose.pose.position.y = self.ycoord[i]
+                    temp_pose.pose.position.z = self.zcoord[i]
 
-                temp_header = Header()
-                temp_header.stamp = rospy.Time.now()
-                temp_header.frame_id = "world"
+                    temp_header = Header()
+                    temp_header.stamp = rospy.Time.now()
+                    temp_header.frame_id = "world"
 
-                temp_pose.header = temp_header
+                    temp_pose.header = temp_header
 
-                self.path_coord.poses.append(temp_pose)
+                    self.path_coord.poses.append(temp_pose)
 
-            self.path_coord.header.frame_id = "world"
+                self.path_coord.header.frame_id = "world"
 
-            self.path_g_publisher.publish(self.path_g)
-            self.path_coord_publisher.publish(self.path_coord)
+                self.path_g_publisher.publish(self.path_g)
+                self.path_coord_publisher.publish(self.path_coord)
 
             r.sleep()
 
@@ -760,6 +769,8 @@ if __name__ == '__main__':
 
     rospy.Subscriber('mavros/global_position/local', Odometry, figure8.odometry_callback)
 
+    rospy.Subscriber('sm_pursuit/start_estimator', Bool, figure8.start_estimator_callback)
+
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
     rospy.Service('plot', Empty, figure8.plot_callback)
@@ -773,8 +784,6 @@ if __name__ == '__main__':
     received_points_pub = rospy.Publisher('figure8_received', Path, queue_size=1)
     estimator_state_pub = rospy.Publisher('figure8_state', Bool, queue_size=1)
     num_of_received_points_pub = rospy.Publisher('figure_estimator/num_of_pts', Float32, queue_size=1)
-
-
 
     figure8.set_uav_position_publisher(uav_position)
     figure8.set_uav_setpoint_publisher(uav_setpoint)

@@ -7,7 +7,7 @@ pursuit:
     z_offset: 0.0
     yaw_deadzone: 0.0
     settle_threshold: 0.2
-    gps_num_points: 3
+    gps_num_points: 2
     collect_timeout: 5.0
     after_takeoff_height : 10.0
 
@@ -23,6 +23,14 @@ pursuit:
 
     interception:
       z_offset: -3.0
+
+    gps_land:
+      lat:
+        -35.3632614
+      lon:
+        149.1652273
+      height:
+        7.0
 
   gps_points:
     '1':

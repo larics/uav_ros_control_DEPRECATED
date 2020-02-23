@@ -15,7 +15,7 @@
         
         <!-- Visual servo state machine parameters -->
         <rosparam command="load"
-            file="$(find uav_ros_control)/config/reference/visual_servo_pursuit_sm.yaml" />
+            file="$(find uav_ros_control)/config/reference/visual_servo_pursuit_sm_ch1.yaml" />
 
         <!-- Visual Servo state machine node -->
         <node
