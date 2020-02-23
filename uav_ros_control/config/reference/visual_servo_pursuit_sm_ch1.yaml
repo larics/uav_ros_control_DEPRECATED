@@ -8,7 +8,7 @@ pursuit:
     yaw_deadzone: 0.0
     settle_threshold: 0.2
     gps_num_points: 5
-    collect_timeout: 120.0
+    collect_timeout: 90.0
     after_takeoff_height : 10.0
 
     search:
@@ -50,7 +50,7 @@ pursuit:
       alt:
         10.0
       hdg:
-        4.8869219056
+        4.9741883682
     '3':
       lat:
         24.4177399
@@ -59,22 +59,22 @@ pursuit:
       alt:
         10.0
       hdg:
-        4.7123889804
+        4.799655443
     '4':
       lat:
-        24.41769
+        24.4176738
       lon:
-        54.43597
+        54.4361611
       alt:
         10.0
       hdg:
-        4.7123889804
+        4.1015237422
     '5':
       lat:
-        24.4176727
+        24.4176927
       lon:
-        54.4361584
+        54.4361601
       alt:
         10.0
       hdg:
-        4.36332313
+        3.926990817
