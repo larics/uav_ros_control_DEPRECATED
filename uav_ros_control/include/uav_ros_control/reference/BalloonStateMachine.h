@@ -222,11 +222,11 @@ double distance(geometry_msgs::Point point, Eigen::Vector3d vector){
 }
 
 bool should_i_spin(){
-    _helper_position_1 = _globalToLocal.toLocal(_lat_home, _long_home, _global_z, true);
+    //_helper_position_1 = _globalToLocal.toLocal(_lat_, _long_home, _global_z, true);
     _helper_position_2 = _globalToLocal.toLocal(_lat_start_help, _long_start_help, _global_z, true);
     _helper_position_3 = _globalToLocal.toLocal(_lat_end2, _long_end2, _global_z, true);
 
-    return !(distance(_tmp_position, _helper_position_1) < 1 ||
+    return !(//distance(_tmp_position, _helper_position_1) < 1 ||
              distance(_tmp_position, _helper_position_2) < 1 ||
              distance(_tmp_position, _helper_position_3) < 1);
 }
@@ -469,7 +469,7 @@ private:
     // Todo: set as param
 
     // sim
-    double _lat_home = -35.3632631;
+    /*double _lat_home = -35.3632631;
     double _long_home = 149.165237;
 
     const double _lat_start_help = -35.3632631, _long_start_help=149.165247;
@@ -479,37 +479,37 @@ private:
     const double _lat_mid_2 = -35.3632631, _long_mid_2 =149.165367;
     const double _lat_end = -35.3632631, _long_end =149.165407;
     const double _lat_end2 = -35.3632631, _long_end2 =149.165387;
-
-
+    const double _lat_land = -35.3632631, _long_land=149.165247;*/
 
 
     // vani
-    // const double _lat_start = 24.41772, _long_start = 54.43562;
-    // const double _lat_mid_1 = 24.41767, _long_mid_1 = 54.43582;
-    // const double _lat_mid_2 = 24.4176, _long_mid_2 = 54.4361;
-    // const double _lat_end = 24.41756, _long_end = 54.43626;
-    // const double _global_alt = 100;
+    const double _lat_start_help = 24.41775, _long_start_help = 54.43559;
+    const double      _lat_start = 24.41772,      _long_start = 54.43562;
+    const double      _lat_mid_1 = 24.41767,      _long_mid_1 = 54.43582;
+    const double      _lat_mid_2 = 24.41760,      _long_mid_2 = 54.43610;
+    const double        _lat_end = 24.41756,        _long_end = 54.43626;
+    const double       _lat_end2 = 24.41757,       _long_end2 = 54.43625;
+    const double       _lat_land = 24.4176690,      _long_land = 54.4359773;
+
+    // vanjske u sim
+    // double _lat_sim_home = -35.3632631;
+    // double _long_sim_home = 149.165237;
+    // double _lat_offset = 24.41775, _long_offset = 54.43559;
+    // const double _lat_start_help = 24.41775 - _lat_offset + _lat_sim_home,  _long_start_help = 54.43559 - _long_offset + _long_sim_home;
+    // const double      _lat_start = 24.41772 - _lat_offset  + _lat_sim_home,   _long_start = 54.43562 - _long_offset + _long_sim_home;
+    // const double      _lat_mid_1 = 24.41767 - _lat_offset + _lat_sim_home,   _long_mid_1 = 54.43582 - _long_offset + _long_sim_home;
+    // const double      _lat_mid_2 = 24.41760 - _lat_offset + _lat_sim_home,   _long_mid_2 = 54.43610 - _long_offset + _long_sim_home;
+    // const double        _lat_end = 24.41756 - _lat_offset + _lat_sim_home,     _long_end = 54.43626 - _long_offset + _long_sim_home;
+    // const double       _lat_end2 = 24.41757 - _lat_offset + _lat_sim_home,    _long_end2 = 54.43625 - _long_offset + _long_sim_home;
+    // const double       _lat_land = 24.4176690 - _lat_offset + _lat_sim_home,   _long_land = 54.4359773 - _long_offset + _long_sim_home;
 
     double _global_z, _yaw, _saved_x, _saved_y;
     geometry_msgs::Quaternion _tmp_orientation;
 
     geometry_msgs::Vector3 _currentReference;
 
-    // std::vector<std::pair<double>> _global_waypoints{
-    //         {_lat_start, _long_start},
-    //         {_lat_mid_1, _long_mid_1},
-    //         {_lat_mid_2, _long_mid_2},
-    //         {_lat_end, _long_end}
-    // };
 
-    // For testing
-
-    // Todo učitaj home
-
-
-    // Prepare for testig
     std::vector<std::pair<double, double>> _global_waypoints{
-            {_lat_home, _long_home},
             {_lat_start_help, _long_start_help},
             {_lat_start,_long_start},
             {_lat_mid_1,_long_mid_1},
@@ -519,7 +519,7 @@ private:
             {_lat_mid_2,_long_mid_2},
             {_lat_mid_1,_long_mid_1},
             {_lat_start,_long_start},
-            {_lat_start_help, _long_start_help}
+            {_lat_land, _long_land}
     };
 
     std::queue<geometry_msgs::PoseStamped> _local_waypoints;

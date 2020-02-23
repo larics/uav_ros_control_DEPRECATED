@@ -1,0 +1,23 @@
+<launch>
+  <arg name="rate" default="10" />
+  <arg name="namespace" default="$(env UAV_NAMESPACE)" />
+
+  <remap from="trajectory_point" to="position_hold/trajectory" />
+  <remap from="exploration_sm/goal" to="balloon_sm/goal"/>
+  <remap from="exploration_sm/point_reached" to="point_reached" />
+  <group ns="$(arg namespace)">
+    <node name="generate_toppra_trajectory" pkg="topp_ros" type="generate_toppra_trajectory.py" output="screen" />
+
+    <node name="global_planner" pkg="larics_motion_planning" type="global_planner_node" output="screen">
+      <param name="rate" value="$(arg rate)" />
+      <param name="global_planner_config_file" value="$(find frontier_exploration_3d)/config/bebop_config.yaml" />
+    </node>
+
+    <node name="joint_trajectory_to_multi_dof_trajectory_point" pkg="larics_motion_planning" type="joint_trajectory_to_multi_dof_trajectory_point.py">
+      <param name="rate" value="100" />
+      <remap from="trajectory_point_ref" to="position_hold/trajectory" />
+    </node>
+
+    <node name="waypoint_generator_ros" pkg="uav_search" type="waypoint_generator_ros.py"/>
+  </group>
+</launch>

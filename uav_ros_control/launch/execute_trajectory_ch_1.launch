@@ -1,0 +1,12 @@
+<launch>
+  <arg name="rate" default="10" />
+  <arg name="namespace" default="$(env UAV_NAMESPACE)" />
+
+<remap from="trajectory_point" to="position_hold/trajectory" />
+    <remap from="exploration_sm/goal" to="balloon_sm/goal"/>
+   <remap from="exploration_sm/point_reached" to="point_reached" />
+
+  <group ns="$(arg namespace)">
+    <node name="execute_trajectory" pkg="frontier_exploration_3d" type="execute_trajectory_state_machine.py" output="screen" />
+  </group>
+</launch>
