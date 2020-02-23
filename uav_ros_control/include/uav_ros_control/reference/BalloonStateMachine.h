@@ -130,11 +130,11 @@ void AddLocalWaypoint(double latitude, double longitude, double yaw_requested){
 
 void FullRotationArroundZAxis(double x, double y){
 
-    double yaws[] = {1, 2, 4, 6};
+    double yaws[] = {0, 3, 6};
     ROS_INFO("Generating spinning\n");
 
     tf2::Quaternion q;
-    for (int i = 0; i < 4; ++i){
+    for (int i = 0; i < 3; ++i){
         geometry_msgs::PoseStamped tmp_pose = geometry_msgs::PoseStamped();
         tmp_pose.pose.position.x = x;
         tmp_pose.pose.position.y = y;
@@ -286,11 +286,24 @@ void destroy(geometry_msgs::PointStamped target_point){
 
 }
 
-void land_or_redo(){
-    if (!_was_detected) {
-        runs_without_detection++;
+void move_to_land(){
+    ROS_INFO("Moving to landing area");
+    _local_land_coords = _globalToLocal.toLocal(_lat_land, _long_land, _global_z, true);
+    _tmp_pose = geometry_msgs::PoseStamped();
+    _tmp_pose.pose.position.x = _local_land_coords.x();
+    _tmp_pose.pose.position.y = _local_land_coords.y();
+    _tmp_pose.pose.position.z = _local_land_coords.z();
+
+    publishCurrGoal(_tmp_pose);
+    _isPointReached = false;
+}
+
+    void land_or_redo(){
+        if (!_was_detected) {
+            runs_without_detection++;
     }
     if (runs_without_detection == runs_without_detection_param) {
+        move_to_land();
         ROS_INFO("[Balloon_sm] Transition to LAND");
         _currentState = State::LAND;
     } else {
@@ -409,18 +422,19 @@ void stateAction(){
 
         case State::LAND:
 
-            ros::Duration(2.0).sleep();
-            ROS_INFO("calling land.");
-            land_srv.data = true;
-            _landClient.call(land_srv, service_success);
-            if (service_success.success) {
-                ROS_INFO("Landed.");
-                ROS_WARN("[Balloon_sm] Land\n");
-                _currentState = State::DONE;
-            }
-            else{
-                ROS_ERROR("[Balloon SM] Calling land failed.\n Message: %s",service_success.message.data());
-                _currentState = State::LAND;
+            if(_isPointReached){
+                ROS_INFO("calling land.");
+                land_srv.data = true;
+                _landClient.call(land_srv, service_success);
+                if (service_success.success) {
+                    ROS_INFO("Landed.");
+                    ROS_WARN("[Balloon_sm] Land\n");
+                    _currentState = State::DONE;
+                }
+                else{
+                    ROS_ERROR("[Balloon SM] Calling land failed.\n Message: %s",service_success.message.data());
+                    _currentState = State::LAND;
+                }
             }
 
 
@@ -540,8 +554,7 @@ private:
             {_lat_end2, _long_end2},
             {_lat_mid_2,_long_mid_2},
             {_lat_mid_1,_long_mid_1},
-            {_lat_start,_long_start},
-            {_lat_land, _long_land}
+            {_lat_start,_long_start}
     };
 
     std::queue<geometry_msgs::PoseStamped> _local_waypoints;
@@ -558,7 +571,7 @@ private:
     geometry_msgs::PoseStamped _tmp_spinning_pose;
     double _tmp_spinning_yaw;
     double _sleep_duration = 2;
-    Eigen::Vector3d _helper_position_1, _helper_position_2, _helper_position_3;
+    Eigen::Vector3d _helper_position_1, _helper_position_2, _helper_position_3, _local_land_coords;
     int runs_without_detection = 0;
     int runs_without_detection_param = 1;
     bool _was_detected = false;
