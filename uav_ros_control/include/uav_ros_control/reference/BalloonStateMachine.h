@@ -283,6 +283,20 @@ void destroy(geometry_msgs::PointStamped target_point){
 
 }
 
+void land_or_redo(){
+    if (!_was_detected) {
+        runs_without_detection++;
+    }
+    if (runs_without_detection == runs_without_detection_param) {
+        ROS_INFO("[Balloon_sm] Transition to LAND");
+        _currentState = State::LAND;
+    } else {
+        ROS_INFO("Redo trajectory");
+        _currentState = State::TAKE_OFF;
+    }
+    ROS_INFO("Runs without detection: %d\n", runs_without_detection);
+}
+
 
 /******************************************************************************************************************
  * **********************************************State machine****************************************************
@@ -342,9 +356,9 @@ void stateAction(){
                 if (!_local_waypoints.empty()) {
                     ROS_INFO("[Balloon_sm] Transition to GETNEXTPOINT");
                     _currentState = State::GETNEXTPOINT;
-                } else {
-                    ROS_INFO("[Balloon_sm] Transition to LAND");
-                    _currentState = State::LAND;
+                }
+                else {
+                    land_or_redo();
                 }
             }
 
@@ -378,16 +392,7 @@ void stateAction(){
             }
 
             if(_local_waypoints.empty()){
-                if (!_was_detected){
-                    runs_without_detection++;
-                }
-                if (runs_without_detection == 2) {
-                    ROS_INFO("[Balloon_sm] Transition to LAND");
-                    _currentState = State::LAND;
-                } else {
-                    ROS_INFO("Redo trajectory");
-                    _currentState = State::TAKE_OFF;
-                }
+                land_or_redo();
             }
             else {
                 ROS_INFO("[Balloon_sm] Transition to GETNEXTPOINT");
@@ -480,7 +485,7 @@ private:
     // Todo: set as param
 
     // sim
-    /*double _lat_home = -35.3632631;
+    double _lat_home = -35.3632631;
     double _long_home = 149.165237;
 
     const double _lat_start_help = -35.3632631, _long_start_help=149.165247;
@@ -490,17 +495,17 @@ private:
     const double _lat_mid_2 = -35.3632631, _long_mid_2 =149.165367;
     const double _lat_end = -35.3632631, _long_end =149.165407;
     const double _lat_end2 = -35.3632631, _long_end2 =149.165387;
-    const double _lat_land = -35.3632631, _long_land=149.165247;*/
+    const double _lat_land = -35.3632631, _long_land=149.165247;
 
 
     // vani
-    const double _lat_start_help = 24.41775, _long_start_help = 54.43559;
-    const double      _lat_start = 24.41772,      _long_start = 54.43562;
-    const double      _lat_mid_1 = 24.41767,      _long_mid_1 = 54.43582;
-    const double      _lat_mid_2 = 24.41760,      _long_mid_2 = 54.43610;
-    const double        _lat_end = 24.41756,        _long_end = 54.43626;
-    const double       _lat_end2 = 24.41757,       _long_end2 = 54.43625;
-    const double       _lat_land = 24.4176690,      _long_land = 54.4359773;
+    // const double _lat_start_help = 24.41775, _long_start_help = 54.43559;
+    // const double      _lat_start = 24.41772,      _long_start = 54.43562;
+    // const double      _lat_mid_1 = 24.41767,      _long_mid_1 = 54.43582;
+    // const double      _lat_mid_2 = 24.41760,      _long_mid_2 = 54.43610;
+    // const double        _lat_end = 24.41756,        _long_end = 54.43626;
+    // const double       _lat_end2 = 24.41757,       _long_end2 = 54.43625;
+    // const double       _lat_land = 24.4176690,      _long_land = 54.4359773;
 
     // vanjske u sim
     // double _lat_sim_home = -35.3632631;
@@ -550,6 +555,7 @@ private:
     double _sleep_duration = 5;
     Eigen::Vector3d _helper_position_1, _helper_position_2, _helper_position_3;
     int runs_without_detection = 0;
+    int runs_without_detection_param = 1;
     bool _was_detected = false;
 };
 }
