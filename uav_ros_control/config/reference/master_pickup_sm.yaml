@@ -1,8 +1,8 @@
 master_pickup:
   state_timer_rate: 10
   
-  search_size_x: 7
-  search_size_y: 7
+  search_size_x: 10
+  search_size_y: 10
   search_spacing: 2
   search_yaw_correction: 0
   search_offset_x: 0
