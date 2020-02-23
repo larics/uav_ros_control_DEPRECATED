@@ -61,7 +61,6 @@ BalloonStateMachine(ros::NodeHandle& nh) : _globalToLocal(nh)
     _subOdom = nh.subscribe("odometry", 1, &BalloonStateMachine::odomCb, this);
     _subPointReached = nh.subscribe("point_reached", 1, &BalloonStateMachine::pointReachedCallback, this);
     _subReadyForExploration = nh.subscribe("ready_for_exploration", 1, &BalloonStateMachine::readyForExplorationCallback, this);
-    _pubGoalsMarker = nh.advertise<visualization_msgs::MarkerArray>("balloon_sm/goals_marker", 20);
 
     _carrot_subscriber = nh.subscribe("carrot/trajectory", 1, &BalloonStateMachine::carrotCb, this);
 
@@ -238,6 +237,7 @@ void publish_spinning_points(){
 
         if (_isPointReached) {
             publishCurrGoal(_spinning_waypoints.front());
+            ROS_INFO("Spinning in place");
             _isPointReached = false;
             _spinning_waypoints.pop();
         }
@@ -259,12 +259,14 @@ void destroy(geometry_msgs::PointStamped target_point){
 
     publishCurrGoal(target_pose);
     _isPointReached = false;
+    ROS_INFO("Moving towards target");
 
     while(!_isPointReached){
         ros::Duration(0.2).sleep();
         ros::spinOnce();
     }
     // point reached
+    ROS_INFO("Lingering around the target");
     ros::Duration(_sleep_duration).sleep();
 
     // Vrati se na saved_x, saved_z, global_z, (yaw prema _local_waypoint.front(), ako postoji)
@@ -273,6 +275,7 @@ void destroy(geometry_msgs::PointStamped target_point){
     target_pose.pose.position.z = _global_z;
     target_pose.pose.orientation = _tmp_orientation;
     publishCurrGoal(target_pose);
+    ROS_INFO("Returning to trajectory point");
     _isPointReached = false;
     while(!_isPointReached){
         ros::Duration(0.2).sleep();
@@ -292,12 +295,17 @@ void land_or_redo(){
         _currentState = State::LAND;
     } else {
         ROS_INFO("Redo trajectory");
-        _currentState = State::TAKE_OFF;
+        generate_local_waypoints();
+        _currentState = State::GETNEXTPOINT;
     }
     ROS_INFO("Runs without detection: %d\n", runs_without_detection);
 }
 
-
+void generate_local_waypoints(){
+    for (auto glob_waypoint : _global_waypoints){
+        AddLocalWaypoint(glob_waypoint.first, glob_waypoint.second, 0);
+    }
+}
 /******************************************************************************************************************
  * **********************************************State machine****************************************************
  *
@@ -310,9 +318,7 @@ void stateAction(){
             if (_ready){
                 ROS_INFO("Ready for action\n");
                 _global_z = _currentReference.z;
-                for (auto glob_waypoint : _global_waypoints){
-                    AddLocalWaypoint(glob_waypoint.first, glob_waypoint.second, 0);
-                }
+                generate_local_waypoints();
                 ROS_INFO("[Balloon_sm] Transition to GETNEXTPOINT");
                 _currentState = State::GETNEXTPOINT;
             }
@@ -325,7 +331,7 @@ void stateAction(){
                 publishCurrGoal(_local_waypoints.front());
                 _tmp_position = _local_waypoints.front().pose.position;
                 _tmp_orientation = _local_waypoints.front().pose.orientation;
-                ROS_INFO("[Balloon_sm] Transition to GOTOPOINT");
+                ROS_INFO("[Balloon_sm] Transition to GOTOPOINT - moving to next waypoint");
                 _currentState = State::GOTOPOINT;
 
             break;
@@ -485,17 +491,17 @@ private:
     // Todo: set as param
 
     // sim
-    double _lat_home = -35.3632631;
-    double _long_home = 149.165237;
+    // double _lat_home = -35.3632631;
+    // double _long_home = 149.165237;
 
-    const double _lat_start_help = -35.3632631, _long_start_help=149.165247;
+    // const double _lat_start_help = -35.3632631, _long_start_help=149.165247;
 
-    const double _lat_start = -35.3632631, _long_start =149.165287;
-    const double _lat_mid_1 = -35.3632631, _long_mid_1 =149.165327;
-    const double _lat_mid_2 = -35.3632631, _long_mid_2 =149.165367;
-    const double _lat_end = -35.3632631, _long_end =149.165407;
-    const double _lat_end2 = -35.3632631, _long_end2 =149.165387;
-    const double _lat_land = -35.3632631, _long_land=149.165247;
+    // const double _lat_start = -35.3632631, _long_start =149.165287;
+    // const double _lat_mid_1 = -35.3632631, _long_mid_1 =149.165327;
+    // const double _lat_mid_2 = -35.3632631, _long_mid_2 =149.165367;
+    // const double _lat_end = -35.3632631, _long_end =149.165407;
+    // const double _lat_end2 = -35.3632631, _long_end2 =149.165387;
+    // const double _lat_land = -35.3632631, _long_land=149.165247;
 
 
     // vani
@@ -508,16 +514,16 @@ private:
     // const double       _lat_land = 24.4176690,      _long_land = 54.4359773;
 
     // vanjske u sim
-    // double _lat_sim_home = -35.3632631;
-    // double _long_sim_home = 149.165237;
-    // double _lat_offset = 24.41775, _long_offset = 54.43559;
-    // const double _lat_start_help = 24.41775 - _lat_offset + _lat_sim_home,  _long_start_help = 54.43559 - _long_offset + _long_sim_home;
-    // const double      _lat_start = 24.41772 - _lat_offset  + _lat_sim_home,   _long_start = 54.43562 - _long_offset + _long_sim_home;
-    // const double      _lat_mid_1 = 24.41767 - _lat_offset + _lat_sim_home,   _long_mid_1 = 54.43582 - _long_offset + _long_sim_home;
-    // const double      _lat_mid_2 = 24.41760 - _lat_offset + _lat_sim_home,   _long_mid_2 = 54.43610 - _long_offset + _long_sim_home;
-    // const double        _lat_end = 24.41756 - _lat_offset + _lat_sim_home,     _long_end = 54.43626 - _long_offset + _long_sim_home;
-    // const double       _lat_end2 = 24.41757 - _lat_offset + _lat_sim_home,    _long_end2 = 54.43625 - _long_offset + _long_sim_home;
-    // const double       _lat_land = 24.4176690 - _lat_offset + _lat_sim_home,   _long_land = 54.4359773 - _long_offset + _long_sim_home;
+    double _lat_sim_home = -35.3632631;
+    double _long_sim_home = 149.165237;
+    double _lat_offset = 24.41775, _long_offset = 54.43559;
+    const double _lat_start_help = 24.41775 - _lat_offset + _lat_sim_home,  _long_start_help = 54.43559 - _long_offset + _long_sim_home;
+    const double      _lat_start = 24.41772 - _lat_offset  + _lat_sim_home,   _long_start = 54.43562 - _long_offset + _long_sim_home;
+    const double      _lat_mid_1 = 24.41767 - _lat_offset + _lat_sim_home,   _long_mid_1 = 54.43582 - _long_offset + _long_sim_home;
+    const double      _lat_mid_2 = 24.41760 - _lat_offset + _lat_sim_home,   _long_mid_2 = 54.43610 - _long_offset + _long_sim_home;
+    const double        _lat_end = 24.41756 - _lat_offset + _lat_sim_home,     _long_end = 54.43626 - _long_offset + _long_sim_home;
+    const double       _lat_end2 = 24.41757 - _lat_offset + _lat_sim_home,    _long_end2 = 54.43625 - _long_offset + _long_sim_home;
+    const double       _lat_land = 24.4176690 - _lat_offset + _lat_sim_home,   _long_land = 54.4359773 - _long_offset + _long_sim_home;
 
     double _global_z, _yaw, _saved_x, _saved_y;
     geometry_msgs::Quaternion _tmp_orientation;
@@ -545,14 +551,13 @@ private:
     boost::recursive_mutex _pursuitConfigMutex;
 
     Global2Local _globalToLocal;
-    ros::Publisher _pubGoalsMarker;
     ros::Subscriber _subReadyForExploration;
 
     geometry_msgs::Point _tmp_position;
     geometry_msgs::PoseStamped _tmp_pose;
     geometry_msgs::PoseStamped _tmp_spinning_pose;
     double _tmp_spinning_yaw;
-    double _sleep_duration = 5;
+    double _sleep_duration = 2;
     Eigen::Vector3d _helper_position_1, _helper_position_2, _helper_position_3;
     int runs_without_detection = 0;
     int runs_without_detection_param = 1;

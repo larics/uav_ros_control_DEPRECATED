@@ -10,7 +10,7 @@
 
     <node name="global_planner" pkg="larics_motion_planning" type="global_planner_node" output="screen">
       <param name="rate" value="$(arg rate)" />
-      <param name="global_planner_config_file" value="$(find frontier_exploration_3d)/config/bebop_config.yaml" />
+      <param name="global_planner_config_file" value="$(find uav_ros_control)/config/reference/balloon_sm_trajectory_params.yaml" />
     </node>
 
     <node name="joint_trajectory_to_multi_dof_trajectory_point" pkg="larics_motion_planning" type="joint_trajectory_to_multi_dof_trajectory_point.py">
