@@ -332,7 +332,7 @@ void initializeParameters(ros::NodeHandle& nh)
     ROS_INFO("Touchdown speed: %.2f", _touchdownSpeed);
     ROS_INFO("Magnet offset: %.2f", _magnetOffset);
     ROS_INFO("After touchdown height: %.2f", _afterTouchdownHeight);
-    ROS_INFO("Detection counter: %d", _descentTransitionCounter);
+    ROS_INFO("Detection counter: %d", _descentCounterMax);
     if (!initialized)
 	{
 		ROS_FATAL("VisualServoStateMachine::initializeParameters() - failed to initialize parameters");
@@ -612,9 +612,9 @@ private:
     /* Touchdown mode parameters */
     double _touchdownHeight, _touchdownDelta = 0, _magnetOffset, 
         _touchdownDuration = 0, _touchdownAlignDuration = 0, 
-        _touchdownTime, _descentCounterMax, _touchdownSpeed, _visualServoDisableHeight;
+        _touchdownTime, _touchdownSpeed, _visualServoDisableHeight;
     double _currHeightReference, _descentSpeed, _ascentSpeed, _afterTouchdownHeight, _afterTouchdownHeight_GPS; 
-    int _descentTransitionCounter = 0;
+    int _descentTransitionCounter = 0, _descentCounterMax;
 
     double _timeLastContour = 0,
         _timeLastOdometry = 0,
