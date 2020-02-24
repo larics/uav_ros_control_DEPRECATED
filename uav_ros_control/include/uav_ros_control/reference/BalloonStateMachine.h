@@ -519,13 +519,13 @@ private:
 
 
     // vani
-    const double _lat_start_help = 24.41775, _long_start_help = 54.43559;
-    const double      _lat_start = 24.41772,      _long_start = 54.43562;
-    const double      _lat_mid_1 = 24.41767,      _long_mid_1 = 54.43582;
-    const double      _lat_mid_2 = 24.41760,      _long_mid_2 = 54.43610;
-    const double        _lat_end = 24.41756,        _long_end = 54.43626;
-    const double       _lat_end2 = 24.41757,       _long_end2 = 54.43625;
-    const double       _lat_land = 24.4176690,      _long_land = 54.4359773;
+    const double _lat_start_help = 24.41776, _long_start_help = 54.43562;
+    const double      _lat_start = 24.41775,      _long_start = 54.43565;
+    const double      _lat_mid_1 = 24.4177,      _long_mid_1 = 54.43583;
+    const double      _lat_mid_2 = 24.41764,      _long_mid_2 = 54.43608;
+    const double        _lat_end = 24.41760,        _long_end = 54.43626;
+    const double       _lat_end2 = 24.41759,       _long_end2 = 54.43629;
+    const double       _lat_land = _lat_start_help,_long_land = _long_start_help;
 
     // vanjske u sim
     //double _lat_sim_home = -35.3632631;
