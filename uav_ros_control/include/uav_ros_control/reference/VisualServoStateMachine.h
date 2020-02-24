@@ -99,8 +99,7 @@ void trajCb(const trajectory_msgs::MultiDOFJointTrajectoryPoint& point)
 void nContoursCb(const std_msgs::Int32ConstPtr& msg)
 {
     _nContours = msg->data;
-    if (msg->data == 0 && _currentState != LocalPickupState::TOUCHDOWN && 
-        _currentState != LocalPickupState::OFF)
+    if (msg->data == 0 && _currentState == BaloonPopState::ALIGNEMNT)
     {
         ROS_FATAL("VSSM - patch count is 0.");
         std_msgs::Bool success;
@@ -114,13 +113,11 @@ void nContoursCb(const std_msgs::Int32ConstPtr& msg)
 void localCentroidPointCb(const geometry_msgs::Vector3& msg) 
 {
     _localCentroid = msg;
-    if (msg.z == INVALID_DISTANCE) {
-        _relativeBrickDistance_local = INVALID_DISTANCE;
+    if (msg.x == INVALID_DISTANCE) {
+        _relativeBaloonDistance = INVALID_DISTANCE;
     } else {
-        _relativeBrickDistance_local = - msg.z; // Minus sign here because Centroid is wrt. the UAV base frame       
+        _relativeBaloonDistance = msg.x;
     }
-    std_msgs::Float32 newMessage;
-    newMessage.data = _relativeBrickDistance_local;
     _timeLastCentroidLocal = ros::Time::now().toSec();
 }
 
@@ -148,19 +145,18 @@ bool popBaloonServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::
         if (_nContours == 0)
             ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::popBaloonServiceCb - no contours found.");
 
-        if (!isRelativeDistanceValid(_relativeBrickDistance_local)
-            || !isRelativeDistanceValid(_relativeBrickDistance_global))
+        if (!isRelativeDistanceValid(_relativeBaloonDistance))
             ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::popBaloonServiceCb - distances invalid");
 
         turnOffVisualServo();
-        _brickPickupActivated = false;
+        _baloonPopActivated = false;
         response.success = false;
         response.message = "Visual servo and baloon pop deactivated";
         return true;
     }
 
     // Check if baloon pop is already activated.
-    if (_brickPickupActivated)
+    if (_baloonPopActivated)
     {
         ROS_FATAL("VSSM::popBaloonServiceCb - baloon pop is already active.");
         response.success = false;
@@ -180,7 +176,7 @@ bool popBaloonServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::
         ROS_FATAL("VSSM::popBaloonServiceCb - calling visual servo failed.");
         response.success = false;
         response.message = "Service caller for visual servo failed.";
-        _currentState = LocalPickupState::OFF;
+        _currentState = BaloonPopState::OFF;
         return true;
     }
 
@@ -190,14 +186,14 @@ bool popBaloonServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::
         ROS_INFO("VSSM::popBaloonServiceCb() - baloon pop activated.");
         response.success = true;
         response.message = "Visual servo enabled - baloon pop activated.";
-        _brickPickupActivated = true;
+        _baloonPopActivated = true;
         return true;
     }
     
     ROS_WARN("VSSM::popBaloonServiceCb - unable to activate baloon pop.");
     response.success = false;
     response.message = "Visual servo failed to start - baloon pop inactive.";
-    _brickPickupActivated = false;
+    _baloonPopActivated = false;
 
     return true;
 }
@@ -305,9 +301,9 @@ void turnOffVisualServo()
     {
         ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - visual servo successfully deactivated");
         // Visual servo successfully activated
-        _currentState = LocalPickupState::OFF;
+        _currentState = BaloonPopState::OFF;
         ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - OFF state activated. ");
-        _brickPickupActivated = false; 
+        _baloonPopActivated = false; 
         ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - baloon pop finished.");
         return;
     }
@@ -321,20 +317,19 @@ void turnOffVisualServo()
 bool stateMachineDisableConditions()
 {
     return !subscribedTopicsActive()
-        || !isRelativeDistanceValid(_relativeBrickDistance_local) 
-        || !isRelativeDistanceValid(_relativeBrickDistance_global) 
+        || !isRelativeDistanceValid(_relativeBaloonDistance)
         || _nContours == 0;
 }
 
 void updateState()
 {
-    if (_currentState != LocalPickupState::OFF && !_brickPickupActivated ||  // If visual servo is 
-        _currentState == LocalPickupState::BRICK_ALIGNMENT && stateMachineDisableConditions())
+    if (_currentState != BaloonPopState::OFF && !_baloonPopActivated ||  // If visual servo is 
+        _currentState == BaloonPopState::ALIGNEMNT && stateMachineDisableConditions())
     {
         // deactivate state machine
         ROS_WARN_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - Visual servo is inactive.");
-        _currentState = LocalPickupState::OFF;
-        _brickPickupActivated = false;
+        _currentState = BaloonPopState::ALIGNEMNT;
+        _baloonPopActivated = false;
         std_msgs::Bool success;
         success.data = false;
         _pubVisualServoSuccess.publish(success);
@@ -344,19 +339,19 @@ void updateState()
     }
 
     // If baloon pop is activate start brick alignment first
-    if (_currentState == LocalPickupState::OFF 
-        && _brickPickupActivated
-        && isRelativeDistanceValid(_relativeBrickDistance_local))
+    if (_currentState == BaloonPopState::OFF 
+        && _baloonPopActivated
+        && isRelativeDistanceValid(_relativeBaloonDistance))
     {
         ROS_INFO("VSSM::updateStatus - baloon pop requested");
         _currHeightReference = _currOdom.pose.pose.position.z;
         _descentTransitionCounter = 0;
-        _currentState = LocalPickupState::BRICK_ALIGNMENT;
+        _currentState = BaloonPopState::ALIGNEMNT;
         ROS_INFO("VSSM::updateStatus - BRICK_ALIGNMENT state activated with height: %2f.", _currHeightReference);
         return;
     }
 
-    if (_currentState == LocalPickupState::BRICK_ALIGNMENT && 
+    if (_currentState == BaloonPopState::ALIGNEMNT && 
         isTargetInThreshold(_minTargetError, _minTargetError, _minTargetError, _brickAlignHeight))
     {
         _descentTransitionCounter++;
@@ -364,7 +359,7 @@ void updateState()
     }
 
     // If brick alignemnt is activated and target error is withing range start descent
-    if (_currentState == LocalPickupState::BRICK_ALIGNMENT &&
+    if (_currentState == BaloonPopState::ALIGNEMNT &&
         _descentTransitionCounter > 15)
     {
         std_msgs::Bool success;
@@ -447,18 +442,22 @@ void publishVisualServoSetpoint(double dt)
         
     switch (_currentState)
     {
-        case LocalPickupState::OFF :
+        case BaloonPopState::OFF :
             if (!_trajPoint.transforms.empty()) {
                 _currVisualServoFeed.x = _trajPoint.transforms.front().translation.x;
                 _currVisualServoFeed.y = _trajPoint.transforms.front().translation.y;
             }
             break;
         
-        case LocalPickupState::BRICK_ALIGNMENT :
+        case BaloonPopState::ALIGNEMNT :
             _currVisualServoFeed.x = _trajPoint.transforms.front().translation.x;
             _currVisualServoFeed.y = _trajPoint.transforms.front().translation.y;
             _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
             _currHeightReference  = _currVisualServoFeed.z;
+            break;
+
+        case BaloonPopState::POP :
+            // TODO:  Add pop state action
             break;
     }
 
@@ -499,8 +498,8 @@ private:
 
     /* Service baloon pop */
 	ros::ServiceServer _serviceBrickPickup;
-    bool _brickPickupActivated = false;
-    LocalPickupState _currentState = LocalPickupState::OFF;
+    bool _baloonPopActivated = false;
+    BaloonPopState _currentState = BaloonPopState::OFF;
     
     /* Client for calling visual servo */
     ros::ServiceClient _vsClienCaller;
@@ -530,9 +529,7 @@ private:
         _minTouchdownAlignDuration, _brickAlignHeight;
     ros::Subscriber _subPatchCentroid_local;
     geometry_msgs::Vector3 _globalCentroid, _localCentroid;    
-    double _relativeBrickDistance_global = INVALID_DISTANCE,
-        _relativeBrickDistance_local = INVALID_DISTANCE,
-        _relativeBrickDistanceGlobal_lastValid = INVALID_DISTANCE;
+    double _relativeBaloonDistance = INVALID_DISTANCE;
 
     /* Contour subscriber */
     ros::Subscriber _subNContours;
