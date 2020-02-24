@@ -93,7 +93,7 @@ namespace uav_reference {
       double _rate, _rateLimit;
       
       bool _visualServoEnabled = false,  _compensate_roll_and_pitch = false;
-      bool _z_frozen = false, _y_frozen = false; // _yaw_frozen = false;
+      bool _z_frozen = false, _y_frozen = false, _yaw_frozen = false;
       bool _compensate_camera_nonlinearity = false;
 
       /** Publishers */

@@ -188,7 +188,7 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
 
   _z_frozen = false;
   _y_frozen = false;
-  //_yaw_frozen = false;
+  _yaw_frozen = false;
   response.success = _visualServoEnabled;
   return true;
 }
@@ -261,7 +261,8 @@ void VisualServo::odomCb(const nav_msgs::OdometryConstPtr& odom) {
 
     _uavRoll = atan2( 2*(_qw * _qx + _qy * _qz), 1 - 2 * (_qx*_qx + _qy*_qy) );
     _uavPitch = asin( 2*(_qw*_qy - _qx*_qz) );
-    _uavYaw = atan2( 2 * (_qw * _qz + _qx * _qy), _qw * _qw + _qx * _qx - _qy * _qy - _qz * _qz);
+    // _uavYaw = atan2( 2 * (_qw * _qz + _qx * _qy), _qw * _qw + _qx * _qx - _qy * _qy - _qz * _qz);
+    
     _floatMsg.data = _uavRoll;
     _pubUavRollDebug.publish(_floatMsg);
     _floatMsg.data = _uavPitch;
@@ -298,7 +299,7 @@ void VisualServo::VisualServoProcessValuesCb(const uav_ros_control_msgs::VisualS
         _uavPos[1] = _setpointPosition[1];
     }
 
-    /*if (msg.yaw == 0.0) {
+    if (msg.yaw == 0.0) {
         _yaw_frozen = true;
     }
     if (!_yaw_frozen) {
@@ -308,10 +309,8 @@ void VisualServo::VisualServoProcessValuesCb(const uav_ros_control_msgs::VisualS
         _uavYaw = _setpointYaw;
     }
     
-    _floatMsg.data = _uavYaw;
-    _pubUavYawDebug.publish(_floatMsg);*/
-
-    _setpointYaw = msg.yaw;
+    //_floatMsg.data = _uavYaw;
+    //_pubUavYawDebug.publish(_floatMsg);
     _uavPos[0] = msg.x;
 }
 
@@ -450,7 +449,8 @@ void VisualServo::updateSetpoint() {
   double x_temp = _setpointPosition[0], y_temp = _setpointPosition[1];
   _setpointPosition[0] = cos(-_uavYaw) * x_temp + sin(-_uavYaw) * y_temp;
   _setpointPosition[1] = cos(-_uavYaw) * y_temp - sin(-_uavYaw) * x_temp;
-  
+  _setpointYaw = _uavYaw;
+
   /*_floatMsg.data = change_yaw;
   _pubChangeYawDebug.publish(_floatMsg);*/
   
