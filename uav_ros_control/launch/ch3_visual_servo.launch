@@ -56,7 +56,7 @@
             <remap from="n_contours" to="$(arg n_contour_topic)"/>
             <remap from="visual_servo/yaw_error" to="red_color_filter/orientation_err"/>
             <!--remap from="brick/distance" to="pointcloud_filter/brick/filtered_distance"/-->
-            <remap from="centroid_point" to="$(arg patch_centroid)" />
+            <remap from="centroid_point" to="visual_servo/centroid/transformed_local" />
         </node>
     </group>
 </launch>
