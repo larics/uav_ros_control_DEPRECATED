@@ -7,7 +7,7 @@
     <!--include file="$(find frontier_exploration_3d)/launch/execute_trajectory.launch"/-->
     <group ns="$(arg namespace)">
     <node pkg="uav_ros_control" type="flight_init_node" name="flight_init_node" output="screen">
-        <param name="takeoff_height" value="4" />
+        <param name="takeoff_height" value="6" />
     </node>
     </group>
 </launch>

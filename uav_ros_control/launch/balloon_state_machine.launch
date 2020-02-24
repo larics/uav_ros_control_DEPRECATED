@@ -17,11 +17,7 @@
 
     </group>
 
-    <!-- trajectory-->
-    <remap from="trajectory_point" to="position_hold/trajectory" />
-    <remap from="exploration_sm/goal" to="balloon_sm/goal"/>
-    <remap from="exploration_sm/point_reached" to="point_reached" />
-    <!--include file="$(find frontier_exploration_3d)/launch/planner.launch"/-->
-    <!--include file="$(find frontier_exploration_3d)/launch/execute_trajectory.launch"/-->
+    <!-- trajectory execution-->
+    <include file="$(find uav_ros_control)/launch/execute_trajectory_ch1.launch"/>
 
 </launch>

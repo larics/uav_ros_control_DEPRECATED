@@ -153,9 +153,6 @@ class UavExplorationSm:
         request.publish_trajectory = False
         request.plan_path = False
         request.plan_trajectory = True
-
-        print "Requesting trajectory"
-        print request
       
         response = self.plan_trajectory_service.call(request)
         # If we did not manage to obtain a successful plan then go to
@@ -172,9 +169,8 @@ class UavExplorationSm:
           self.trajectory_pub.publish(response.trajectory)
           self.current_trajectory_execution_time = \
             response.trajectory.points[len(response.trajectory.points)-1].time_from_start.to_sec()
-          print "Len of received trajectory"
-          print len(response.trajectory.points)
-          print "Trajectory execution time"
+
+          print "Trajectory execution time:"
           print self.current_trajectory_execution_time
        
           self.state = "execute"

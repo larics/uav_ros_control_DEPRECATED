@@ -7,6 +7,6 @@
    <remap from="exploration_sm/point_reached" to="point_reached" />
 
   <group ns="$(arg namespace)">
-    <node name="execute_trajectory" pkg="frontier_exploration_3d" type="execute_trajectory_state_machine.py" output="screen" />
+    <node name="execute_trajectory" pkg="uav_ros_control" type="execute_trajectory_state_machine.py" output="screen" />
   </group>
 </launch>
