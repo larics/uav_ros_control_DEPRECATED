@@ -78,10 +78,10 @@ VisualServoStateMachine(ros::NodeHandle& nh)
 		&uav_reference::VisualServoStateMachine::vssmParamCb, this, _1, _2);
 	_vssmConfigServer.setCallback(_vssmParamCallback);
 
-    // Setup brick pickup service callback
+    // Setup baloon pop service callback
     _serviceBrickPickup = nh.advertiseService(
-			"brick_pickup/local",
-			&uav_reference::VisualServoStateMachine::brickPickupServiceCb,
+			"pop_baloon",
+			&uav_reference::VisualServoStateMachine::popBaloonServiceCb,
 			this);
 
     // Initialize visual servo client caller
@@ -129,44 +129,42 @@ bool healthyNumberOfPublishers()
     ROS_FATAL_COND(!_subNContours.getNumPublishers() > 0, "VSSM - 'n_contours' topic publisher missing");
     ROS_FATAL_COND(!_subOdom.getNumPublishers() > 0, "VSSM - 'odometry' topic publisher missing");
     ROS_FATAL_COND(!_subPatchCentroid_local.getNumPublishers() > 0, "VSSM - 'centroid_local' topic publisher missing");
-    //ROS_FATAL_COND(!_subYawError.getNumPublishers() > 0, "VSSM - 'yaw_error' topic publisher missing");
     
     return _subNContours.getNumPublishers() > 0 
         && _subOdom.getNumPublishers() > 0
         && _subPatchCentroid_local.getNumPublishers() > 0;
-        //&& _subYawError.getNumPublishers() > 0;
 }
 
-bool brickPickupServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::Response& response)
+bool popBaloonServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::Response& response)
 {
     if (!request.data || stateMachineDisableConditions() || !healthyNumberOfPublishers() )
     {
         if (!healthyNumberOfPublishers())
-            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::brickPickupServiceCb - check connected publishers.");
+            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::popBaloonServiceCb - check connected publishers.");
         
         if (!request.data)
-            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::brickPickupServiceCb - brick pickup deactivation requested.");
+            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::popBaloonServiceCb - baloon pop deactivation requested.");
         
         if (_nContours == 0)
-            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::brickPickupServiceCb - no contours found.");
+            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::popBaloonServiceCb - no contours found.");
 
         if (!isRelativeDistanceValid(_relativeBrickDistance_local)
             || !isRelativeDistanceValid(_relativeBrickDistance_global))
-            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::brickPIckupServiceCb - distances invalid");
+            ROS_FATAL_THROTTLE(THROTTLE_TIME, "VSSM::popBaloonServiceCb - distances invalid");
 
         turnOffVisualServo();
         _brickPickupActivated = false;
         response.success = false;
-        response.message = "Visual servo and brick pickup deactivated";
+        response.message = "Visual servo and baloon pop deactivated";
         return true;
     }
 
-    // Check if brick pickup is already activated.
+    // Check if baloon pop is already activated.
     if (_brickPickupActivated)
     {
-        ROS_FATAL("VSSM::brickPickupServiceCb - brick pickup is already active.");
+        ROS_FATAL("VSSM::popBaloonServiceCb - baloon pop is already active.");
         response.success = false;
-        response.message = "Brick pickup is already active";
+        response.message = "baloon pop is already active";
         return true;
     }
 
@@ -179,7 +177,7 @@ bool brickPickupServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool
     req.data = true;
     if (!_vsClienCaller.call(req, resp))
     {
-        ROS_FATAL("VSSM::brickPickupServiceCb - calling visual servo failed.");
+        ROS_FATAL("VSSM::popBaloonServiceCb - calling visual servo failed.");
         response.success = false;
         response.message = "Service caller for visual servo failed.";
         _currentState = LocalPickupState::OFF;
@@ -189,16 +187,16 @@ bool brickPickupServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool
     if (resp.success)
     {
         // Visual servo successfully activated
-        ROS_INFO("VSSM::brickPickupServiceCb() - brick pickup activated.");
+        ROS_INFO("VSSM::popBaloonServiceCb() - baloon pop activated.");
         response.success = true;
-        response.message = "Visual servo enabled - brick pickup activated.";
+        response.message = "Visual servo enabled - baloon pop activated.";
         _brickPickupActivated = true;
         return true;
     }
     
-    ROS_WARN("VSSM::brickPickupServiceCb - unable to activate brick pickup.");
+    ROS_WARN("VSSM::popBaloonServiceCb - unable to activate baloon pop.");
     response.success = false;
-    response.message = "Visual servo failed to start - brick pickup inactive.";
+    response.message = "Visual servo failed to start - baloon pop inactive.";
     _brickPickupActivated = false;
 
     return true;
@@ -310,7 +308,7 @@ void turnOffVisualServo()
         _currentState = LocalPickupState::OFF;
         ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - OFF state activated. ");
         _brickPickupActivated = false; 
-        ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - Brick pickup finished.");
+        ROS_INFO_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - baloon pop finished.");
         return;
     }
     else
@@ -345,12 +343,12 @@ void updateState()
         return;
     }
 
-    // If brick pickup is activate start brick alignment first
+    // If baloon pop is activate start brick alignment first
     if (_currentState == LocalPickupState::OFF 
         && _brickPickupActivated
         && isRelativeDistanceValid(_relativeBrickDistance_local))
     {
-        ROS_INFO("VSSM::updateStatus - Brick pickup requested");
+        ROS_INFO("VSSM::updateStatus - baloon pop requested");
         _currHeightReference = _currOdom.pose.pose.position.z;
         _descentTransitionCounter = 0;
         _currentState = LocalPickupState::BRICK_ALIGNMENT;
@@ -499,7 +497,7 @@ private:
     static constexpr double THROTTLE_TIME = 3.0;
     double _rate = 50;
 
-    /* Service brick pickup */
+    /* Service baloon pop */
 	ros::ServiceServer _serviceBrickPickup;
     bool _brickPickupActivated = false;
     LocalPickupState _currentState = LocalPickupState::OFF;
