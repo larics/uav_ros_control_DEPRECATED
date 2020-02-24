@@ -416,7 +416,7 @@ void updateState()
 
     // If brick alignemnt is activated and target error is withing range start descent
     if (_currentState == LocalPickupState::BRICK_ALIGNMENT &&
-        _descentTransitionCounter > _descentCounterMax)
+        _descentTransitionCounter > 15)
     {
         std_msgs::Bool success;
         success.data = true;
