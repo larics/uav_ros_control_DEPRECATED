@@ -344,7 +344,9 @@ void updateState()
         && isRelativeDistanceValid(_relativeBaloonDistance))
     {
         ROS_INFO("VSSM::updateStatus - baloon pop requested");
-        _currDistanceReference = cos(_uavYaw) * _currOdom.pose.pose.position.x + sin(_uavYaw) * _currOdom.pose.pose.position.y;
+        _currDistanceReference = 
+            cos(_uavYaw) * _currOdom.pose.pose.position.x 
+            + sin(_uavYaw) * _currOdom.pose.pose.position.y; // From global to local
         _descentTransitionCounter = 0;
         _currentState = BaloonPopState::ALIGNEMNT;
         ROS_INFO("VSSM::updateStatus - BRICK_ALIGNMENT state activated with height: %2f.", _currDistanceReference);
@@ -380,6 +382,9 @@ void updateState()
     if (_currentState == BaloonPopState::BACK && _backStateTime > _backStateDuration) {
         _currentState == BaloonPopState::OFF;
         ROS_INFO("VSSM::updateStatus - BACK is finished, turning off visual servo");
+        std_msgs::Bool success;
+        success.data = true;
+        _pubVisualServoSuccess.publish(success);
         turnOffVisualServo();
     }
 }   
@@ -463,14 +468,31 @@ void publishVisualServoSetpoint(double dt)
             break;
         
         case BaloonPopState::ALIGNEMNT :
-            _currVisualServoFeed.x = _trajPoint.transforms.front().translation.x;
-            _currVisualServoFeed.y = _trajPoint.transforms.front().translation.y;
+            _currVisualServoFeed.x = _currDistanceReference;
+            _currVisualServoFeed.y = 
+                cos(_uavYaw) * _currOdom.pose.pose.position.y 
+                - sin(_uavYaw) * _currOdom.pose.pose.position.x;  // Transform from global to local
             _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
-            _currDistanceReference  = _currVisualServoFeed.z;
+            _currVisualServoFeed.yaw = 0;
             break;
 
         case BaloonPopState::POP :
-            // TODO:  Add pop state action
+            _currVisualServoFeed.x = _currDistanceReference + _descentSpeed * dt;
+            _currVisualServoFeed.y = 
+                cos(_uavYaw) * _currOdom.pose.pose.position.y 
+                - sin(_uavYaw) * _currOdom.pose.pose.position.x;  // Transform from global to local
+            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
+            _currVisualServoFeed.yaw = 0;
+            _currDistanceReference = _currVisualServoFeed.x;
+            break;
+
+        case BaloonPopState::BACK :
+            _backStateTime += dt;
+            _currVisualServoFeed.x = _currDistanceReference + _ascentSpeed * dt;
+            _currVisualServoFeed.y = 0;
+            _currVisualServoFeed.z = 0;
+            _currVisualServoFeed.yaw = 0;
+            _currDistanceReference = _currVisualServoFeed.x;
             break;
     }
 
