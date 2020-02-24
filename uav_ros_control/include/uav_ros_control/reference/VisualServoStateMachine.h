@@ -63,10 +63,6 @@ VisualServoStateMachine(ros::NodeHandle& nh)
     // Define Subscribers
     _subOdom =
         nh.subscribe("odometry", 1, &uav_reference::VisualServoStateMachine::odomCb, this);
-    // Note from past Lovro : This is changed to debug/yaw_error because that holds actual information about the yaw_error
-    // TODO: Change this to make more sense
-    //_subYawError = 
-    //    nh.subscribe("debug/yaw_error", 1, &uav_reference::VisualServoStateMachine::yawErrorCb, this); 
     _subNContours =
         nh.subscribe("n_contours", 1, &uav_reference::VisualServoStateMachine::nContoursCb, this);
     _subPatchCentroid_local = 
@@ -126,42 +122,6 @@ void localCentroidPointCb(const geometry_msgs::Vector3& msg)
     std_msgs::Float32 newMessage;
     newMessage.data = _relativeBrickDistance_local;
     _timeLastCentroidLocal = ros::Time::now().toSec();
-}
-
-void globalCentroidPointCb(const geometry_msgs::Vector3& msg)
-{
-    static constexpr double MIN_CENTROID_DISTANCE = 1;
-
-    // Check if global centroid is same as previous centroid
-    if (_currentState != LocalPickupState::OFF              // Not in OFF state
-        && _currentState != LocalPickupState::TOUCHDOWN     // .. and Not in TOUCHDOWN state
-        && isRelativeDistanceValid(msg.z)                   // .. and relative distance is valid
-        && sqrt(                                             
-                pow(_globalCentroid.x - msg.x, 2) 
-                + pow(_globalCentroid.y - msg.y, 2) 
-                + pow(_globalCentroid.z - msg.z, 2)
-                ) > MIN_CENTROID_DISTANCE)                  // .. and not close to precious centroid
-    {  
-        ROS_FATAL("VSSM - new centroid [%.2f, %.2f, %.2f] is not old [%.2f, %.2f, %.2f]",
-            msg.x, msg.y, msg.z, _globalCentroid.x, _globalCentroid.y, _globalCentroid.z);
-        std_msgs::Bool success;
-        success.data = false;
-        _pubVisualServoSuccess.publish(success);
-        turnOffVisualServo();
-    }
-
-    _globalCentroid = msg;
-    // TODO: provjeriti sa relativnom udaljenoscu
-    if (msg.z == INVALID_DISTANCE) {
-        _relativeBrickDistance_global = INVALID_DISTANCE;
-    }
-    else {
-        _relativeBrickDistance_global = msg.z;
-    }
-
-    std_msgs::Float32 newMessage;
-    newMessage.data = _relativeBrickDistance_global;
-    _timeLastCentroidGlobal = ros::Time::now().toSec();
 }
 
 bool healthyNumberOfPublishers() 
@@ -437,19 +397,17 @@ bool isUavVelcityInThreshold()
 
 bool isTargetInThreshold(const double minX, const double minY, const double minZ, const double targetDistance)
 {
-    double tarx = fabs(_localCentroid.x),
+    double tarz = fabs(_localCentroid.z),
         tary = fabs(_localCentroid.y);
-        //tarz = fabs(_relativeBrickDistance_local - targetDistance);
     
     geometry_msgs::Vector3 msg;
-    msg.x = tarx;
+    msg.x = 0;
     msg.y = tary;
-    msg.z = 0;
+    msg.z = tarz;
     _pubTargetError.publish(msg);
 
-    return tarx < minX 
+    return tarz < minZ 
         && tary < minY;
-        //&& tarz < minZ;
 }
 
 bool isRelativeDistanceValid(const double checkDistance)
@@ -462,23 +420,19 @@ bool subscribedTopicsActive()
     double currentTime = ros::Time::now().toSec();
     double dt_odom = currentTime - _timeLastOdometry;
     double dt_contour = currentTime - _timeLastContour;
-    double dt_centGlobal = currentTime - _timeLastCentroidGlobal;
     double dt_centLocal = currentTime - _timeLastCentroidLocal;
     //double dt_yaw = currentTime - _timeLastYawError;
     
     static constexpr double MAX_DT = 0.5;
-    static constexpr double MAX_DT_SERVO = 5;
+    // static constexpr double MAX_DT_SERVO = 5;
+    // TODO: Mozda ce dugo trebati
     ROS_FATAL_COND(dt_odom > MAX_DT,        "VSSM - odometry timeout reached.");
     ROS_FATAL_COND(dt_contour > MAX_DT,     "VSSM - contour timeout reached.");
-    ROS_FATAL_COND(dt_centGlobal > MAX_DT_SERVO,  "VSSM - centroid global timeout reached.");
-    ROS_FATAL_COND(dt_centLocal > MAX_DT_SERVO,   "VSSM - centroid local timeout reached.");
-    //ROS_FATAL_COND(dt_yaw > MAX_DT,         "VSSM - yaw error timeout reached.");
+    ROS_FATAL_COND(dt_centLocal > MAX_DT,   "VSSM - centroid local timeout reached.");
     
     return dt_odom < MAX_DT 
         && dt_contour < MAX_DT 
-        && dt_centGlobal < MAX_DT_SERVO
-        && dt_centLocal < MAX_DT_SERVO;
-        //&& dt_yaw < MAX_DT;
+        && dt_centLocal < MAX_DT;
 }
 
 void publishVisualServoSetpoint(double dt)
@@ -525,12 +479,6 @@ void odomCb(const nav_msgs::OdometryConstPtr& msg)
     _timeLastOdometry = ros::Time::now().toSec();
 }
 
-/*void yawErrorCb(const std_msgs::Float32ConstPtr& msg)
-{
-    _currYawError = msg->data;
-    _timeLastYawError = ros::Time::now().toSec();
-}*/
-
 void run()
 {
     ros::Rate loopRate(_rate);
@@ -541,10 +489,6 @@ void run()
         
         updateState();
         publishVisualServoSetpoint(dt);
-
-        if (_currentState == LocalPickupState::DESCENT 
-            && !isRelativeDistanceValid(_relativeBrickDistance_local))
-            ROS_FATAL("*** FATAL - BLIND DESCENT ***"); // TODO: :) (?)
 
         loopRate.sleep();
     }
@@ -605,7 +549,6 @@ private:
 
     double _timeLastContour = 0,
         _timeLastOdometry = 0,
-        _timeLastCentroidGlobal = 0,
         _timeLastCentroidLocal = 0;
         //_timeLastYawError = 0;
 
