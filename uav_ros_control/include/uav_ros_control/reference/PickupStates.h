@@ -28,7 +28,8 @@ namespace pickup_states
   enum class BaloonPopState {
     OFF,
     ALIGNEMNT,
-    POP
+    POP,
+    BACK
   };
 
   std::ostream& operator<<(std::ostream& o, const MasterPickupStates& state) 

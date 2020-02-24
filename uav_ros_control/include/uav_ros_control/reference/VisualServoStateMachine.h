@@ -328,7 +328,7 @@ void updateState()
     {
         // deactivate state machine
         ROS_WARN_THROTTLE(THROTTLE_TIME, "VSSM::updateStatus - Visual servo is inactive.");
-        _currentState = BaloonPopState::ALIGNEMNT;
+        _currentState = BaloonPopState::OFF;
         _baloonPopActivated = false;
         std_msgs::Bool success;
         success.data = false;
@@ -338,16 +338,16 @@ void updateState()
         return;
     }
 
-    // If baloon pop is activate start brick alignment first
+    // If baloon pop is activated start alignment first
     if (_currentState == BaloonPopState::OFF 
         && _baloonPopActivated
         && isRelativeDistanceValid(_relativeBaloonDistance))
     {
         ROS_INFO("VSSM::updateStatus - baloon pop requested");
-        _currHeightReference = _currOdom.pose.pose.position.z;
+        _currDistanceReference = cos(_uavYaw) * _currOdom.pose.pose.position.x + sin(_uavYaw) * _currOdom.pose.pose.position.y;
         _descentTransitionCounter = 0;
         _currentState = BaloonPopState::ALIGNEMNT;
-        ROS_INFO("VSSM::updateStatus - BRICK_ALIGNMENT state activated with height: %2f.", _currHeightReference);
+        ROS_INFO("VSSM::updateStatus - BRICK_ALIGNMENT state activated with height: %2f.", _currDistanceReference);
         return;
     }
 
@@ -362,12 +362,25 @@ void updateState()
     if (_currentState == BaloonPopState::ALIGNEMNT &&
         _descentTransitionCounter > 15)
     {
-        std_msgs::Bool success;
-        success.data = true;
-        _pubVisualServoSuccess.publish(success);
-        turnOffVisualServo();
-        ROS_INFO("VSSM::updateStatus - ALIGNED!");
+        _currentState = BaloonPopState::POP;
+        ROS_INFO("VSSM::updateStatus - ALIGNED! activate POP");
         return;
+    }
+
+    // If pop is activated and no contour is found, go to BACK state
+    if (_currentState == BaloonPopState::POP && isRelativeDistanceValid(_relativeBaloonDistance)) {
+        _currentState = BaloonPopState::BACK;
+        _backStateTime = 0;
+        _backStateDuration = 1;
+        ROS_INFO("VSSM::updateStatus - baloon is popped, activate BACK");
+        return;
+    }
+
+    // If BACK is activated and back time is elapsed, go to off
+    if (_currentState == BaloonPopState::BACK && _backStateTime > _backStateDuration) {
+        _currentState == BaloonPopState::OFF;
+        ROS_INFO("VSSM::updateStatus - BACK is finished, turning off visual servo");
+        turnOffVisualServo();
     }
 }   
 
@@ -453,7 +466,7 @@ void publishVisualServoSetpoint(double dt)
             _currVisualServoFeed.x = _trajPoint.transforms.front().translation.x;
             _currVisualServoFeed.y = _trajPoint.transforms.front().translation.y;
             _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
-            _currHeightReference  = _currVisualServoFeed.z;
+            _currDistanceReference  = _currVisualServoFeed.z;
             break;
 
         case BaloonPopState::POP :
@@ -474,6 +487,11 @@ void odomCb(const nav_msgs::OdometryConstPtr& msg)
 {
     _currOdom = *msg;
     _timeLastOdometry = ros::Time::now().toSec();
+    double _qx = _currOdom.pose.pose.orientation.x;
+    double _qy = _currOdom.pose.pose.orientation.y;
+    double _qz = _currOdom.pose.pose.orientation.z;
+    double _qw = _currOdom.pose.pose.orientation.w;
+    _uavYaw = atan2( 2 * (_qw * _qz + _qx * _qy), _qw * _qw + _qx * _qx - _qy * _qy - _qz * _qz);
 }
 
 void run()
@@ -537,9 +555,10 @@ private:
 
     /* Touchdown mode parameters */
     double _touchdownHeight, _touchdownDelta = 0, _magnetOffset, 
-        _touchdownDuration = 0, _touchdownAlignDuration = 0, 
-        _touchdownTime, _touchdownSpeed, _visualServoDisableHeight;
-    double _currHeightReference, _descentSpeed, _ascentSpeed, _afterTouchdownHeight, _afterTouchdownHeight_GPS; 
+        _backStateDuration = 0, _touchdownAlignDuration = 0, 
+        _backStateTime, _touchdownSpeed, _visualServoDisableHeight;
+    double _currDistanceReference, _descentSpeed, _ascentSpeed, _afterTouchdownHeight, _afterTouchdownHeight_GPS;
+    double _uavYaw;
     int _descentTransitionCounter = 0, _descentCounterMax;
 
     double _timeLastContour = 0,
