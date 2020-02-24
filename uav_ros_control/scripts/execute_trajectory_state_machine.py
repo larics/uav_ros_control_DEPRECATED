@@ -87,8 +87,22 @@ class UavExplorationSm:
       self.globalPositionCallback, queue_size=1)
     rospy.Subscriber('executing_trajectory', Int32, 
       self.executingTrajectoryCallback, queue_size=1)
+    rospy.Subscriber('/blue/carrot/trajectory', MultiDOFJointTrajectoryPoint,
+      self.carrotTrajectoryCallback, queue_size=1)
 
     time.sleep(0.2)
+
+    #def targetPointCallback(self, msg):
+    #if self.state == "start":
+    #  self.target_pose = msg.pose
+    #  self.state = "plan"
+    #  self.state_previous = "start"
+    #else:
+    #  print ("Not accepting new target pose. Current pose not yet")
+
+
+  def carrotTrajectoryCallback(self, msg):
+    self.current_carrot_transform = msg.transforms[0]
 
   def run(self):
     
@@ -118,13 +132,15 @@ class UavExplorationSm:
           self.state_previous = "plan"
           self.state_pub.publish(self.state)
 
+        # OVDJE
         # Call the obstacle free trajectory planning service
         request = MultiDofTrajectoryRequest()
-        # Create start point from current position information
+        # Create start point from current reference information
         trajectory_point = JointTrajectoryPoint()
-        trajectory_point.positions = [self.current_pose.position.x, \
-          self.current_pose.position.y, self.current_pose.position.z, \
-          self.quaternion2Yaw(self.current_pose.orientation)]
+        trajectory_point.positions = [self.current_carrot_transform.translation.x, \
+          self.current_carrot_transform.translation.y, \
+          self.current_carrot_transform.translation.z, \
+          self.quaternion2Yaw(self.current_carrot_transform.rotation)]
         request.waypoints.points.append(copy.deepcopy(trajectory_point))
         # Create start point from target position information
         trajectory_point = JointTrajectoryPoint()
@@ -137,6 +153,9 @@ class UavExplorationSm:
         request.publish_trajectory = False
         request.plan_path = False
         request.plan_trajectory = True
+
+        print "Requesting trajectory"
+        print request
       
         response = self.plan_trajectory_service.call(request)
         # If we did not manage to obtain a successful plan then go to
@@ -153,7 +172,11 @@ class UavExplorationSm:
           self.trajectory_pub.publish(response.trajectory)
           self.current_trajectory_execution_time = \
             response.trajectory.points[len(response.trajectory.points)-1].time_from_start.to_sec()
-
+          print "Len of received trajectory"
+          print len(response.trajectory.points)
+          print "Trajectory execution time"
+          print self.current_trajectory_execution_time
+       
           self.state = "execute"
 
       # While trajectory is executing we check if it is done or if uav is 
@@ -195,7 +218,7 @@ class UavExplorationSm:
           elif self.checkTrajectoryExecuted() == True:
             print ("**********************************************")
             print ("In state:", self.state)
-            print ("Execution timeout factor triggered!")
+            print ("Reached!")
             print ("**********************************************")
             print (" ")
             self.state = "end"
@@ -208,7 +231,7 @@ class UavExplorationSm:
               time.time()-self.execution_start)):
             print ("**********************************************")
             print ("In state:", self.state)
-            print ("Execution timeout factor triggered!")
+            print ("STUCK! Execution timeout factor triggered!")
             print ("**********************************************")
             print (" ")
             self.state = "plan"
@@ -284,7 +307,7 @@ class UavExplorationSm:
 
       delta = math.sqrt(dx*dx + dy*dy + dz*dz)
 
-      if delta > self.r_trajectory and dyaw > 0.15:
+      if delta > self.r_trajectory or dyaw > 0.15:
         return False
 
     if self.executing_trajectory == 0:
