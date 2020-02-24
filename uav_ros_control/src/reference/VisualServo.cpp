@@ -311,7 +311,8 @@ void VisualServo::VisualServoProcessValuesCb(const uav_ros_control_msgs::VisualS
     _floatMsg.data = _uavYaw;
     _pubUavYawDebug.publish(_floatMsg);*/
 
-    _uavPos[0] = msg.x; //ovdje
+    _setpointYaw = msg.yaw;
+    _uavPos[0] = msg.x;
 }
 
 void VisualServo::xOffsetCb(const std_msgs::Float32 &msg) {
@@ -449,9 +450,7 @@ void VisualServo::updateSetpoint() {
   double x_temp = _setpointPosition[0], y_temp = _setpointPosition[1];
   _setpointPosition[0] = cos(-_uavYaw) * x_temp + sin(-_uavYaw) * y_temp;
   _setpointPosition[1] = cos(-_uavYaw) * y_temp - sin(-_uavYaw) * x_temp;
-
-  //_setpointYaw = _uavYaw + change_yaw;
-
+  
   /*_floatMsg.data = change_yaw;
   _pubChangeYawDebug.publish(_floatMsg);*/
   
@@ -468,11 +467,16 @@ void VisualServo::updateSetpoint() {
 void VisualServo::publishNewSetpoint() {
 
   tf2::Quaternion q;
+  q.setEulerZYX(_setpointYaw, 0.0, 0.0);
 
   _new_point.transforms[0].translation.x = _setpointPosition[0];
   _new_point.transforms[0].translation.y = _setpointPosition[1];
   _new_point.transforms[0].translation.z = _setpointPosition[2];
-  _new_point.transforms[0].rotation = _uavOdom.pose.pose.orientation;
+  
+  _new_point.transforms[0].rotation.x = q.getX();
+  _new_point.transforms[0].rotation.y = q.getY();
+  _new_point.transforms[0].rotation.z = q.getZ();
+  _new_point.transforms[0].rotation.w = q.getW();
 
   _pubNewSetpoint.publish(_new_point);
 }
