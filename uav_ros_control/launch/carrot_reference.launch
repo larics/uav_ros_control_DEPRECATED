@@ -30,7 +30,7 @@
             <remap from="odometry"          to="$(arg odom)"/>
         </node>
 
-        <include file="$(find uav_ros_control)/launch/joy.launch"/>
+        <!--include file="$(find uav_ros_control)/launch/joy.launch"/-->
     </group>
 
 </launch>
