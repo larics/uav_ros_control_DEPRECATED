@@ -2,7 +2,7 @@ visual_servo:
   state_machine:
     
     rate: 50
-    min_error: 0.05
+    min_error: 0.15
     brick_alignment_height: 3
     min_touchdown_target_position_error_xy: 0.05
     min_touchdown_target_position_error_z: 0.03
@@ -15,6 +15,6 @@ visual_servo:
     touchdown_speed: 1
     after_touchdown_height: 4
     disable_visual_servo_touchdown_height: 1.45
-    descent_speed: 1
+    descent_speed: 0.3
     ascent_speed: 1
     detection_counter: 25

@@ -411,21 +411,23 @@ void VisualServo::updateSetpoint() {
     double move_left_x = sin(-_uavYaw) * move_left;
     double move_left_y = cos(-_uavYaw) * move_left;
     
+    // ROS_INFO("Move up: %.3f", move_up);
+    //ROS_INFO("Target - z: %.3f", _targetCentroid.point.z);
     const double newSetpoint_2 = _uavPos[2] - move_up;
     const double newSetpoint_1 = _uavPos[1] - move_left_y;
-
+    
     static constexpr double DT = 0.02;
 
     double rate_2 = fabs(newSetpoint_2 - _setpointPosition[2]) / DT;
     double rate_1 = fabs(newSetpoint_1 - _setpointPosition[1]) / DT;  
     
-    if (rate_2 > _rateLimit) {
-      rate_2 = _rateLimit;
-      _setpointPosition[2] = _setpointPosition[2] + signum(newSetpoint_2 - _setpointPosition[2]) * _rateLimit * DT;
-    }
-    else {
-      _setpointPosition[2] = newSetpoint_2;
-    }
+    // if (rate_2 > _rateLimit) {
+    //   rate_2 = _rateLimit;
+    //   _setpointPosition[2] = _setpointPosition[2] + signum(newSetpoint_2 - _setpointPosition[2]) * _rateLimit * DT;
+    // }
+    // else {
+    //   _setpointPosition[2] = newSetpoint_2;
+    // }
 
     if (rate_1 > _rateLimit ) {
       rate_1 = _rateLimit;
@@ -439,6 +441,8 @@ void VisualServo::updateSetpoint() {
     //_setpointPosition[1] = _uavPos[1] + move_left;
 
     _setpointPosition[0] = _uavPos[0] - move_left_x;
+    _setpointPosition[2] = newSetpoint_2;
+    //ROS_INFO("Setpoint z: %.3f", _setpointPosition[2]);
   } 
   else {
     _setpointPosition[2] = _uavPos[2];

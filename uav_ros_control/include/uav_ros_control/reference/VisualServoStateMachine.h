@@ -165,8 +165,8 @@ bool popBaloonServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::
     }
 
     // Try calling visual servo
-    //ros::spinOnce();
-    //publishVisualServoSetpoint(1.0 / _rate);
+    ros::spinOnce();
+    publishVisualServoSetpoint(1.0 / _rate);
     
     std_srvs::SetBool::Request req;
     std_srvs::SetBool::Response resp;
@@ -349,7 +349,7 @@ void updateState()
         _currentState = BaloonPopState::ALIGNEMNT;
         _popXReference = _currOdom.pose.pose.position.x;
         _popYReference = _currOdom.pose.pose.position.y;
-        ROS_INFO("VSSM::updateStatus - BRICK_ALIGNMENT state activated with baloon distance: %2f.", _currDistanceReference);
+        ROS_INFO("VSSM::updateStatus - ALIGNMENT state activated with baloon distance: %2f.", _currDistanceReference);
         return;
     }
 
@@ -480,7 +480,6 @@ void publishVisualServoSetpoint(double dt)
             
             _currVisualServoFeed.x = _popXReference;
             _currVisualServoFeed.y = _popYReference;
-            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
             _currVisualServoFeed.yaw = 0;
             _currDistanceReference = _currVisualServoFeed.x;
             break;
