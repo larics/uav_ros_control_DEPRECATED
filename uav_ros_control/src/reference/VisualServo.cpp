@@ -402,13 +402,17 @@ void VisualServo::updateSetpoint() {
 
     // x and y are in the UAV reference frame
     /* X AXIS PID IS NOW Z AXIS*/
-    if(!_z_frozen) move_up = _x_axis_PID.compute(_targetCentroid.point.z, _uavOdom.pose.pose.position.z, 1 / _rate);
-    if(!_y_frozen) move_left = _y_axis_PID.compute(_targetCentroid.point.y, _uavOdom.pose.pose.position.y, 1 / _rate);
+    if(!_z_frozen) move_up = _x_axis_PID.compute(0, _targetCentroid.point.z, 1 / _rate);
+    if(!_y_frozen) move_left = _y_axis_PID.compute(0, _targetCentroid.point.y, 1 / _rate);
     //if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
 
     // Do some basic rate limiter
-    const double newSetpoint_2 = _uavPos[2] + move_up;
-    const double newSetpoint_1 = _uavPos[1] + move_left;
+
+    double move_left_x = sin(-_uavYaw) * move_left;
+    double move_left_y = cos(-_uavYaw) * move_left;
+    
+    const double newSetpoint_2 = _uavPos[2] - move_up;
+    const double newSetpoint_1 = _uavPos[1] - move_left_y;
 
     static constexpr double DT = 0.02;
 
@@ -433,22 +437,19 @@ void VisualServo::updateSetpoint() {
 
     //_setpointPosition[0] = _uavPos[0] + move_forward;
     //_setpointPosition[1] = _uavPos[1] + move_left;
+
+    _setpointPosition[0] = _uavPos[0] - move_left_x;
   } 
   else {
     _setpointPosition[2] = _uavPos[2];
     _setpointPosition[1] = _uavPos[1];
+    _setpointPosition[0] = _uavPos[0];
 
     double rate_2 = 0;
     double rate_1 = 0;
   }
 
 
-  _setpointPosition[0] = _uavPos[0];
-
-  // Local to global
-  double x_temp = _setpointPosition[0], y_temp = _setpointPosition[1];
-  _setpointPosition[0] = cos(-_uavYaw) * x_temp + sin(-_uavYaw) * y_temp;
-  _setpointPosition[1] = cos(-_uavYaw) * y_temp - sin(-_uavYaw) * x_temp;
   _setpointYaw = _uavYaw;
 
   /*_floatMsg.data = change_yaw;

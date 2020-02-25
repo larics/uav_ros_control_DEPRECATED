@@ -165,8 +165,8 @@ bool popBaloonServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::
     }
 
     // Try calling visual servo
-    ros::spinOnce();
-    publishVisualServoSetpoint(1.0 / _rate);
+    //ros::spinOnce();
+    //publishVisualServoSetpoint(1.0 / _rate);
     
     std_srvs::SetBool::Request req;
     std_srvs::SetBool::Response resp;
@@ -344,12 +344,12 @@ void updateState()
         && isRelativeDistanceValid(_relativeBaloonDistance))
     {
         ROS_INFO("VSSM::updateStatus - baloon pop requested");
-        _currDistanceReference = 
-            cos(_uavYaw) * _currOdom.pose.pose.position.x 
-            + sin(_uavYaw) * _currOdom.pose.pose.position.y; // From global to local
+        _currDistanceReference = _relativeBaloonDistance;
         _descentTransitionCounter = 0;
         _currentState = BaloonPopState::ALIGNEMNT;
-        ROS_INFO("VSSM::updateStatus - BRICK_ALIGNMENT state activated with height: %2f.", _currDistanceReference);
+        _popXReference = _currOdom.pose.pose.position.x;
+        _popYReference = _currOdom.pose.pose.position.y;
+        ROS_INFO("VSSM::updateStatus - BRICK_ALIGNMENT state activated with baloon distance: %2f.", _currDistanceReference);
         return;
     }
 
@@ -370,7 +370,7 @@ void updateState()
     }
 
     // If pop is activated and no contour is found, go to BACK state
-    if (_currentState == BaloonPopState::POP && isRelativeDistanceValid(_relativeBaloonDistance)) {
+    if (_currentState == BaloonPopState::POP && !isRelativeDistanceValid(_relativeBaloonDistance)) {
         _currentState = BaloonPopState::BACK;
         _backStateTime = 0;
         _backStateDuration = 1;
@@ -435,15 +435,14 @@ bool subscribedTopicsActive()
     //double dt_yaw = currentTime - _timeLastYawError;
     
     static constexpr double MAX_DT = 0.5;
-    // static constexpr double MAX_DT_SERVO = 5;
-    // TODO: Mozda ce dugo trebati
+    static constexpr double MAX_DT_SERVO = 5;
     ROS_FATAL_COND(dt_odom > MAX_DT,        "VSSM - odometry timeout reached.");
     ROS_FATAL_COND(dt_contour > MAX_DT,     "VSSM - contour timeout reached.");
-    ROS_FATAL_COND(dt_centLocal > MAX_DT,   "VSSM - centroid local timeout reached.");
+    ROS_FATAL_COND(dt_centLocal > MAX_DT_SERVO,   "VSSM - centroid local timeout reached.");
     
     return dt_odom < MAX_DT 
         && dt_contour < MAX_DT 
-        && dt_centLocal < MAX_DT;
+        && dt_centLocal < MAX_DT_SERVO;
 }
 
 void publishVisualServoSetpoint(double dt)
@@ -458,41 +457,43 @@ void publishVisualServoSetpoint(double dt)
         _currOdom.pose.pose.orientation.z,
         _currOdom.pose.pose.orientation.w);
         
+
+    double forward_movement_local = _descentSpeed * dt;
+    double backward_movement_local = - _ascentSpeed * dt;
+
     switch (_currentState)
     {
         case BaloonPopState::OFF :
-            if (!_trajPoint.transforms.empty()) {
-                _currVisualServoFeed.x = _trajPoint.transforms.front().translation.x;
-                _currVisualServoFeed.y = _trajPoint.transforms.front().translation.y;
-            }
+            // pass
             break;
         
         case BaloonPopState::ALIGNEMNT :
-            _currVisualServoFeed.x = _currDistanceReference;
-            _currVisualServoFeed.y = 
-                cos(_uavYaw) * _currOdom.pose.pose.position.y 
-                - sin(_uavYaw) * _currOdom.pose.pose.position.x;  // Transform from global to local
-            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
+            //_currVisualServoFeed.x = _currDistanceReference;
+            _currVisualServoFeed.x = _popXReference;
+            _currVisualServoFeed.y = _popYReference;
             _currVisualServoFeed.yaw = 0;
             break;
 
         case BaloonPopState::POP :
-            _currVisualServoFeed.x = _currDistanceReference + _descentSpeed * dt;
-            _currVisualServoFeed.y = 
-                cos(_uavYaw) * _currOdom.pose.pose.position.y 
-                - sin(_uavYaw) * _currOdom.pose.pose.position.x;  // Transform from global to local
+            _popXReference += cos(-_uavYaw) * forward_movement_local;
+            _popYReference += - sin(-_uavYaw) * forward_movement_local;
+            
+            _currVisualServoFeed.x = _popXReference;
+            _currVisualServoFeed.y = _popYReference;
             _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
             _currVisualServoFeed.yaw = 0;
             _currDistanceReference = _currVisualServoFeed.x;
             break;
 
         case BaloonPopState::BACK :
+            _popXReference += cos(-_uavYaw) * backward_movement_local;
+            _popYReference += - sin(-_uavYaw) * backward_movement_local;
             _backStateTime += dt;
-            _currVisualServoFeed.x = _currDistanceReference + _ascentSpeed * dt;
-            _currVisualServoFeed.y = 0;
+
+            _currVisualServoFeed.x = _popXReference;
+            _currVisualServoFeed.y = _popYReference;
             _currVisualServoFeed.z = 0;
             _currVisualServoFeed.yaw = 0;
-            _currDistanceReference = _currVisualServoFeed.x;
             break;
     }
 
@@ -570,6 +571,7 @@ private:
     ros::Subscriber _subPatchCentroid_local;
     geometry_msgs::Vector3 _globalCentroid, _localCentroid;    
     double _relativeBaloonDistance = INVALID_DISTANCE;
+    double _popXReference, _popYReference;
 
     /* Contour subscriber */
     ros::Subscriber _subNContours;
