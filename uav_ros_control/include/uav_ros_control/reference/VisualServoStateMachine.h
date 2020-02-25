@@ -165,8 +165,8 @@ bool popBaloonServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::
     }
 
     // Try calling visual servo
-    ros::spinOnce();
-    publishVisualServoSetpoint(1.0 / _rate);
+    // ros::spinOnce();
+    // publishVisualServoSetpoint(1.0 / _rate);
     
     std_srvs::SetBool::Request req;
     std_srvs::SetBool::Response resp;
@@ -347,8 +347,10 @@ void updateState()
         _currDistanceReference = _relativeBaloonDistance;
         _descentTransitionCounter = 0;
         _currentState = BaloonPopState::ALIGNEMNT;
-        _popXReference = _currOdom.pose.pose.position.x;
-        _popYReference = _currOdom.pose.pose.position.y;
+        ros::spinOnce();
+        _popXReference = _trajPoint.transforms.front().translation.x;
+        _popYReference = _trajPoint.transforms.front().translation.y;
+        ROS_INFO("[%.3f, %.3f]", _popXReference, _popYReference);
         ROS_INFO("VSSM::updateStatus - ALIGNMENT state activated with baloon distance: %2f.", _currDistanceReference);
         return;
     }

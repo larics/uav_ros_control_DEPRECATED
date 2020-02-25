@@ -2,7 +2,7 @@ visual_servo:
   state_machine:
     
     rate: 50
-    min_error: 0.15
+    min_error: 0.3
     brick_alignment_height: 3
     min_touchdown_target_position_error_xy: 0.05
     min_touchdown_target_position_error_z: 0.03

@@ -190,6 +190,12 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
   _y_frozen = false;
   _yaw_frozen = false;
   response.success = _visualServoEnabled;
+
+  if (_visualServoEnabled) {
+    _setpointPosition[0] = _uavPos[0];
+    _setpointPosition[1] = _uavPos[1];
+    _setpointPosition[2] = _uavPos[2];
+  }
   return true;
 }
 
@@ -421,13 +427,13 @@ void VisualServo::updateSetpoint() {
     double rate_2 = fabs(newSetpoint_2 - _setpointPosition[2]) / DT;
     double rate_1 = fabs(newSetpoint_1 - _setpointPosition[1]) / DT;  
     
-    // if (rate_2 > _rateLimit) {
-    //   rate_2 = _rateLimit;
-    //   _setpointPosition[2] = _setpointPosition[2] + signum(newSetpoint_2 - _setpointPosition[2]) * _rateLimit * DT;
-    // }
-    // else {
-    //   _setpointPosition[2] = newSetpoint_2;
-    // }
+    if (rate_2 > _rateLimit) {
+      rate_2 = _rateLimit;
+      _setpointPosition[2] = _setpointPosition[2] + signum(newSetpoint_2 - _setpointPosition[2]) * _rateLimit * DT;
+    }
+    else {
+      _setpointPosition[2] = newSetpoint_2;
+    }
 
     if (rate_1 > _rateLimit ) {
       rate_1 = _rateLimit;
