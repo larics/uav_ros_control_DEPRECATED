@@ -5,8 +5,8 @@
  *
  */
 
-#ifndef VISUAL_SERVO_PURSUIT_STATE_MACHINE_H
-#define VISUAL_SERVO_PURSUIT_STATE_MACHINE_H
+#ifndef TRACK_AND_FOLLOW_STATE_MACHINE_H
+#define TRACK_AND_FOLLOW_STATE_MACHINE_H
 
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
@@ -78,16 +78,16 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _pubSearchTrajectoryFlag = nh.advertise<std_msgs::Bool>("topp/trajectory_flag", 1);
     /* Detection activation/deactivation */
     _pubInferenceEnabled = nh.advertise<std_msgs::Bool>("/sm_pursuit/inference_enabled", 1);
+    _pubEstimatorStart = nh.advertise<std_msgs::Bool>("sm_pursuit/start_estimator", 1, true);
 
     // Define Subscribers
     _subOdom = nh.subscribe("odometry", 1, &uav_reference::PursuitStateMachine::odomCb, this);
     _subCarrotReference = nh.subscribe("carrot/trajectory", 1, &uav_reference::PursuitStateMachine::carrotReferenceCb, this);
     /* UAV vision based errors */
-    _subUAVDist = nh.subscribe("/uav_object_tracking/uav/distance_kf", 1, &uav_reference::PursuitStateMachine::uavDistCb, this);
+    _subUAVDist = nh.subscribe("/uav_object_tracking/uav/depth_kf", 1, &uav_reference::PursuitStateMachine::uavDistCb, this);
     _subUAVHeightError = nh.subscribe("/uav_object_tracking/uav/height_kf", 1, &uav_reference::PursuitStateMachine::uavHeightCb, this);
     _subUAVYawError = nh.subscribe("/uav_object_tracking/uav/yaw_kf", 1, &uav_reference::PursuitStateMachine::uavYawCb, this);
     _subUAVPursuitConfident = nh.subscribe("/YOLODetection/uav_following_confident", 1, &uav_reference::PursuitStateMachine::uavConfidentCb, this);
-    _subUAVDistanceConfident = nh.subscribe("/YOLODetection/kf_distance_active", 1, &uav_reference::PursuitStateMachine::uavDistanceConfidentCb, this);
     /* BALL vision based errors */
     _subBALLDist = nh.subscribe("/uav_object_tracking/ball/distance", 1, &uav_reference::PursuitStateMachine::ballDistCb, this);
     _subBALLHeightError = nh.subscribe("/uav_object_tracking/ball/height_error", 1, &uav_reference::PursuitStateMachine::ballHeightCb, this);
@@ -98,6 +98,9 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _subCurrentEstimatedTargetPoint = nh.subscribe("target_uav/position_estimated", 1, &uav_reference::PursuitStateMachine::currentEstimatedTargetPointCb, this);
     _subEstimatorStatus = nh.subscribe("figure8_state", 1, &uav_reference::PursuitStateMachine::estimatorStatusCb, this);
     _subToppStatus = nh.subscribe("topp/status", 1, &uav_reference::PursuitStateMachine::toppStatusCb, this);
+    /* Takeoff successful*/
+    _subReadyForPursuit = nh.subscribe("ready_for_exploration", 1, &uav_reference::PursuitStateMachine::readyForPursuitCb, this);
+
 
 
     // Setup dynamic reconfigure server
@@ -169,10 +172,6 @@ void ballConfidentCb(const std_msgs::Bool msg)
     // TO DO
 }
 
-void uavDistanceConfidentCb(const std_msgs::Bool msg){
-    _kf_distance_active = msg.data;
-}
-
 void figureEstimatorCb(geometry_msgs::PoseStamped msg){
     _interceptionPoint = msg;
     _interceptionPoint.pose.position.z += _interceptionZOffset;
@@ -182,7 +181,6 @@ void figureEstimatorCb(geometry_msgs::PoseStamped msg){
 void currentEstimatedTargetPointCb(geometry_msgs::PointStamped msg){
     _currentEstimatedTargetPoint = msg;
     _searchEstimated = true;
-
 }
 
 void estimatorStatusCb(std_msgs::Bool msg){
@@ -191,6 +189,11 @@ void estimatorStatusCb(std_msgs::Bool msg){
 
 void toppStatusCb(std_msgs::Bool msg){
     _toppStatus = msg;
+}
+
+void readyForPursuitCb(std_msgs::Bool msg){
+    // If takeoff successfully finished
+    _pursuitActivated = msg.data;
 }
 
 
@@ -422,6 +425,11 @@ void updateState()
         _inferenceEnabled.data = true;
         _followingStartTime = 0;
 
+        // Start collescting points and estimating trajectory
+        std_msgs::Bool estimator_start_msg;
+        estimator_start_msg.data = true;
+        _pubEstimatorStart.publish(estimator_start_msg);
+
         return;
     }
 
@@ -463,6 +471,11 @@ void updateState()
             ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative.");
             _currDistanceReference = _uav_distance_offset;
         }
+
+        // Start collescting points and estimating trajectory
+        std_msgs::Bool estimator_start_msg;
+        estimator_start_msg.data = true;
+        _pubEstimatorStart.publish(estimator_start_msg);
         
         return;
     }
@@ -764,6 +777,9 @@ private:
     /* Client for calling visual servo and search trajectory */
     ros::ServiceClient _vsClienCaller, _searchTrajectoryClientCaller, _interceptionTrajectoryClientCaller;
 
+    ros::Subscriber _subReadyForPursuit;
+    ros::Publisher _pubEstimatorStart;
+
     /* Offset subscriber and publisher */
     ros::Publisher _pubVssmState, _pubOffsetY, _pubOffsetZ;
 
@@ -793,7 +809,7 @@ private:
     /* Interception subscribers*/
     ros::Subscriber _subInterceptionPoint, _subCurrentEstimatedTargetPoint, _subEstimatorStatus;
     float _interceptionZOffset;
-    bool _searchEstimated = false;
+    bool _searchEstimated = false, _readyForPursuit = false;
     geometry_msgs::PointStamped _currentEstimatedTargetPoint;
 
     /* Pose publisher */
@@ -807,7 +823,7 @@ private:
 
     /* Parameters */
     double _currDistanceReference, _currHeightReference, _currYawReference;
-    bool _start_following_uav = false, _isDetectionActive = false, _kf_distance_active = false;
+    bool _start_following_uav = false, _isDetectionActive = false;
     float _uav_distance_offset, _ball_distance_offset;
     float _uav_z_offset, _yawDeadZoneThreshold;
     ros::Time _time_last_detection_msg;
@@ -826,5 +842,5 @@ private:
 };
 }
 
-#endif /* VISUAL_SERVO_PURSUIT_STATE_MACHINE_H*/
+#endif /* TRACK_AND_FOLLOW_STATE_MACHINE_H*/
 

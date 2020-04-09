@@ -92,13 +92,13 @@ target_link_libraries(carrot_reference_node reference_lib)
 add_executable(visual_servo_node nodes/reference/VisualServoNode.cpp)
 target_link_libraries(visual_servo_node reference_lib)
 
-# visual servo state machine
-add_executable(visual_servo_sm nodes/reference/VisualServoStateNode.cpp)
-target_link_libraries(visual_servo_sm ${catkin_LIBRARIES} nfilt)
+# Track and Follow state machine
+add_executable(track_and_follow_sm nodes/reference/TrackAndFollowStateNode.cpp)
+target_link_libraries(track_and_follow_sm ${catkin_LIBRARIES} nfilt reference_lib ${GeographicLib_LIBRARIES})
 
-# visual servo PURSUIT state machine
-add_executable(visual_servo_sm_pursuit nodes/reference/VisualServoStatePursuitNode.cpp)
-target_link_libraries(visual_servo_sm_pursuit ${catkin_LIBRARIES} nfilt reference_lib ${GeographicLib_LIBRARIES})
+# Wait and Observe state machine
+add_executable(wait_and_observe_sm nodes/reference/WaitAndObserveStateNode.cpp)
+target_link_libraries(wait_and_observe_sm ${catkin_LIBRARIES} nfilt reference_lib ${GeographicLib_LIBRARIES})
 
 # PID cascade node
 add_executable(pid_cascade_node nodes/control/PositionControlNode.cpp)

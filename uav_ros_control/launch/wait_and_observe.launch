@@ -20,7 +20,7 @@
         <!-- Visual Servo state machine node -->
         <node
             pkg="uav_ros_control"
-            type="visual_servo_sm_pursuit"
+            type="wait_and_observe_sm"
             name="visual_servo_state_machine"
             output="screen">
 

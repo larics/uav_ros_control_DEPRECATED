@@ -1,12 +1,12 @@
  /*
  * @author Antonella Barisic
  * @version 0.1
- * @date December 2019
+ * @date February 2020
  *
  */
 
-#ifndef VISUAL_SERVO_PURSUIT_STATE_MACHINE_H
-#define VISUAL_SERVO_PURSUIT_STATE_MACHINE_H
+#ifndef WAIT_AND_OBSERVE_STATE_MACHINE_H
+#define WAIT_AND_OBSERVE_STATE_MACHINE_H
 
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
@@ -66,11 +66,7 @@ enum PursuitState {
     INTERCEPTION,
     WAIT,
     LAND,
-    END,
-    SETTLE,
-    SEARCH,
-    UAV_FOLLOWING,
-    BALL_GRASPING
+    END
 };
 
 class PursuitStateMachine
@@ -833,167 +829,6 @@ void updateState()
         _interceptionSent = true;
         return;
     }
-
-
-    // // Request search trajectory
-    // if (_currentState == PursuitState::OFF && (!_start_following_uav || !_isDetectionActive) && _pursuitActivated){
-    //     ROS_WARN("PursuitSM::updateStatus - SEARCH state activated.");
-    //     turnOffVisualServo();
-    //     _currentState = PursuitState::SEARCH;
-    //     _searchTrajectoryFlag.data = true;
-    //     _inferenceEnabled.data = true;
-    //     _followingStartTime = 0;
-
-    //     return;
-    // }
-
-    // if (_currentState == PursuitState::SEARCH && (!_start_following_uav || !_isDetectionActive) && _pursuitActivated){
-    //     if (!_toppStatus.data){
-    //         requestSearchTrajectory();
-    //         ros::Duration(0.5).sleep();
-    //     }
-    //     _followingStartTime = 0;
-    //     return;
-    // }
-
-    // // Activate Pursuit algorithm when detection is confident.
-    // if ((_currentState == PursuitState::OFF || _currentState == PursuitState::SEARCH || _currentState == PursuitState::SETTLE)
-    //  && _start_following_uav && _isDetectionActive && _pursuitActivated && !_interceptionActivated)
-    // {
-    //     ROS_INFO("PursuitSM::updateStatus - Starting visual servo for UAV following.");
-    //     _currentState = PursuitState::UAV_FOLLOWING;
-    //     _searchTrajectoryFlag.data = false;
-    //     _inferenceEnabled.data = true;
-    //     turnOnVisualServo();
-    //     _followingStartTime = 1/_rate;
-
-    //     // Comment this out for testing pursposes
-    //     //_currHeightReference = 0;
-    //     //_currDistanceReference = _uav_distance_offset;
-
-    //     _currDistanceReference = _relativeUAVDistance;
-
-    //     _currHeightReference = _relativeUAVHeight;
-    //     _currYawReference = _relativeUAVYaw;
-
-    //     if (isRelativeDistanceNan()){
-    //         _currDistanceReference = _maxDistanceReference;
-    //         ROS_WARN("PursuitSM::updateStatus - UAV distance is Nan.");
-    //     }
-    //     else if (!isRelativeDistancePositive()) {
-    //         // pass
-    //         ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative.");
-    //         _currDistanceReference = _uav_distance_offset;
-    //     }
-        
-    //     return;
-    // }
-    // // Transition to ball following when distance is below certain threshold.
-    // // If detection is not confident anymore or visual servo is deactivated or detection node is inactive, turn off UAV following.
-    // if (_currentState == PursuitState::UAV_FOLLOWING && (!_start_following_uav || !_pursuitActivated || !_isDetectionActive))
-    // {
-    //     ROS_WARN("PursuitSM::updateStatus - exiting UAV_FOLLOWING mode.");
-    //     ROS_WARN_COND(!_start_following_uav, "PursuitSM::condition - UAV following not confident anymore.");
-    //     ROS_WARN_COND(!_pursuitActivated, "PursuitSM::condition - service Pursuit is not active anymore.");
-    //     ROS_WARN_COND(!_isDetectionActive, "PursuitSM::condition - detection is inactive.");
-    //     _lastCarrotReference = _currCarrotReference;
-
-    //     turnOffVisualServo();
-    //     _currentState = PursuitState::SETTLE;
-    //     _collectTime = 0;
-    //     _followingStartTime = 0;
-    //     _inferenceEnabled.data = true;
-    //     //requestSearchTrajectory();
-    //     ROS_WARN("PursuitSM::updateStatus - SETTLE State activated.");
-    //     return;
-    // }
-
-    // if (_currentState == PursuitState::SETTLE){
-    //     _collectTime += 1/_rate;
-    //     // if (_collectTime >= _searchTimeOut){
-    //     //     _currentState = PursuitState::OFF;
-    //     //     ROS_WARN("PursuitSM::updateStatus - Settle timeout exceeded. Transition to OFF state.");
-    //     //     _collectTime = 0.0;
-    //     // }
-    //     double _settleX, _settleY, _settleZ;
-
-    //     _settleX = abs(_currCarrotReference.transforms[0].translation.x - _currOdom.pose.pose.position.x);
-    //     _settleY = abs(_currCarrotReference.transforms[0].translation.y - _currOdom.pose.pose.position.y);
-    //     _settleZ = abs(_currCarrotReference.transforms[0].translation.z - _currOdom.pose.pose.position.z);
-
-    //     ROS_INFO("Time: %f X: %f Y: %f Z: %f", _collectTime, _settleX, _settleY, _settleZ);
-
-    //     if (_settleX < _settleThreshold && _settleY < _settleThreshold && _settleZ < _settleThreshold){
-    //         _currentState = PursuitState::OFF;
-    //         ROS_WARN("PursuitSM::updateStatus - Settle timeout exceeded. Transition to OFF state.");
-    //     }
-
-
-    //     return;
-    // }
-
-    // if (_currentState == PursuitState::UAV_FOLLOWING && _interceptionActivated){
-    //     ROS_WARN("PursuitSM::updateStatus - Going to SETTLE state to prepare for interception.");
-    //     turnOffVisualServo();
-    //     _collectTime = 0;
-    //     _currentState = PursuitState::SETTLE;
-    //     _pursuitActivated = false;
-    //     return;
-    // }
-
-    // if (_currentState == PursuitState::OFF && _interceptionActivated){
-    //     ROS_WARN("PursuitSM::updateStatus - INTERCEPT state activated.");
-    //     turnOffVisualServo();
-    //     _currentState = PursuitState::INTERCEPTION;
-    //     // generate trajectory
-    //     requestInterceptionTrajectory();
-    //     _searchTrajectoryFlag.data = true;
-    //     _inferenceEnabled.data = true;
-    //     _followingStartTime = 0;
-    //     _pubSearchTrajectoryFlag.publish(_searchTrajectoryFlag);
-    //     ros::Duration(2.0).sleep();
-
-    //     return;
-    // }
-
-    // if (_currentState == PursuitState::INTERCEPTION && !_toppStatus.data && _interceptionActivated){
-    //     ROS_FATAL("PursuitSM::updateStatus - Interception point reached. BALL_GRASPING state activated.");
-    //     _currentState = PursuitState::BALL_GRASPING;
-    //     _searchTrajectoryFlag.data = false;
-    //     _followingStartTime = 0;
-    //     ROS_WARN("PursuitSM::updateStatus - CNN inference disabled.");
-    //     _inferenceEnabled.data = false;
-
-
-    //     return;
-    // }
-
-    // if (_currentState == PursuitState::UAV_FOLLOWING && _pursuitActivated)
-    // {
-    //     // Comment this out for testing pursposes
-    //     //_currHeightReference = 0;
-    //     //_currDistanceReference = _uav_distance_offset;
-
-
-    //     _inferenceEnabled.data = true;
-    //     _followingStartTime += 1/_rate;
-
-    //     _currDistanceReference = _relativeUAVDistance;
-    //     _currHeightReference = _relativeUAVHeight;
-    //     _currYawReference = _relativeUAVYaw;
-
-    //     if (isRelativeDistanceNan()){
-    //         _currDistanceReference = _maxDistanceReference;
-    //         ROS_WARN("PursuitSM::updateStatus - UAV distance is Nan.");
-    //     }
-    //     else if (!isRelativeDistancePositive()) {
-    //         // pass
-    //         ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative. %f", _relativeUAVDistance);
-    //         _currDistanceReference = _uav_distance_offset;
-    //     }
-
-    //     return;
-    // }
 }   
 
 bool isRelativeDistanceNan()
@@ -1047,40 +882,6 @@ void publishVisualServoSetpoint(double dt)
                 break;
 
             }
-        case PursuitState::UAV_FOLLOWING : 
-            // if (!_currCarrotReference.transforms.empty() && _followingStartTime < 0.5){
-            //     ROS_INFO("Carrot");
-            //     _currVisualServoFeed.x = _currCarrotReference.transforms[0].translation.x;
-            //     _currVisualServoFeed.y = _currCarrotReference.transforms[0].translation.y;
-            //     _currVisualServoFeed.z = _currCarrotReference.transforms[0].translation.z;
-            //     _currVisualServoFeed.yaw = util::calculateYaw(
-            //         _currCarrotReference.transforms[0].rotation.x,
-            //         _currCarrotReference.transforms[0].rotation.y,
-            //         _currCarrotReference.transforms[0].rotation.z,
-            //         _currCarrotReference.transforms[0].rotation.w);
-            //     break;
-
-            // }
-            // else{
-            //     _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
-            //     _currVisualServoFeed.y = _currOdom.pose.pose.position.y;
-            //     _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
-            //     _currVisualServoFeed.yaw = util::calculateYaw(
-            //         _currOdom.pose.pose.orientation.x,
-            //         _currOdom.pose.pose.orientation.y,
-            //         _currOdom.pose.pose.orientation.z,
-            //         _currOdom.pose.pose.orientation.w);
-            //     break;
-            // }
-            _currVisualServoFeed.x = _currOdom.pose.pose.position.x;
-            _currVisualServoFeed.y = _currOdom.pose.pose.position.y;
-            _currVisualServoFeed.z = _currOdom.pose.pose.position.z;
-            _currVisualServoFeed.yaw = util::calculateYaw(
-                _currOdom.pose.pose.orientation.x,
-                _currOdom.pose.pose.orientation.y,
-                _currOdom.pose.pose.orientation.z,
-                _currOdom.pose.pose.orientation.w);
-            break;
     }
 
     _currVisualServoFeed.header.stamp = ros::Time::now();
@@ -1092,17 +893,19 @@ void publishVisualServoSetpoint(double dt)
     _pubVssmState.publish(stateMsg);
 }
 
+// For visual servo
+// TO DO: VS for BALL GRASPING
 void publishOffsets()
 {
-    if (_currentState == PursuitState::UAV_FOLLOWING){
-        std_msgs::Float32 offsetYMsg;
-        offsetYMsg.data = -1 * _uav_distance_offset;
-        _pubOffsetY.publish(offsetYMsg);
+    // if (_currentState == PursuitState::UAV_FOLLOWING){
+    //     std_msgs::Float32 offsetYMsg;
+    //     offsetYMsg.data = -1 * _uav_distance_offset;
+    //     _pubOffsetY.publish(offsetYMsg);
 
-        std_msgs::Float32 offsetZMsg;
-        offsetZMsg.data = _uav_z_offset;
-        _pubOffsetZ.publish(offsetZMsg);  
-    }
+    //     std_msgs::Float32 offsetZMsg;
+    //     offsetZMsg.data = _uav_z_offset;
+    //     _pubOffsetZ.publish(offsetZMsg);  
+    // }
     // later for ball
     // if (_currentState == PursuitState::BALL_FOLLOWING){
     //     std_msgs::Float32 offsetXMsg;
@@ -1113,26 +916,26 @@ void publishOffsets()
 }
 
 void publishErrors(){
-    if (_currentState == PursuitState::UAV_FOLLOWING){
-        std_msgs::Float32 msg;
+    // if (_currentState == PursuitState::UAV_FOLLOWING){
+    //     std_msgs::Float32 msg;
 
-        msg.data = -1 * _currDistanceReference;
-        _pubYError.publish(msg);
+    //     msg.data = -1 * _currDistanceReference;
+    //     _pubYError.publish(msg);
 
-        msg.data = _currHeightReference;
-        _pubZError.publish(msg);
+    //     msg.data = _currHeightReference;
+    //     _pubZError.publish(msg);
 
-        // Deadzone for error
-        if (abs(_currYawReference) < _yawDeadZoneThreshold){
-            _currYawReference = 0;
-        }
-        else{
-            _currYawReference -= _yawDeadZoneThreshold; 
-        }
+    //     // Deadzone for error
+    //     if (abs(_currYawReference) < _yawDeadZoneThreshold){
+    //         _currYawReference = 0;
+    //     }
+    //     else{
+    //         _currYawReference -= _yawDeadZoneThreshold; 
+    //     }
 
-        msg.data = _currYawReference;
-        _pubYawError.publish(msg);
-    }
+    //     msg.data = _currYawReference;
+    //     _pubYawError.publish(msg);
+    // }
     // later
     // if (_currentState == PursuitState::BALL_FOLLOWING){
     //     std_msgs::Float32 msg;
@@ -1147,6 +950,7 @@ void publishErrors(){
     //     _pubYawError.publish(msg);
     // }
 }
+
 void odomCb(const nav_msgs::OdometryConstPtr& msg)
 {
     _currOdom = *msg;
@@ -1175,8 +979,8 @@ void run()
             updateState();
             _pubSearchTrajectoryFlag.publish(_searchTrajectoryFlag);
             _pubInferenceEnabled.publish(_inferenceEnabled);
-            publishOffsets();
-            publishErrors();
+            // publishOffsets();
+            // publishErrors();
             publishVisualServoSetpoint(dt);  
             _challengeTime += 1/_rate;
         }
@@ -1276,5 +1080,5 @@ private:
 };
 }
 
-#endif /* VISUAL_SERVO_PURSUIT_STATE_MACHINE_H*/
+#endif /* WAIT_AND_OBSERVE_STATE_MACHINE_H*/
 

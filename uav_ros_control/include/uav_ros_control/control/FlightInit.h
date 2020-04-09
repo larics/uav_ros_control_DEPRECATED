@@ -85,10 +85,6 @@ public:
 			&flight_init::FlightInit::stateCb, this);
 		m_subRcIn = nh.subscribe("mavros/rc/in", 1,
 			&flight_init::FlightInit::rcInCallback, this);
-		// m_subCartographerPose = nh.subscribe("uav/cartographer/pose", 1,
-		// 	&flight_init::FlightInit::cartographerPoseCb, this);
-		// m_subMsfOdometry = nh.subscribe("msf_core/odometry", 1,
-		// 	&flight_init::FlightInit::msfOdometryCb, this);
 
 		// Initialize publishers 
 		m_pubTrajectory = nh.advertise<trajectory_msgs::JointTrajectory> (
@@ -108,12 +104,6 @@ public:
             ("mavros/set_mode");
 		m_takeoffClient = nh.serviceClient<uav_ros_control_msgs::TakeOff>
 			("takeoff");
-		// m_initializeMsfHeightClient = nh.serviceClient<sensor_fusion_comm::InitHeight>
-		// 	("msf_pose_sensor/pose_sensor/initialize_msf_height");
-		// m_initializeMsfScaleClient = nh.serviceClient<sensor_fusion_comm::InitScale>
-		// 	("msf_pose_sensor/pose_sensor/initialize_msf_scale");			
-		// m_planTrajectoryClient = nh.serviceClient<larics_motion_planning::MultiDofTrajectory> (
-		// 	"multi_dof_trajectory");
 		
 		// Setup dynamic reconfigure server
 		fi_param_t  fiConfig;
@@ -154,12 +144,7 @@ bool subscribedTopicsActive()
     double dt_cartographer = currentTime - m_timeLastCartographer;
     
     static constexpr double MAX_DT = 0.2;
-    // ROS_FATAL_COND(dt_odom > MAX_DT,        	"FI - odometry timeout reached.");
-   //ROS_FATAL_COND(dt_state > MAX_DT,     		"FI - mavros state timeout reached.");
-    // ROS_FATAL_COND(dt_cartographer > MAX_DT,  "FI - cartographer pose timeout reached.");
-    
-    // return dt_odom < MAX_DT ;
-        // && dt_cartographer < MAX_DT;
+
     return true;
 }
 
@@ -167,11 +152,9 @@ bool healthyNumberOfPublishers()
 {
     ROS_FATAL_COND(!m_subOdometry.getNumPublishers() > 0, "IF - 'mavros odometry' topic publisher missing");
     ROS_FATAL_COND(!m_subState.getNumPublishers() > 0, "IF - 'mavros state' topic publisher missing");
-		// ROS_FATAL_COND(!m_subCartographerPose.getNumPublishers() > 0, "IF - 'cartographer pose' topic publisher missing");
 
     return m_subOdometry.getNumPublishers() > 0 
       && 	m_subState.getNumPublishers() > 0;
-			// && 	m_subCartographerPose.getNumPublishers() > 0;
 }
 
 bool stateMachineDisableConditions()
@@ -184,16 +167,10 @@ bool all_services_available()
 	ROS_FATAL_COND(!m_armingClient.exists(), "FI - arming service does not exist.");
 	ROS_FATAL_COND(!m_setModeClient.exists(), "FI - set mode service does not exist.");
 	ROS_FATAL_COND(!m_takeoffClient.exists(), "FI - takeoff service does not exist.");
-	// ROS_FATAL_COND(!m_initializeMsfHeightClient.exists(), "FI - msf height service does not exist.");
-	// ROS_FATAL_COND(!m_initializeMsfScaleClient.exists(), "FI - msf scale service does not exist.");
-	// ROS_FATAL_COND(!m_planTrajectoryClient.exists(), "FI - multi_dof_trajectory does not exist.");
 
   return m_armingClient.exists() 
     && m_setModeClient.exists()
     && m_takeoffClient.exists();
-	// && m_initializeMsfHeightClient.exists()
-	// && m_initializeMsfScaleClient.exists()
-	// && m_planTrajectoryClient.exists();
 }
 
 void fiParamCb(fi_param_t& configMsg,uint32_t level)
@@ -283,13 +260,13 @@ bool armAndTakeOffCb(
 		return true;
 	}
 	// Sleep before grasper
-	ros::Duration(10.0).sleep();
+	ros::Duration(5.0).sleep();
 	// Open the GRASPER
 	std_msgs::String msg;
 	msg.data = "unwinding";
 	m_pubDynamixelState.publish(msg);
 	// Sleep to stabilize before State Machine
-	ros::Duration(20.0).sleep();
+	//ros::Duration(20.0).sleep();
 	// Tell SM that TakeOff is successful
 	t_ready_msg.data = true;
 	m_pubReadyForExploration.publish(t_ready_msg);
