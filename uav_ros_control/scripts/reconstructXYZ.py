@@ -2,7 +2,7 @@
 
 import rospy
 
-from geometry_msgs.msg import PointStamped, Pose
+from geometry_msgs.msg import PointStamped, Pose, PoseStamped
 from uav_object_tracking_msgs.msg import object
 from sensor_msgs.msg import CameraInfo
 from std_msgs.msg import Header, Bool, Float32
@@ -25,6 +25,9 @@ class reconstructXYZ():
         self.new_odometry_data = False
         self.odometry_data = Odometry()
 
+        self.new_target_pose = False
+        self.target_pose = PoseStamped()
+
         # Camera coordinates to UAV coordinates
         self.Tuav_cam = np.zeros((4, 4))
         self.Tuav_cam[0, 2] = 1.0
@@ -42,9 +45,11 @@ class reconstructXYZ():
 
         rospy.Subscriber('/yellow/mavros/global_position/local', Odometry, self.odometry_callback)
 
+        rospy.Subscriber('/uav/pose', PoseStamped, self.target_callback)
+
         # Create publishers
         self.uav_position_publisher = rospy.Publisher('reconstructXYZ/position_estimated', PointStamped, queue_size = 1)
-
+        self.depth_gt_pub = rospy.Publisher('reconstructXYZ/depth_gt', Float32, queue_size=1)
 
     """ Callbacks """
     def camera_info_callback(self, data):
@@ -61,6 +66,10 @@ class reconstructXYZ():
     def odometry_callback(self, data):
         self.new_odometry_data = True
         self.odometry_data = data
+
+    def target_callback(self, data):
+        self.target_pose = data
+        self.new_target_pose = True
 
     def quaternion2euler(self, quaternion):
 
@@ -114,7 +123,7 @@ class reconstructXYZ():
 
         r31 = -math.sin(y)
 
-        r32 = math.cos(y)*math.sin(z)
+        r32 = math.cos(y)*math.sin(x)
 
         r33 = math.cos(x)*math.cos(y)
 
@@ -171,10 +180,50 @@ class reconstructXYZ():
 
         return Tworld_uav1
 
+    def getTrueDepth(self):
+        """
+        Transform ground truth data of the target's pose to camera frame to get depth.
+        """
+        euler = [0.0, 0.0, 1.5707963268]
+        position = [0.0 , 0.0, 0.0]
+
+        Tpoint= np.zeros((4, 4))
+        Tpoint[0, 0] = 1.0
+        Tpoint[0, 3] = self.target_pose.pose.position.x
+        Tpoint[1, 1] = 1.0
+        Tpoint[1, 3] = self.target_pose.pose.position.y
+        Tpoint[2, 2] = 1.0
+        Tpoint[2, 3] = self.target_pose.pose.position.z
+        Tpoint[3, 3] = 1.0
+
+        # Transform world to map
+        Tmap_world = self.getRotationTranslationMatrix(euler, position)
+
+        Tpoint_map = np.dot(Tmap_world, Tpoint)
+
+        quaternion = [self.odometry_data.pose.pose.orientation.w, self.odometry_data.pose.pose.orientation.x, self.odometry_data.pose.pose.orientation.y, self.odometry_data.pose.pose.orientation.z]
+        euler = self.quaternion2euler(quaternion)
+        position = [self.odometry_data.pose.pose.position.x, self.odometry_data.pose.pose.position.y, self.odometry_data.pose.pose.position.z]
+        Tworld_uav = self.getRotationTranslationMatrix(euler, position)
+
+        Tpoint_uav = np.dot(np.linalg.inv(Tworld_uav), Tpoint_map)
+
+        Tpoint_cam = np.dot(np.linalg.inv(self.Tuav_cam), Tpoint_uav)
+
+        depth_gt_msg = Float32()
+        depth_gt_msg.data = Tpoint_cam[2,3]
+        self.depth_gt_pub.publish(depth_gt_msg)
+
+        self.new_target_pose = False
+
     def run(self, rate):
         r = rospy.Rate(rate)
 
         while not rospy.is_shutdown():
+
+            if self.new_target_pose and self.new_odometry_data:
+                self.getTrueDepth()
+
             if self.new_depth_data and self.new_detection_data and self.new_odometry_data:
 
                 """
