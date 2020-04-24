@@ -10,7 +10,7 @@ from nav_msgs.msg import Odometry
 import math
 import numpy as np
 from numpy.linalg import inv
-from math import sqrt, sin, cos, pi, atan, floor
+from math import sqrt, sin, cos, pi, atan, floor, atan2
 
 class reconstructXYZ():
     def __init__(self):
@@ -40,16 +40,20 @@ class reconstructXYZ():
         # Create subscribers
         rospy.Subscriber('/uav_object_tracking/uav/depth_kf', Float32, self.distance_callback)
         rospy.Subscriber('/YOLODetection/tracked_detection', object, self.detection_callback)
+        rospy.Subscriber('/yellow/mavros/global_position/local', Odometry, self.odometry_callback)
+        rospy.Subscriber('/uav/pose', PoseStamped, self.target_callback)
         rospy.Subscriber('/camera/color/camera_info', CameraInfo, self.camera_info_callback)
         #rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
 
-        rospy.Subscriber('/yellow/mavros/global_position/local', Odometry, self.odometry_callback)
-
-        rospy.Subscriber('/uav/pose', PoseStamped, self.target_callback)
-
         # Create publishers
-        self.uav_position_publisher = rospy.Publisher('reconstructXYZ/position_estimated', PointStamped, queue_size = 1)
-        self.depth_gt_pub = rospy.Publisher('reconstructXYZ/depth_gt', Float32, queue_size=1)
+        self.target_world_cs_pub = rospy.Publisher('reconstructXYZ/world_cs/position_estimated', PointStamped, queue_size = 1)
+        self.target_uav_cs_pub = rospy.Publisher('reconstructXYZ/uav_cs/position_estimated', PointStamped, queue_size = 1)
+
+        self.depth_gt_pub = rospy.Publisher('reconstructXYZ/depth_gt', Float32, queue_size = 1)
+
+        self.depth_relative_pub = rospy.Publisher('reconstructXYZ/depth_relative', Float32, queue_size = 1)
+        self.height_relative_pub = rospy.Publisher('reconstructXYZ/height_relative', Float32, queue_size = 1)
+        self.yaw_relative_pub = rospy.Publisher('reconstructXYZ/yaw_relative', Float32, queue_size = 1)
 
     """ Callbacks """
     def camera_info_callback(self, data):
@@ -175,10 +179,40 @@ class reconstructXYZ():
         # Transform from camera coordinates to UAV coordinates
         Tuav_uav1 = np.dot(self.Tuav_cam, Tcam_uav_t)
 
+        # Publish target position in UAV CS
+        target_uav_cs = PointStamped()
+        target_uav_cs.header.frame_id = "bebop/base_link"
+        target_uav_cs.point.x = Tuav_uav1[0,3]
+        target_uav_cs.point.y = Tuav_uav1[1,3]
+        target_uav_cs.point.z = Tuav_uav1[2,3]
+
+        self.target_uav_cs_pub.publish(target_uav_cs)
+
+        """ Publish relative values for Visual-servoing """
+
+        depth_r_msg = Float32()
+        depth_r_msg.data = Tuav_uav1[0,3]
+        self.depth_relative_pub.publish(depth_r_msg)
+
+        height_r_msg = Float32()
+        height_r_msg.data = -1 * Tuav_uav1[2,3]
+        self.height_relative_pub.publish(height_r_msg)
+
+        yaw_r_msg = Float32()
+        yaw_r_msg.data = atan2(Tuav_uav1[1,3], Tuav_uav1[0,3])
+        self.yaw_relative_pub.publish(yaw_r_msg)
+
         # Tranform from UAV coordinates to World coordinates
         Tworld_uav1 = np.dot(Tworld_uav, Tuav_uav1)
 
-        return Tworld_uav1
+        # Publish target position in World CS
+        target_world_cs = PointStamped()
+        target_world_cs.header.frame_id = "map"
+        target_world_cs.point.x = Tworld_uav1[0,3]
+        target_world_cs.point.y = Tworld_uav1[1,3]
+        target_world_cs.point.z = Tworld_uav1[2,3]
+
+        self.target_world_cs_pub.publish(target_world_cs)
 
     def getTrueDepth(self):
         """
@@ -236,24 +270,12 @@ class reconstructXYZ():
                 y_3d = (self.detection_data.y - self.camera_info.K[5]) * self.depth_data.data / self.camera_info.K[4]
                 z_3d = self.depth_data.data
 
-                T_temp = self.transform2global(x_3d, y_3d, z_3d)
-
-                uav_position = PointStamped()
-                uav_position.header.frame_id = "map"
-                uav_position.point.x = T_temp[0,3]
-                uav_position.point.y = T_temp[1,3]
-                uav_position.point.z = T_temp[2,3]
-
-                self.uav_position_publisher.publish(uav_position)
-
-                self.new_depth_data = False
-                self.new_detection_data = False
-                self.new_odometry_data = False
+                self.transform2global(x_3d, y_3d, z_3d)
 
             r.sleep()
 
 if __name__ == '__main__':
     rospy.init_node('reconstructXYZ')
 
-    figure8 = reconstructXYZ()
-    figure8.run(50)
+    reconstructor = reconstructXYZ()
+    reconstructor.run(50)
