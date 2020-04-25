@@ -11,25 +11,46 @@
     <arg name="process_value" default="visual_servo/process_value"/>
     <arg name="status"      default="visual_servo/is_enabled"/>
 
+    <arg name="depth"   default="reconstructXYZ/depth_relative"/>
+    
+<!--     <arg name="depth"   default="reconstructXYZ/depth_gt"/>
+ -->    <arg name="height"   default="reconstructXYZ/height_relative"/>
+    <arg name="yaw"   default="reconstructXYZ/yaw_relative"/>
+
+<!--     <include file="$(find uav_ros_control)/launch/generate_search.launch">
+    </include>
+ -->
     <group ns="$(arg namespace)">
+
         
         <!-- Visual servo state machine parameters -->
         <rosparam command="load"
             file="$(find uav_ros_control)/config/reference/visual_servo_pursuit_sm_ch1.yaml" />
 
+        <node
+            pkg="uav_ros_control"
+            type="reconstructXYZ.py"
+            name="reconstructXYZ"
+            output="screen"> 
+        </node>
+
         <!-- Visual Servo state machine node -->
         <node
             pkg="uav_ros_control"
-            type="wait_and_observe_sm"
-            name="wait_and_observe_sm"
+            type="track_and_follow_sm"
+            name="track_and_follow_sm"
             output="screen">
 
             <remap from="odometry" to="$(arg odom)"/>
+            <remap from="/uav_object_tracking/uav/depth_kf"  to="$(arg depth)"/>
+            <remap from="/uav_object_tracking/uav/height_kf"  to="$(arg height)"/>
+            <remap from="/uav_object_tracking/uav/yaw_kf"  to="$(arg yaw)"/>
+
         </node>
 
                  <!-- Visual servo state machine parameters -->
         <rosparam command="load"
-            file="$(find uav_ros_control)/config/reference/visual_servo_pursuit.yaml" />
+            file="$(find uav_ros_control)/config/reference/visual_servo_pursuit_PBVS.yaml" />
         
         <!-- Visual servo node -->
         <node
