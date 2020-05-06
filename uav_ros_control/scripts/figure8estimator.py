@@ -3,7 +3,7 @@
 import rospy
 
 from geometry_msgs.msg import PointStamped, PoseStamped, PoseArray, Pose
-from uav_object_tracking.msg import object
+from uav_object_tracking_msgs.msg import object
 from sensor_msgs.msg import CameraInfo
 from std_msgs.msg import Header, Bool, Float32
 from nav_msgs.msg import Odometry, Path
@@ -116,7 +116,6 @@ class Tfm_Aprox():
         self.disable_boundary_check = rospy.get_param('disable_boundary_check', False)
 
         print self.disable_boundary_check
-
 
     def check_inside_2d(self, point):
         if self.local_corners is None:
@@ -307,7 +306,7 @@ class Tfm_Aprox():
 
             self.goal_point = PoseStamped()
             self.goal_point.header.stamp = rospy.get_rostime()
-            self.goal_point.header.frame_id = "world"
+            self.goal_point.header.frame_id = "map"
             self.goal_point.pose.position.x = pt2[0]
             self.goal_point.pose.position.y = pt2[1]
             self.goal_point.pose.position.z = pt2[2] + self.z_offset
@@ -385,15 +384,18 @@ class Tfm_Aprox():
                     detection_data = self.find_min_time_diff_data(self.detection_data_list, self.distance_data.header.stamp.to_sec())
                     odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.distance_data.header.stamp.to_sec())
 
-                    x = (detection_data.x - self.camera_info.K[2]) / self.camera_info.K[0]
-                    y = (detection_data.y - self.camera_info.K[5]) / self.camera_info.K[4]
+                    # Uncomment in case of distance instead depth
+                    # x = (detection_data.x - self.camera_info.K[2]) / self.camera_info.K[0]
+                    # y = (detection_data.y - self.camera_info.K[5]) / self.camera_info.K[4]
 
-                    z_m = self.distance_data.point.x / (math.sqrt(1 + x*x + y*y))
+                    # z_m = self.distance_data.point.x / (math.sqrt(1 + x*x + y*y))
 
-                    x_m = x * z_m
-                    y_m = y * z_m
+                    # x_m = x * z_m
+                    # y_m = y * z_m
 
-                    #treba transformirati iz kamere u globalni sustav
+                    x_m = (detection_data.x - self.camera_info.K[2]) * self.distance_data.point.x / self.camera_info.K[0]
+                    y_m = (detection_data.y - self.camera_info.K[5]) * self.distance_data.point.x / self.camera_info.K[4]
+                    z_m = self.distance_data.point.x
 
                     Tcam_uav1 = np.zeros((4, 4))
                     Tcam_uav1[0, 0] = 1.0
@@ -416,6 +418,7 @@ class Tfm_Aprox():
 
                     uav_position = PointStamped()
                     uav_position.header = self.distance_data.header
+                    uav_position.header.frame_id = "map"
                     uav_position.point.x = Tworld_uav1[0,3]
                     uav_position.point.y = Tworld_uav1[1,3]
                     uav_position.point.z = Tworld_uav1[2,3]
@@ -482,7 +485,7 @@ class Tfm_Aprox():
                         self.target_z_g = p_out[2]
 
                         self.goal_setpoint.header.stamp = rospy.get_rostime()
-                        self.goal_setpoint.header.frame_id = "world"
+                        self.goal_setpoint.header.frame_id = "map"
                         self.goal_setpoint.pose.position.x = self.goal_x_g
                         self.goal_setpoint.pose.position.y = self.goal_y_g
                         self.goal_setpoint.pose.position.z = self.goal_z_g + self.z_offset
@@ -525,13 +528,13 @@ class Tfm_Aprox():
 
                     temp_header = Header()
                     temp_header.stamp = rospy.Time.now()
-                    temp_header.frame_id = "world"
+                    temp_header.frame_id = "map"
 
                     temp_pose.header = temp_header
 
                     self.path_g.poses.append(temp_pose)
 
-                self.path_g.header.frame_id = "world"
+                self.path_g.header.frame_id = "map"
 
                 self.path_coord = Path()
                 for i in range(len(self.xcoord)):
@@ -542,13 +545,13 @@ class Tfm_Aprox():
 
                     temp_header = Header()
                     temp_header.stamp = rospy.Time.now()
-                    temp_header.frame_id = "world"
+                    temp_header.frame_id = "map"
 
                     temp_pose.header = temp_header
 
                     self.path_coord.poses.append(temp_pose)
 
-                self.path_coord.header.frame_id = "world"
+                self.path_coord.header.frame_id = "map"
 
                 self.path_g_publisher.publish(self.path_g)
                 self.path_coord_publisher.publish(self.path_coord)
@@ -762,7 +765,7 @@ if __name__ == '__main__':
 
     figure8 = Tfm_Aprox()
 
-    rospy.Subscriber('/uav_object_tracking/uav/distance_kf_header', PointStamped, figure8.distance_callback)
+    rospy.Subscriber('/YOLODetection/depth_header', PointStamped, figure8.distance_callback)
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
     #rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
     rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
@@ -775,15 +778,14 @@ if __name__ == '__main__':
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
     rospy.Service('plot', Empty, figure8.plot_callback)
 
+    uav_backup_setpoint = rospy.Publisher('figure8/target/setpoint_estimated_backup', PoseStamped, queue_size=1)
+    uav_position = rospy.Publisher('figure8/target/position_estimated', PointStamped, queue_size=1)
+    uav_setpoint = rospy.Publisher('figure8/target/setpoint_estimated', PoseStamped, queue_size=1)
 
-    uav_backup_setpoint = rospy.Publisher('target_uav/backup_setpoint_estimated', PoseStamped, queue_size=1)
-    uav_position = rospy.Publisher('target_uav/position_estimated', PointStamped, queue_size=1)
-    uav_setpoint = rospy.Publisher('target_uav/setpoint_estimated', PoseStamped, queue_size=1)
-
-    estimated_figure_pub = rospy.Publisher('figure8_estimated', Path, queue_size=1)
-    received_points_pub = rospy.Publisher('figure8_received', Path, queue_size=1)
-    estimator_state_pub = rospy.Publisher('figure8_state', Bool, queue_size=1)
-    num_of_received_points_pub = rospy.Publisher('figure_estimator/num_of_pts', Float32, queue_size=1)
+    estimated_figure_pub = rospy.Publisher('figure8/debug/path_estimated', Path, queue_size=1)
+    received_points_pub = rospy.Publisher('figure8/debug/path_collected', Path, queue_size=1)
+    num_of_received_points_pub = rospy.Publisher('figure8/debug/points_number', Float32, queue_size=1)
+    estimator_state_pub = rospy.Publisher('figure8/state', Bool, queue_size=1)
 
     figure8.set_uav_position_publisher(uav_position)
     figure8.set_uav_setpoint_publisher(uav_setpoint)
