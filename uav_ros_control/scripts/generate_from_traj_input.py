@@ -3,7 +3,8 @@
 import rospy
 import tf
 import copy
-from geometry_msgs.msg import PoseStamped
+import math
+from geometry_msgs.msg import PoseStamped, Point
 from nav_msgs.msg import Odometry
 from std_msgs.msg import String
 from std_msgs.msg import Bool
@@ -16,18 +17,29 @@ from geometry_msgs.msg import Transform, Twist
 class TrajectoryPointPublisher:
 
     def __init__(self):        
-        self.point_index = 0
         self.trajectory = MultiDOFJointTrajectory()
-        self.pose_sub = rospy.Subscriber("input/trajectory", MultiDOFJointTrajectory, self.trajectory_cb)
         self.carrot_status = String()
-        self.status_sub = rospy.Subscriber("carrot/status", String, self.status_cb)
+        # Current odometry
         self.odom_msg = Odometry()
         self.odom_flag = False
-        self.odom_sub = rospy.Subscriber("odometry", Odometry, self.odom_cb)
-        self.point_pub = rospy.Publisher("output/point", MultiDOFJointTrajectoryPoint, queue_size=1)
-        self.activity_pub = rospy.Publisher("topp/status", Bool, queue_size=1)
-        self.trajectory_flag_sub = rospy.Subscriber("trajectory_flag", Bool, self.trajectory_flag_cb)
+        # Last trajectory point
+        self.trajectory_target_point = Point()
         self.publish_trajectory = True
+        self.trajectory_executed = Bool()
+        # Distance of the UAV from the target pose at which we consider the 
+        # trajectory to be executed
+        self.r_trajectory = rospy.get_param('~radius_trajectory_executed', 0.5)
+
+        # Initialize publishers
+        self.point_pub = rospy.Publisher("output/point", MultiDOFJointTrajectoryPoint, queue_size=1)
+        self.publishing_trajectory_pub = rospy.Publisher("topp/status", Bool, queue_size=1)
+        self.trajectory_executed_pub = rospy.Publisher("topp/trajectory_executed", Bool, queue_size=1)
+
+        # Initialize subscribers
+        self.status_sub = rospy.Subscriber("carrot/status", String, self.status_cb)
+        self.pose_sub = rospy.Subscriber("input/trajectory", MultiDOFJointTrajectory, self.trajectory_cb)
+        self.trajectory_flag_sub = rospy.Subscriber("trajectory_flag", Bool, self.trajectory_flag_cb)
+        self.odom_sub = rospy.Subscriber("odometry", Odometry, self.odom_cb)
 
     def status_cb(self, msg):
         self.carrot_status = msg
@@ -42,7 +54,7 @@ class TrajectoryPointPublisher:
     def publish_trajectory_status(self, status):
         msg = Bool()
         msg.data = status
-        self.activity_pub.publish(msg)
+        self.publishing_trajectory_pub.publish(msg)
 
     def trajectory_flag_cb(self, msg):
         self.publish_trajectory = msg.data
@@ -52,6 +64,11 @@ class TrajectoryPointPublisher:
             print("TrajectoryPointPublisher - empty input trajectory recieved, RESET")
             self.trajectory = MultiDOFJointTrajectory()
             return 
+
+        # Get the target point of trajectory
+        self.trajectory_target_point.x = msg.points[len(msg.points) - 1].transforms[0].translation.x
+        self.trajectory_target_point.y = msg.points[len(msg.points) - 1].transforms[0].translation.y
+        self.trajectory_target_point.z = msg.points[len(msg.points) - 1].transforms[0].translation.z
         
         x = []
         y = []
@@ -81,7 +98,7 @@ class TrajectoryPointPublisher:
             # constraints are added only on the first waypoint since the
             # TOPP-RA reads them only from there.
             if i==0:
-                waypoint.velocities = [1.5, 1.5, 1, 0.5] 
+                waypoint.velocities = [2, 2, 2, 0.5] 
                 waypoint.accelerations = [0.75, 0.75, 0.8, 0.5]
 
             # Append all waypoints in request
@@ -104,13 +121,28 @@ class TrajectoryPointPublisher:
         request_trajectory_service = rospy.ServiceProxy("generate_toppra_trajectory", GenerateTrajectory)
         response = request_trajectory_service(request)
 
-
         # Response will have trajectory and bool variable success. If for some
         # reason the trajectory was not able to be planned or the configuration
         # was incomplete or wrong it will return False.
         print ("TrajectoryPointPublisher: Converting trajectory to multi dof")
         joint_trajectory = response.trajectory
         self.trajectory = self.JointTrajectory2MultiDofTrajectory(joint_trajectory)
+
+
+    def checkTrajectoryExecuted(self):
+        # Here we check if the UAV's has been within some radius from the target 
+        # point. If so we consider trajectory to be executed.
+        if self.odom_flag:
+            dx = self.trajectory_target_point.x - self.odom_msg.pose.pose.position.x
+            dy = self.trajectory_target_point.y - self.odom_msg.pose.pose.position.y
+            dz = self.trajectory_target_point.z - self.odom_msg.pose.pose.position.z
+
+            delta = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+            if delta > self.r_trajectory:
+                return False
+            else:
+                return True
 
     def JointTrajectory2MultiDofTrajectory(self, joint_trajectory):
         multi_dof_trajectory = MultiDOFJointTrajectory()
@@ -151,34 +183,48 @@ class TrajectoryPointPublisher:
         while not rospy.is_shutdown():
             
             if not self.odom_flag:
-                print("TrajectoryPointPublisher - odometry unavailable")
+                rospy.logwarn_throttle(1, "TrajectoryPointPublisher - odometry unavailable")
                 self.publish_trajectory_status(False)
                 rospy.sleep(0.01)
                 continue
 
             if not self.carrot_status.data == "HOLD":
-                print("TrajectoryPointPublisher - Position hold disabled")
+                rospy.logwarn_throttle(1, "TrajectoryPointPublisher - Position hold disabled")
                 self.publish_trajectory_status(False)
                 rospy.sleep(0.01)
                 continue
             
             if not self.trajectory.points:
-                print("TrajectoryPointPublisher - No trajectory available")
+                rospy.loginfo_throttle(10, "TrajectoryPointPublisher - No trajectory available")
+                rospy.loginfo_throttle(10, "TrajectoryPointPublisher - Checking if previous trajectory is executed.")
+
+                self.trajectory_executed.data = self.checkTrajectoryExecuted()
+                if(self.trajectory_executed.data == True):
+                    rospy.logwarn_throttle(0.1, "TrajectoryPointPublisher - Trajectory successfully executed.")
+                self.trajectory_executed_pub.publish(self.trajectory_executed)
+                self.odom_flag = False
+
                 self.publish_trajectory_status(False)
                 rospy.sleep(0.01)
                 continue
+
             if not self.publish_trajectory:
-                print("TrajectoryPointPublisher - Do not have a permission to publish trajectory.")
+                rospy.loginfo_throttle(1, "TrajectoryPointPublisher - Do not have a permission to publish trajectory.")
                 self.publish_trajectory_status(False)
+
+                # Clear the trajectory
                 self.trajectory = MultiDOFJointTrajectory()
-                #rospy.sleep(0.5)
+                rospy.sleep(0.01)
                 continue
 
             # Publish trajectory point
             self.point_pub.publish(self.trajectory.points.pop(0))
-            print("TrajectoryPointPublisher - Publishing trajectory.")
+            rospy.loginfo_throttle(1, "TrajectoryPointPublisher - Publishing trajectory.")
             self.publish_trajectory_status(True)
-            rospy.sleep(0.01)
+
+            # If the trajectory is being published, then it is certainly not executed.
+            self.trajectory_executed.data = False
+            self.trajectory_executed_pub.publish(self.trajectory_executed)
 
 if __name__ == "__main__":
     rospy.init_node("pickup_trajectory")   
