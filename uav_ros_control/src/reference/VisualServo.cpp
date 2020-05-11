@@ -70,11 +70,7 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _pubMoveForward = nh.advertise<std_msgs::Float32>("visual_servo/move_forward", 1);
   _pubMoveUp = nh.advertise<std_msgs::Float32>("visual_servo/move_up", 1);
   
-  _pubUavYawDebug = nh.advertise<std_msgs::Float32>("debug/Uav_yaw", 1);
   _pubYawErrorDebug = nh.advertise<std_msgs::Float32>("debug/yaw_error", 1);
-  _pubChangeYawDebug = nh.advertise<std_msgs::Float32>("debug/yaw_change", 1); // Advertised again for user friendliness
-  _pubUavRollDebug = nh.advertise<std_msgs::Float32>("debug/uav_roll", 1);
-  _pubUavPitchDebug = nh.advertise<std_msgs::Float32>("debug/uav_pitch", 1);
   _pubNewSetpoint =
       nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("position_hold/trajectory", 1);
 
@@ -369,10 +365,6 @@ void VisualServo::odomCb(const nav_msgs::OdometryConstPtr& odom) {
     _uavRoll = atan2( 2*(_qw * _qx + _qy * _qz), 1 - 2 * (_qx*_qx + _qy*_qy) );
     _uavPitch = asin( 2*(_qw*_qy - _qx*_qz) );
 
-    _floatMsg.data = _uavRoll;
-    _pubUavRollDebug.publish(_floatMsg);
-    _floatMsg.data = _uavPitch;
-    _pubUavPitchDebug.publish(_floatMsg);
 }
 
 void VisualServo::CarrotReferenceCb(const trajectory_msgs::MultiDOFJointTrajectoryPoint msg){
@@ -457,8 +449,6 @@ void VisualServo::VisualServoProcessValuesCb(const uav_ros_control_msgs::VisualS
     else {
       _uavYaw = _setpointYaw;
     }
-    _floatMsg.data = _uavYaw;
-    _pubUavYawDebug.publish(_floatMsg);
 }
 
 void VisualServo::xOffsetCb(const std_msgs::Float32 &msg) {
@@ -542,10 +532,7 @@ void VisualServo::updateSetpoint() {
     ChangeYawRateLimiter.setInput(change_yaw);
     change_yaw_limited = ChangeYawRateLimiter.getData();
 
-  } 
-
-  _floatMsg.data = change_yaw;
-  _pubChangeYawDebug.publish(_floatMsg);
+  }
 
   _newXSetpoint = _uavPos[0] + move_forward * cos(_uavYaw + _yaw_added_offset) - move_left * sin(_uavYaw + _yaw_added_offset);
   _newYSetpoint = _uavPos[1] + move_forward * sin(_uavYaw + _yaw_added_offset) + move_left * cos(_uavYaw + _yaw_added_offset);

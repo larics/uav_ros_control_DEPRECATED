@@ -128,8 +128,7 @@ namespace uav_reference {
       std_msgs::Float32 _moveLeftMsg, _moveForwardMsg, _changeYawMsg, _moveUpMsg;
 
       // Topics for debugging
-      ros::Publisher _pubUavYawDebug, _pubChangeYawDebug, _pubYawErrorDebug, _pubXAdd, _pubYAdd;
-      ros::Publisher _pubUavRollDebug, _pubUavPitchDebug;
+      ros::Publisher _pubChangeYawDebug, _pubYawErrorDebug, _pubXAdd, _pubYAdd;
       std_msgs::Float32 _floatMsg;
 
       // Brick errors publisher
