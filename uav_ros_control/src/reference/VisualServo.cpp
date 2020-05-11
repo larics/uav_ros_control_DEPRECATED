@@ -254,6 +254,13 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
     response.message = "Visual servo disabled.";
   }
 
+  // Wait for the first callback from carrot reference.
+  while (_currCarrotReference.transforms.empty()){
+    ros::spinOnce();
+    ros::Duration(1.0).sleep();
+  }
+  ROS_INFO("UAV VisualServo - First carrot reference received.");
+
   MoveForwardRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, _DistanceRateLimiter_F, 0.0);
   MoveUpRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
   ChangeYawRateLimiter.init(_YawRateLimiter_T, _YawRateLimiter_R, -_YawRateLimiter_R, 0.0);
@@ -264,8 +271,6 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
   YRateLimiter.initialCondition(_currCarrotReference.transforms[0].translation.y, _currCarrotReference.transforms[0].translation.y);
   ZRateLimiter.init(_SetpointRateLimiter_T, _SetpointRateLimiter_R, -_SetpointRateLimiter_R, 0.0);
   ZRateLimiter.initialCondition(_currCarrotReference.transforms[0].translation.z, _currCarrotReference.transforms[0].translation.z);
-
-
 
   ROS_INFO("Initializing rate limiters");
 
