@@ -74,7 +74,7 @@ class Tfm_Aprox():
         self.hausdorff = -1.0
         self.num_of_pts_hausdorff = 50
 
-        self.hausdorff_threshold = 0.6
+        self.hausdorff_threshold = 0.1
         self.max_a = 30.0
         self.min_a = 15.0
  
@@ -115,7 +115,7 @@ class Tfm_Aprox():
             rospy.logerr("Couldn't get the local arena constraints. Service call failed with error: %s", e)
         self.disable_boundary_check = rospy.get_param('disable_boundary_check', False)
 
-        print self.disable_boundary_check
+        rospy.loginfo('Geofencing is {}'.format("OFF" if self.disable_boundary_check else "ON"))
 
     def check_inside_2d(self, point):
         if self.local_corners is None:
@@ -375,6 +375,7 @@ class Tfm_Aprox():
 
         while not rospy.is_shutdown():
             if (self.start_estimator):
+                rospy.loginfo_once('Figure-8-estimator started.')
                 global_position = PointStamped()
                 detection_data = object()
                 odometry_data = Odometry()
@@ -428,11 +429,12 @@ class Tfm_Aprox():
                         self.num_of_received_points = self.num_of_received_points + 1
 
                         self.num_of_received_points_publisher.publish(self.num_of_received_points)
+                        rospy.loginfo_throttle(10, "Figure-8-estimator - Received %d points" %self.num_of_received_points)
 
                         if (not self.estimator_state):
                             self.estimatefigure8(uav_position)
                     else:
-                        rospy.logwarn("Receieved point not inside GEO Fence.")
+                        rospy.logwarn("Figure-8-estimator - Receieved point not inside GEO Fence.")
 
                     if (self.hausdorff_counter > self.num_of_pts_hausdorff):
                         p_reconstructed = np.asarray(self.p_reconstructed)#, dtype=None, order=None)
@@ -513,6 +515,10 @@ class Tfm_Aprox():
                     self.new_distance_data = False
 
                 self.uav_setpoint_publisher.publish(self.goal_setpoint)
+
+                if self.estimator_state: rospy.logwarn_once("Figure-8-estimator has found interception setpoint.")
+                if self.num_of_received_points > 1 :
+                    rospy.loginfo_throttle(10, "Figure-8-estimator - Hausdorff distance is " + "{:.3f}".format(self.hausdorff/self.a) + ". TH: " + str(self.hausdorff_threshold))
 
                 estimator_state_msg = Bool()
                 estimator_state_msg.data = self.estimator_state
