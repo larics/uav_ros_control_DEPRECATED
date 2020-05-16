@@ -9,266 +9,208 @@ import tf
 from math import pi, sqrt, sin, cos, atan2, floor, ceil, fabs
 from nav_msgs.msg import Odometry
 from uav_ros_control.srv import GenerateSearch, GenerateSearchResponse
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
+from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 from geometry_msgs.msg import Transform, Twist, PointStamped
 
-# from uav_search.msg import *
-# from uav_search.srv import *
-
+from dynamic_reconfigure.server import Server
+from uav_ros_control.cfg import GenerateSearchParametersConfig
 
 class RequestSearchTrajectory():
+    """ 
+    This class provides search strategies for MBZIRC 2020 Challenge 1. It is used with Track-and-Follow algorithm.
+    There are two types of search: line search and Point of Interest(POI) search.
+    All parameters are configurable.
+    """
 
     def __init__(self):
+        """ Initialize search parameters, subscribers, publishers and service. """
+        # Define initial parameters [service, dynamic, class]
+        self.type = "line"
+        self.z_default = 10.0
+
+        self.searchAreaX = 100.0
+        self.searchAreaY = 40.0
+        self.offsetX = 0
+        self.offsetY = 0
+        self.initialX = 0
+        self.initialY = 0
+        self.arenaYawOffsetDeg = 0.0
+
+        self.radiusPOI = 4.0
+        self.zOffsetPOI = 3.0
+
+        self.pointsNumLine = 20
+        self.pointsNumPOI = 20
+
+        self.odomAvailable = False
+
+        # Define msgs
+        self.currOdom = Odometry()
+        self.currCarrotReference = MultiDOFJointTrajectoryPoint()
+        self.estimatedTargetPoint = PointStamped()
+        self.trajectoryPoints = MultiDOFJointTrajectory()
+
+        # Subscribers
+        self.subOdom = rospy.Subscriber("odom", Odometry, self.odometryCb)
+        self.subCarrotReference = rospy.Subscriber("carrot/trajectory", MultiDOFJointTrajectoryPoint, self.carrotReferenceCb)
+        self.subEstimatedTargetPoint = rospy.Subscriber("figure8/target/position_estimated", PointStamped, self.estimatedTargetPointCb)
+
+        # Publishers
+        self.pubTrajectory = rospy.Publisher("topp/input/trajectory", MultiDOFJointTrajectory, queue_size=1)
+
         # Service
         self.generate_search_service = rospy.Service('generate_search', GenerateSearch, self.generateSearchCallback)
 
-        # Subscribers
-        self.odom_sub = rospy.Subscriber("odom", Odometry, self.odom_cb)
-        self.carrot_reference_sub = rospy.Subscriber("carrot/trajectory", MultiDOFJointTrajectoryPoint, self.carrot_reference_cb)
+        # Dynamic reconfigure
+        self.srv = Server(GenerateSearchParametersConfig, self.parametersCb)
 
-        # Publishers
-        self.trajectory_pub = rospy.Publisher("topp/input/trajectory", MultiDOFJointTrajectory, queue_size=1)
+    # Callbacks
 
-        # # Define msg for points
-        # self.trajectoryPoints = MultiDOFJointTrajectory()
+    def parametersCb(self, config, level):
+        """  Dynamic reconfigure callback for parameters update.  """
+        rospy.loginfo("GenerateSearch - Parameters callback.")
+        self.searchAreaX = config["searchAreaX"]
+        self.searchAreaY = config["searchAreaY"]
+        self.offsetX = config["offsetX"]
+        self.offsetY = config["offsetY"]
+        self.initialX = config["initialX"]
+        self.initialY = config["initialY"]
+        self.arenaYawOffsetDeg = config["arenaYawOffsetDeg"]
 
-        # Odometry msg
-        self.odom_msg = Odometry()
-        self.odom_flag = False
+        self.radiusPOI = config["radius"]
+        self.zOffsetPOI = config["offsetZ"]
 
-        self.carrot_reference = MultiDOFJointTrajectoryPoint()
+        self.updateTakeoffPoint()
 
-        # Type of search [scan, estimated]
-        self.type = "scan"
-        # Define height
-        self.z_default = 10.0
-        self.estimated_point_stamped = PointStamped()
-        self.r_estimated = 4.0
-        self.num_of_circle_points = 20
-        self.estimated_z_offset = 3.0
-        self.scan_yaw_offset_deg = 0.0
-
-        # Define arena dimensions
-        self.x_size = 100.0
-        self.y_size = 40.0
-
-        self.x_offset = 20
-        self.y_offset = 10
-
-        # Number of points for trajectory
-        self.numPoints = 200
-
-        # # Takeo Off point
-        # self.takeOffPoint = MultiDOFJointTrajectoryPoint()
-        # temp_transform = Transform()
-        # temp_transform.translation.x = -40.0
-        # temp_transform.translation.y = 0.0
-        # temp_transform.translation.z = self.z_default
-        # temp_transform.rotation.w = 1.0
-
-        # self.takeOffPoint.transforms.append(temp_transform)
-
+        return config
 
     def generateSearchCallback(self, req):
-        print "Generating search trajectory."
+        """ 
+        GenerateSearch service provides search waypoints and trajectory for a trajectory publisher.
+
+        :param type:    type of search (line or POI). 
+        :param height:  constant height during line search in meters.
+        """
+        rospy.loginfo("GenerateSearch - Service requested.")
         res = GenerateSearchResponse()
 
-        # Define msg for points
         self.trajectoryPoints = MultiDOFJointTrajectory()
 
-        #get params
+        # Retrieve parameters
         self.type = req.type
-        self.z_default = req.desired_height
-        self.x_size = req.x_size
-        self.y_size = req.y_size
-        self.x_offset = req.x_offset
-        self.y_offset = req.y_offset
-        self.x_takeOff = req.x_takeOff
-        self.y_takeOff = req.y_takeOff
-        self.scan_yaw_offset_deg = req.yaw_offset
-        self.estimated_point_stamped = req.estimated_point
+        self.z_default = req.height
 
-        # Takeo Off point
-        self.takeOffPoint = MultiDOFJointTrajectoryPoint()
-        temp_transform = Transform()
-        temp_transform.translation.x = req.x_takeOff
-        temp_transform.translation.y = req.y_takeOff
-        temp_transform.translation.z = self.z_default
+        if (self.type == "line"):
 
-        self.takeOffPoint.transforms.append(temp_transform)
-
-        if (self.type == "scan"):
-
-            if self.odom_flag:
-                self.getMyPosition2()
+            if self.odomAvailable:
+                # Generate waypoints and trajectory
                 self.generateLine()
-                self.modifyTrajectory()
+                self.generateLineTrajectory()
 
-                self.trajectory_pub.publish(self.trajectoryPoints)
-                self.odom_flag = False
+                # Publish trajectory
+                self.pubTrajectory.publish(self.trajectoryPoints)
+                rospy.loginfo("GenerateSearch - Points for LINE search generated.")
+
+                # Set flag and response
+                self.odomAvailable = False
                 res.success = True
-                print "GenerateSearch - Points generated"
             else:
-                print "GenerateSearch - Odometry unavailable."
+                rospy.loginfo("GenerateSearch - Odometry unavailable.")
                 res.success = False
 
-        elif (self.type == "estimated"):
-            if self.odom_flag:
-                # self.getMyPosition2()
-                self.getMidPoint()
-                self.getEstimatedPoint()
-                self.generateEstimatedSearch()
+        elif (self.type == "POI"):
+            if self.odomAvailable:
+                # Generate waypoints and trajectory
+                self.generatePOITrajectory()
 
-                self.trajectory_pub.publish(self.trajectoryPoints)
-                self.odom_flag = False
+                # Publish trajectory
+                self.pubTrajectory.publish(self.trajectoryPoints)
+                rospy.loginfo("GenerateSearch - Points for POI search generated.")
+
+                # Set flag and response
+                self.odomAvailable = False
                 res.success = True
-                print "GenerateSearch - Points generated"
 
             else:
-                print "GenerateSearch - Odometry unavailable."
+                rospy.loginfo("GenerateSearch - Odometry unavailable.")
                 res.success = False
 
         return res
 
-    def odom_cb(self, msg):
-        self.odom_msg = msg
-        self.odom_flag = True
+    def odometryCb(self, msg):
+        self.currOdom = msg
+        self.odomAvailable = True
 
-    def carrot_reference_cb(self, msg):
-        self.carrot_reference = msg
+    def carrotReferenceCb(self, msg):
+        self.currCarrotReference = msg
 
+    def estimatedTargetPointCb(self, msg):
+        self.estimatedTargetPoint = msg
 
-    # def start(self):
-    #     # Starting point = odom
-    #     rospy.sleep(0.5)
-    #     while not rospy.is_shutdown():
-    #         if self.odom_flag:
-    #             self.getMyPosition()
-    #             self.generateLine()
-    #             self.modifyTrajectory()
+    # Functions
 
-    #             self.trajectory_pub.publish(self.trajectoryPoints)
-    #             return
-    #         rospy.sleep(0.01)
-
-    def run(self):
-        #  Waiting for service request
-        r = rospy.Rate(100)
-        rospy.spin()
-        r.sleep()
-
-
-    def getMyPosition(self):
-        self.starting_point = MultiDOFJointTrajectoryPoint()
+    def updateTakeoffPoint(self):
+        """ Convert takeoff data to trajectory point."""
+        self.takeOffPoint = MultiDOFJointTrajectoryPoint()
         temp_transform = Transform()
-        temp_transform.translation.x = self.odom_msg.pose.pose.position.x
-        temp_transform.translation.y = self.odom_msg.pose.pose.position.y
-        temp_transform.translation.z = self.odom_msg.pose.pose.position.z
+        temp_transform.translation.x = self.initialX
+        temp_transform.translation.y = self.initialY
+        temp_transform.translation.z = self.z_default
+        self.takeOffPoint.transforms.append(temp_transform)
 
-        self.yaw_starting = tf.transformations.euler_from_quaternion(
-            [self.odom_msg.pose.pose.orientation.x, 
-            self.odom_msg.pose.pose.orientation.y,
-            self.odom_msg.pose.pose.orientation.z,
-            self.odom_msg.pose.pose.orientation.w])[2]
-
-
-        temp_transform.rotation.x = self.odom_msg.pose.pose.orientation.x
-        temp_transform.rotation.y = self.odom_msg.pose.pose.orientation.y
-        temp_transform.rotation.z = self.odom_msg.pose.pose.orientation.z
-        temp_transform.rotation.w = self.odom_msg.pose.pose.orientation.w
-
-        self.starting_point.transforms.append(temp_transform)
-
-    def getMyPosition2(self):
-        self.starting_point = MultiDOFJointTrajectoryPoint()
-        self.starting_point = self.carrot_reference
-
-        self.yaw_starting = tf.transformations.euler_from_quaternion(
-            [self.starting_point.transforms[0].rotation.x, 
-            self.starting_point.transforms[0].rotation.y,
-            self.starting_point.transforms[0].rotation.z,
-            self.starting_point.transforms[0].rotation.w])[2]
-
-        print self.starting_point
-
-
-    def getMidPoint(self):
-        self.mid_point = MultiDOFJointTrajectoryPoint()
+    def initialPositionFromOdometry(self):
+        """ Retrieve current information about UAV from odometry. """
+        self.initialSearchPoint = MultiDOFJointTrajectoryPoint()
         temp_transform = Transform()
-        temp_transform.translation.x = self.odom_msg.pose.pose.position.x
-        temp_transform.translation.y = self.odom_msg.pose.pose.position.y 
-        temp_transform.translation.z = self.odom_msg.pose.pose.position.z
+        temp_transform.translation.x = self.currOdom.pose.pose.position.x
+        temp_transform.translation.y = self.currOdom.pose.pose.position.y
+        temp_transform.translation.z = self.currOdom.pose.pose.position.z
 
-        # yaw_start = tf.transformations.euler_from_quaternion(
-        #     [self.odom_msg.pose.pose.orientation.x, 
-        #     self.odom_msg.pose.pose.orientation.y,
-        #     self.odom_msg.pose.pose.orientation.z,
-        #     self.odom_msg.pose.pose.orientation.w])[2]
+        temp_transform.rotation.x = self.currOdom.pose.pose.orientation.x
+        temp_transform.rotation.y = self.currOdom.pose.pose.orientation.y
+        temp_transform.rotation.z = self.currOdom.pose.pose.orientation.z
+        temp_transform.rotation.w = self.currOdom.pose.pose.orientation.w
 
-        # print yaw_start
+        self.initialSearchPoint.transforms.append(temp_transform)
 
-        # temp_transform.rotation.x = self.odom_msg.pose.pose.orientation.x
-        # temp_transform.rotation.y = self.odom_msg.pose.pose.orientation.y
-        # temp_transform.rotation.z = self.odom_msg.pose.pose.orientation.z
-        # temp_transform.rotation.w = self.odom_msg.pose.pose.orientation.w
+    def initialPositionFromCarrotReference(self):
+        """ Retrieve current information about UAV from last carrot reference. """
+        self.initialSearchPoint = MultiDOFJointTrajectoryPoint()
+        self.initialSearchPoint = self.currCarrotReference
 
-        yaw_start = pi
-        q_backwards = tf.transformations.quaternion_from_euler(0, 0, yaw_start, 'rxyz')
-
-        temp_transform.rotation.x = q_backwards[0]
-        temp_transform.rotation.y = q_backwards[1]
-        temp_transform.rotation.z = q_backwards[2]
-        temp_transform.rotation.w = q_backwards[3]
-
-        self.mid_point.transforms.append(temp_transform)
-
-    def getEstimatedPoint(self):
-        self.estimated_point = MultiDOFJointTrajectoryPoint()
-        temp_transform = Transform()
-        temp_transform.translation.x = self.estimated_point_stamped.point.x
-        temp_transform.translation.y = self.estimated_point_stamped.point.y
-        temp_transform.translation.z = self.estimated_point_stamped.point.z + self.estimated_z_offset
-
-        yaw_start = pi
-        q_backwards = tf.transformations.quaternion_from_euler(0, 0, yaw_start, 'rxyz')
-
-        temp_transform.rotation.x = q_backwards[0]
-        temp_transform.rotation.y = q_backwards[1]
-        temp_transform.rotation.z = q_backwards[2]
-        temp_transform.rotation.w = q_backwards[3]
-
-        self.estimated_point.transforms.append(temp_transform)
-
-
-    def getToCenter(self):
-
-        self.x_center = -48.0
-        self.y_center = 0.0
-        self.z_center = 10.0
-
-        temp_point = MultiDOFJointTrajectoryPoint()
-        temp_transform = Transform()
-        temp_transform.translation.x = self.x_center
-        temp_transform.translation.y = self.y_center
-        temp_transform.translation.z = self.z_center
-
-        temp_transform.rotation.w = 1.0
-        temp_point.transforms.append(temp_transform)
-
-        self.trajectoryPoints.points.append(temp_point)
+    def getInitialYaw(self):
+        """ Calculate current yaw from quaternion data. """
+        self.initialSearchYaw = tf.transformations.euler_from_quaternion(
+            [self.initialSearchPoint.transforms[0].rotation.x, 
+            self.initialSearchPoint.transforms[0].rotation.y,
+            self.initialSearchPoint.transforms[0].rotation.z,
+            self.initialSearchPoint.transforms[0].rotation.w])[2]
 
     def generateLine(self):
-        if (self.x_size > self.y_size):
-            temp_x = np.linspace(self.takeOffPoint.transforms[0].translation.x + self.x_offset, self.takeOffPoint.transforms[0].translation.x + (self.x_size-self.x_offset), self.numPoints)
-            temp_y = [self.y_takeOff]*len(temp_x)
-        elif (self.y_size > self.x_size):
-            temp_y = np.linspace(self.takeOffPoint.transforms[0].translation.y + self.y_offset, self.takeOffPoint.transforms[0].translation.y + (self.y_size-self.y_offset), self.numPoints)
-            temp_x = [self.x_takeOff]*len(temp_y)        
+        """
+        Create an array of points for a line search. The search is performed along the line 
+        whose center is defined with takeoff point and offsets. The search line lies on 
+        the longer axis of the search area.
+
+        :param searchAreaX:     size of search area along the x axis.
+        :param searchAreaY:     size of search area along the y axis.
+        :param offsetX:         offset from takeoff point along the x axis.
+        :param offsetY:         offset from takeoff point along the y axis.
+        :param pointsNumLine:   number of points in one direction.
+        """
+        if (self.searchAreaX > self.searchAreaY):
+            temp_x = np.linspace(self.takeOffPoint.transforms[0].translation.x - self.searchAreaX / 2.0 + self.offsetX,\
+                self.takeOffPoint.transforms[0].translation.x + self.searchAreaX / 2.0 + self.offsetX, self.pointsNumLine)
+            temp_y = [self.initialY]*len(temp_x)
+        elif (self.searchAreaY > self.searchAreaX):
+            temp_y = np.linspace(self.takeOffPoint.transforms[0].translation.y - self.searchAreaY / 2.0 + self.offsetY, \
+                self.takeOffPoint.transforms[0].translation.y + self.searchAreaX / 2.0 + self.offsetY, self.pointsNumLine)
+            temp_x = [self.initialX]*len(temp_y)        
 
         temp_z = [self.z_default]*len(temp_x)
         temp_yaw = [0]*len(temp_x)
 
-        self.line_array = np.zeros((2*self.numPoints, 4))
+        self.line_array = np.zeros((2*self.pointsNumLine, 4))
 
         for i in range(0, len(temp_x)):
             # self.line_arrayp[i][0] = temp_x[i]
@@ -278,34 +220,136 @@ class RequestSearchTrajectory():
 
         # Backwards
         for i in range(0, len(temp_x)):
-            self.line_array[i+self.numPoints][:]= np.array([temp_x[-i-1], temp_y[-i-1], temp_z[-i-1], temp_yaw[i]])
-
-    def generateEstimatedSearch(self):
-        self.getMyPosition2()
-        self.trajectoryPoints.points.append(self.starting_point)
-        #self.trajectoryPoints.points.append(self.mid_point)
-        #self.trajectoryPoints.points.append(self.estimated_point)
-
-        x = [0] * self.num_of_circle_points
-        y = [0] * self.num_of_circle_points
-        z = [0] * self.num_of_circle_points
-        yaw = [0] * self.num_of_circle_points
-
-        theta = np.linspace(0 , 2*pi, self.num_of_circle_points)
-
-        for i in range(self.num_of_circle_points):
-            x[i] = self.estimated_point_stamped.point.x + self.r_estimated * cos(theta[i])
-            y[i] = self.estimated_point_stamped.point.y + self.r_estimated * sin(theta[i])
-            z[i] = self.estimated_point_stamped.point.z + self.estimated_z_offset
-
-            yaw[i] = atan2((self.estimated_point_stamped.point.y - y[i]),
-                self.estimated_point_stamped.point.x - x[i])
+            self.line_array[i+self.pointsNumLine][:]= np.array([temp_x[-i-1], temp_y[-i-1], temp_z[-i-1], temp_yaw[i]])
 
 
-        for i in range (self.num_of_circle_points):
+    def generateLineTrajectory(self):
+        """
+        Based on waypoints and initial pose of UAV, create a MultiDOFJointTrajectory for a line search.
+        Align the points taking into account the orientation of the arena towards the local CS of UAV. 
+        Find the nearest waypoint with convenient orientation and arrange waypoints accordingly.
+
+        :param arenaYawOffsetDeg:   arena orientation in local CS of UAV.
+
+        """
+        # Add my position
+        self.initialPositionFromCarrotReference()
+        self.getInitialYaw()
+        self.trajectoryPoints.points.append(self.initialSearchPoint)
+
+        dist = []
+        temp_yaw = []
+
+        # Align with arena orientation
+        theta = np.radians(self.arenaYawOffsetDeg)
+        c, s = np.cos(theta), np.sin(theta)
+        R = np.array(((c, -s), (s, c)))
+
+        for i in range(len(self.line_array)):
+            self.line_array[i][3] += self.arenaYawOffsetDeg * pi / 180
+            self.line_array[i][:2] = (R.dot(self.line_array[i][:2].reshape(2,1))).flatten()
+
+        # Get current yaw
+        yaw_start = tf.transformations.euler_from_quaternion(
+            [self.currOdom.pose.pose.orientation.x, 
+            self.currOdom.pose.pose.orientation.y,
+            self.currOdom.pose.pose.orientation.z,
+            self.currOdom.pose.pose.orientation.w])[2]
+
+        # Compare current position and orientation with points in line_array
+        for i in range(0,len(self.line_array)):
+            dist.append(np.linalg.norm(self.line_array[i][:2]-[self.initialSearchPoint.transforms[0].translation.x, self.initialSearchPoint.transforms[0].translation.y]))
+            temp_yaw.append(pi-abs(abs(yaw_start -self.line_array[i][3])-pi))
+
+        # Index of two nearest points in line array with opposite orientation
+        idx = np.argpartition(dist, 2)
+
+        # Select one point with an orientation closer to the current yaw
+        if (temp_yaw[idx[0]] < temp_yaw[idx[1]]):
+            self.startInTrajectoryIdx = idx[0]
+        else:
+            self.startInTrajectoryIdx = idx[1]
+
+        # Create trajectory points starting from the nearest
+        for i in range(self.startInTrajectoryIdx, 2*self.pointsNumLine):
+
+            if (i == self.startInTrajectoryIdx):
+                delta = self.initialSearchYaw - self.line_array[i][3]
+            else:
+                delta = self.line_array[i-1][3] - self.line_array[i][3]
+
+            if (delta > pi):
+                self.line_array[i][3] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+            elif (delta < -pi):
+                self.line_array[i][3] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
+
+            temp_point = MultiDOFJointTrajectoryPoint()
+            temp_transform = Transform()
+            temp_transform.translation.x = self.line_array[i][0]
+            temp_transform.translation.y = self.line_array[i][1]
+            temp_transform.translation.z = self.line_array[i][2]
+
+            q_backwards = tf.transformations.quaternion_from_euler(0, 0, self.line_array[i][3], 'rxyz')
+
+            temp_transform.rotation.x = q_backwards[0]
+            temp_transform.rotation.y = q_backwards[1]
+            temp_transform.rotation.z = q_backwards[2]
+            temp_transform.rotation.w = q_backwards[3]
+            temp_point.transforms.append(temp_transform)
+
+            self.trajectoryPoints.points.append(temp_point)
+
+        for i in range(0, self.startInTrajectoryIdx):
+
+            temp_point = MultiDOFJointTrajectoryPoint()
+            temp_transform = Transform()
+            temp_transform.translation.x = self.line_array[i][0]
+            temp_transform.translation.y = self.line_array[i][1]
+            temp_transform.translation.z = self.line_array[i][2]
+
+            q_backwards = tf.transformations.quaternion_from_euler(0, 0, self.line_array[i][3], 'rxyz')
+
+            temp_transform.rotation.x = q_backwards[0]
+            temp_transform.rotation.y = q_backwards[1]
+            temp_transform.rotation.z = q_backwards[2]
+            temp_transform.rotation.w = q_backwards[3]
+            temp_point.transforms.append(temp_transform)
+
+            self.trajectoryPoints.points.append(temp_point)
+
+    def generatePOITrajectory(self):
+        """
+        Create a MultiDOFJointTrajectory for a circle search around Point of Interest (POI).
+        Point of Interest is a estimated pose of a target.
+
+        :param radiusPOI:       radius of the circle around POI.
+        :param zOffsetPOI:      offset along the z axis that is added to the height of the target.
+        :param pointsNumPOI:    number of points for one circle.
+
+        """
+        self.initialPositionFromCarrotReference()
+        self.getInitialYaw()
+        self.trajectoryPoints.points.append(self.initialSearchPoint)
+
+        x = [0] * self.pointsNumPOI
+        y = [0] * self.pointsNumPOI
+        z = [0] * self.pointsNumPOI
+        yaw = [0] * self.pointsNumPOI
+
+        theta = np.linspace(0 , 2*pi, self.pointsNumPOI)
+
+        for i in range(self.pointsNumPOI):
+            x[i] = self.estimatedTargetPoint.point.x + self.radiusPOI * cos(theta[i])
+            y[i] = self.estimatedTargetPoint.point.y + self.radiusPOI * sin(theta[i])
+            z[i] = self.estimatedTargetPoint.point.z + self.zOffsetPOI
+
+            yaw[i] = atan2((self.estimatedTargetPoint.point.y - y[i]),
+                self.estimatedTargetPoint.point.x - x[i])
+
+        for i in range (self.pointsNumPOI):
 
             if (i == 0):
-                delta = self.yaw_starting - yaw[i]
+                delta = self.initialSearchYaw - yaw[i]
             else:
                 delta = yaw[i-1] - yaw[i]
 
@@ -330,96 +374,16 @@ class RequestSearchTrajectory():
 
             self.trajectoryPoints.points.append(temp_point)
 
-    def modifyTrajectory(self):
-        dist = []
-        temp_yaw = []
-
-        # Align with arena orientation
-        theta = np.radians(self.scan_yaw_offset_deg)
-        c, s = np.cos(theta), np.sin(theta)
-        R = np.array(((c, -s), (s, c)))
-
-        for i in range(len(self.line_array)):
-            self.line_array[i][3] += self.scan_yaw_offset_deg * pi / 180
-            self.line_array[i][:2] = (R.dot(self.line_array[i][:2].reshape(2,1))).flatten()
-
-        # Get current yaw
-        yaw_start = tf.transformations.euler_from_quaternion(
-            [self.odom_msg.pose.pose.orientation.x, 
-            self.odom_msg.pose.pose.orientation.y,
-            self.odom_msg.pose.pose.orientation.z,
-            self.odom_msg.pose.pose.orientation.w])[2]
-
-        # Compare current position and orientation with points in line_array
-        for i in range(0,len(self.line_array)):
-            dist.append(np.linalg.norm(self.line_array[i][:2]-[self.starting_point.transforms[0].translation.x, self.starting_point.transforms[0].translation.y]))
-            temp_yaw.append(pi-abs(abs(yaw_start -self.line_array[i][3])-pi))
-
-        # Index of two nearest points in line array with opposite orientation
-        idx = np.argpartition(dist, 2)
-
-        # Select one point with an orientation closer to the current yaw
-        if (temp_yaw[idx[0]] < temp_yaw[idx[1]]):
-            self.startInTrajectoryIdx = idx[0]
-        else:
-            self.startInTrajectoryIdx = idx[1]
-
-        # Add my position
-        self.getMyPosition2()
-        self.trajectoryPoints.points.append(self.starting_point)
-        
-        print self.starting_point
-
-
-        for i in range(self.startInTrajectoryIdx, 2*self.numPoints):
-
-            if (i == self.startInTrajectoryIdx):
-                delta = self.yaw_starting - self.line_array[i][3]
-            else:
-                delta = self.line_array[i-1][3] - self.line_array[i][3]
-
-            if (delta > pi):
-                self.line_array[i][3] += ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
-            elif (delta < -pi):
-                self.line_array[i][3] -= ceil(floor(fabs(delta)/pi)/(2.0))*2.0*pi
-
-
-            temp_point = MultiDOFJointTrajectoryPoint()
-            temp_transform = Transform()
-            temp_transform.translation.x = self.line_array[i][0]
-            temp_transform.translation.y = self.line_array[i][1]
-            temp_transform.translation.z = self.line_array[i][2]
-
-            q_backwards = tf.transformations.quaternion_from_euler(0, 0, self.line_array[i][3], 'rxyz')
-
-            temp_transform.rotation.x = q_backwards[0]
-            temp_transform.rotation.y = q_backwards[1]
-            temp_transform.rotation.z = q_backwards[2]
-            temp_transform.rotation.w = q_backwards[3]
-            temp_point.transforms.append(temp_transform)
-
-            self.trajectoryPoints.points.append(temp_point)
-
-        for i in range(0, self.startInTrajectoryIdx):
-            temp_point = MultiDOFJointTrajectoryPoint()
-            temp_transform = Transform()
-            temp_transform.translation.x = self.line_array[i][0]
-            temp_transform.translation.y = self.line_array[i][1]
-            temp_transform.translation.z = self.line_array[i][2]
-
-            q_backwards = tf.transformations.quaternion_from_euler(0, 0, self.line_array[i][3], 'rxyz')
-
-            temp_transform.rotation.x = q_backwards[0]
-            temp_transform.rotation.y = q_backwards[1]
-            temp_transform.rotation.z = q_backwards[2]
-            temp_transform.rotation.w = q_backwards[3]
-            temp_point.transforms.append(temp_transform)
-
-            self.trajectoryPoints.points.append(temp_point)
-
+    def run(self):
+        """ A loop waiting for a service request. """
+        r = rospy.Rate(100)
+        while not rospy.is_shutdown():
+            rospy.spin()
+            r.sleep()
 
 if __name__ == "__main__":
+    # Initialize the node and name it.
     rospy.init_node("generate_search")
+
     trajectory = RequestSearchTrajectory()
-    # trajectory.start()
     trajectory.run()
