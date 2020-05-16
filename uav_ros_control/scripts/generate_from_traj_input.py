@@ -29,6 +29,7 @@ class TrajectoryPointPublisher:
         # Distance of the UAV from the target pose at which we consider the 
         # trajectory to be executed
         self.r_trajectory = rospy.get_param('~radius_trajectory_executed', 0.5)
+        self.rate = rospy.get_param('~rate', 100)
 
         # Initialize publishers
         self.point_pub = rospy.Publisher("output/point", MultiDOFJointTrajectoryPoint, queue_size=1)
@@ -180,6 +181,8 @@ class TrajectoryPointPublisher:
         return multi_dof_trajectory
 
     def run(self):
+        rate = rospy.Rate(self.rate)
+
         while not rospy.is_shutdown():
             
             if not self.odom_flag:
@@ -225,6 +228,7 @@ class TrajectoryPointPublisher:
             # If the trajectory is being published, then it is certainly not executed.
             self.trajectory_executed.data = False
             self.trajectory_executed_pub.publish(self.trajectory_executed)
+            rate.sleep()
 
 if __name__ == "__main__":
     rospy.init_node("pickup_trajectory")   

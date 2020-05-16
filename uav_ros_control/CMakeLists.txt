@@ -36,6 +36,7 @@ generate_dynamic_reconfigure_options(
 	config/control/PositionControlParameters.cfg
 	config/control/DistanceControlParameters.cfg
 	config/control/FlightInitParameters.cfg
+	config/reference/GenerateSearchParameters.cfg
 	config/reference/VisualServoParameters.cfg
 	config/reference/VisualServoStateMachineParameters.cfg
 	config/reference/VisualServoPursuitParameters.cfg

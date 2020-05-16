@@ -95,10 +95,12 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _subBALLYawError = nh.subscribe("/uav_object_tracking/ball/yaw_error", 1, &uav_reference::PursuitStateMachine::ballYawCb, this);
     _subBALLPursuitConfident = nh.subscribe("/red_ball/confident", 1, &uav_reference::PursuitStateMachine::ballConfidentCb, this);
     /* Figure 8 estimator*/
-    _subInterceptionPoint = nh.subscribe("target_uav/setpoint_estimated", 1, &uav_reference::PursuitStateMachine::figureEstimatorCb, this);
-    _subCurrentEstimatedTargetPoint = nh.subscribe("target_uav/position_estimated", 1, &uav_reference::PursuitStateMachine::currentEstimatedTargetPointCb, this);
-    _subEstimatorStatus = nh.subscribe("figure8_state", 1, &uav_reference::PursuitStateMachine::estimatorStatusCb, this);
+    _subInterceptionPoint = nh.subscribe("figure8/target/setpoint_estimated", 1, &uav_reference::PursuitStateMachine::figureEstimatorCb, this);
+    _subCurrentEstimatedTargetPoint = nh.subscribe("figure8/target/position_estimated", 1, &uav_reference::PursuitStateMachine::currentEstimatedTargetPointCb, this);
+    _subEstimatorStatus = nh.subscribe("figure8/state", 1, &uav_reference::PursuitStateMachine::estimatorStatusCb, this);
     _subToppStatus = nh.subscribe("topp/status", 1, &uav_reference::PursuitStateMachine::toppStatusCb, this);
+    _subTrajectoryExecuted = nh.subscribe("topp/trajectory_executed", 1, &uav_reference::PursuitStateMachine::trajectoryExecutedCb, this);
+
     /* Takeoff successful*/
     _subReadyForPursuit = nh.subscribe("ready_for_exploration", 1, &uav_reference::PursuitStateMachine::readyForPursuitCb, this);
 
@@ -180,7 +182,7 @@ void figureEstimatorCb(geometry_msgs::PoseStamped msg)
 void currentEstimatedTargetPointCb(geometry_msgs::PointStamped msg)
 {
     _currentEstimatedTargetPoint = msg;
-    _searchEstimated = true;
+    _searchPOI = true;
 }
 
 void estimatorStatusCb(std_msgs::Bool msg)
@@ -191,6 +193,10 @@ void estimatorStatusCb(std_msgs::Bool msg)
 void toppStatusCb(std_msgs::Bool msg)
 {
     _toppStatus = msg;
+}
+
+void trajectoryExecutedCb(std_msgs::Bool msg){
+    _trajectoryExecuted = msg.data;
 }
 
 void readyForPursuitCb(std_msgs::Bool msg)
@@ -312,35 +318,29 @@ void initializeParameters(ros::NodeHandle& nh)
 
 void requestSearchTrajectory()
 {
-    ROS_INFO("PursuitSM::update status - requesting search trajectory.");
     uav_ros_control::GenerateSearch srv;
 
-    if (_searchEstimated){
-        ROS_FATAL("PursuitSM::updateStatus - ESTIMATED search requested.");
-        srv.request.type = "estimated";
+    if (_searchPOI){
+        ROS_INFO("PursuitSM::updateStatus - Point of Interset(POI) search requested.");
+        srv.request.type = "POI";
     }
     else{
-        ROS_FATAL("PursuitSM::updateStatus - SCAN search requested.");
-        srv.request.type = "scan";
+        ROS_INFO("PursuitSM::updateStatus - LINE search requested.");
+        srv.request.type = "line";
     }
-    srv.request.desired_height = _search_height;
-    srv.request.x_size = _arena_x_size;
-    srv.request.y_size = _arena_y_size;
-    srv.request.x_offset = _arena_x_offset;
-    srv.request.y_offset = _arena_y_offset;
-    srv.request.yaw_offset = _arena_yaw_offset;
-    srv.request.x_takeOff = _x_takeOff;
-    srv.request.y_takeOff = _y_takeOff;
-    srv.request.estimated_point = _currentEstimatedTargetPoint;
+    srv.request.height = _search_height;
 
     if(!_searchTrajectoryClientCaller.call(srv)){
         ROS_FATAL("PursuitSM::updateStatus - search trajectory not generated.");
-        _currentState = PursuitState::OFF;
+        // _currentState = PursuitState::OFF;
         return;
     }
 
     if (srv.response.success){
         ROS_INFO("PursuitSM::updateStatus - search trajectory successfully generated.");
+        _newSearch = false;
+        ros::Duration(0.5).sleep();
+
     }
 }
 
@@ -369,12 +369,10 @@ void turnOnVisualServo()
     std_srvs::SetBool::Request req;
     std_srvs::SetBool::Response resp;
     req.data = true; 
-    ROS_INFO(" Someone requested Visual Servo turn ON.");
     if (!_vsClienCaller.call(req, resp))
     {
         ROS_FATAL("PursuitSM::updateStatus - calling visual servo failed.");
         _currentState = PursuitState::OFF;
-        _pursuitActivated = false;
         return;
     }
 
@@ -451,9 +449,13 @@ void updateState()
 
     if (_currentState == PursuitState::SEARCH && (!_startFollowingUAV || !_isDetectionActive) && _pursuitActivated)
     {
-        if (!_toppStatus.data){
+        if (_trajectoryExecuted | _newSearch){
+            ROS_INFO_COND(_newSearch, "PursuitSM::condition - Requesting first search trajectory.");
+            ROS_INFO_COND(_trajectoryExecuted, "PursuitSM::condition - Previous search trajectory executed. Requesting new one.");
+            ROS_WARN_COND(_interceptionActivated, "PursuitSM::condition - Search STATE but INTERCEPTION requested.");
+
             requestSearchTrajectory();
-            ros::Duration(0.5).sleep();
+            // ros::Duration(0.2).sleep();
         }
         _followingStartTime = 0;
         return;
@@ -508,6 +510,7 @@ void updateState()
         _settleTime = 0;
         _followingStartTime = 0;
         _inferenceEnabled.data = true;
+        _newSearch = true;
 
         if (_interceptionActivated)
             _pursuitActivated = false;
@@ -794,7 +797,7 @@ private:
     /* Client for calling visual servo and search trajectory */
     ros::ServiceClient _vsClienCaller, _searchTrajectoryClientCaller, _interceptionTrajectoryClientCaller;
 
-    ros::Subscriber _subReadyForPursuit;
+    ros::Subscriber _subReadyForPursuit, _subTrajectoryExecuted;
     ros::Publisher _pubEstimatorStart;
 
     /* Offset subscriber and publisher */
@@ -827,7 +830,7 @@ private:
     /* Interception subscribers*/
     ros::Subscriber _subInterceptionPoint, _subCurrentEstimatedTargetPoint, _subEstimatorStatus;
     float _interceptionZOffset;
-    bool _searchEstimated = false, _readyForPursuit = false;
+    bool _searchPOI = false, _readyForPursuit = false, _trajectoryExecuted = false, _newSearch = true;
     geometry_msgs::PointStamped _currentEstimatedTargetPoint;
 
     /* Pose publisher */
