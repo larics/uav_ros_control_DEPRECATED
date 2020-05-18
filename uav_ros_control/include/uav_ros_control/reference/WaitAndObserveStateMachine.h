@@ -27,7 +27,6 @@
 #include <uav_ros_control/VisualServoPursuitParametersConfig.h>
 #include <uav_ros_control_msgs/VisualServoProcessValues.h>
 #include <uav_ros_control/filters/NonlinearFilters.h>
-#include <uav_ros_control/GenerateSearch.h>
 #include <uav_ros_control/GenerateInterception.h>
 #include <uav_ros_control/reference/Global2Local.h>
 
@@ -95,28 +94,28 @@ _global2Local(nh)
     _subOdom = nh.subscribe("odometry", 1, &uav_reference::PursuitStateMachine::odomCb, this);
     _subCarrotReference = nh.subscribe("carrot/trajectory", 1, &uav_reference::PursuitStateMachine::carrotReferenceCb, this);
     /* UAV vision based errors */
-    _subUAVDist = nh.subscribe("/uav_object_tracking/uav/distance_kf", 1, &uav_reference::PursuitStateMachine::uavDistCb, this);
+    _subUAVDist = nh.subscribe("/uav_object_tracking/uav/depth_kf", 1, &uav_reference::PursuitStateMachine::uavDistCb, this);
     _subUAVHeightError = nh.subscribe("/uav_object_tracking/uav/height_kf", 1, &uav_reference::PursuitStateMachine::uavHeightCb, this);
     _subUAVYawError = nh.subscribe("/uav_object_tracking/uav/yaw_kf", 1, &uav_reference::PursuitStateMachine::uavYawCb, this);
     _subUAVPursuitConfident = nh.subscribe("/YOLODetection/uav_following_confident", 1, &uav_reference::PursuitStateMachine::uavConfidentCb, this);
-    _subUAVDistanceConfident = nh.subscribe("/YOLODetection/kf_distance_active", 1, &uav_reference::PursuitStateMachine::uavDistanceConfidentCb, this);
     /* BALL vision based errors */
     _subBALLDist = nh.subscribe("/uav_object_tracking/ball/distance", 1, &uav_reference::PursuitStateMachine::ballDistCb, this);
     _subBALLHeightError = nh.subscribe("/uav_object_tracking/ball/height_error", 1, &uav_reference::PursuitStateMachine::ballHeightCb, this);
     _subBALLYawError = nh.subscribe("/uav_object_tracking/ball/yaw_error", 1, &uav_reference::PursuitStateMachine::ballYawCb, this);
     _subBALLPursuitConfident = nh.subscribe("/red_ball/confident", 1, &uav_reference::PursuitStateMachine::ballConfidentCb, this);
     /* Figure 8 estimator*/
-    _subHausdorffEstimator = nh.subscribe("target_uav/setpoint_estimated", 1, &uav_reference::PursuitStateMachine::hausdorffEstimatorCb, this);
-    _subCurrentEstimatedTargetPoint = nh.subscribe("target_uav/position_estimated", 1, &uav_reference::PursuitStateMachine::currentEstimatedTargetPointCb, this);
-    _subBackupEstimator = nh.subscribe("target_uav/backup_setpoint_estimated", 1, &uav_reference::PursuitStateMachine::backupEstimatorCb, this);
-    // _subEstimatorStatus = nh.subscribe("figure8_state", 1, &uav_reference::PursuitStateMachine::estimatorStatusCb, this);
+    _subHausdorffEstimator = nh.subscribe("figure8/target/setpoint_estimated", 1, &uav_reference::PursuitStateMachine::hausdorffEstimatorCb, this);
+    _subBackupEstimator = nh.subscribe("figure8/target/setpoint_estimated_backup", 1, &uav_reference::PursuitStateMachine::backupEstimatorCb, this);
+    _subCurrentEstimatedTargetPoint = nh.subscribe("figure8/target/position_estimated", 1, &uav_reference::PursuitStateMachine::currentEstimatedTargetPointCb, this);
+    _subEstimatorStatus = nh.subscribe("figure8/state", 1, &uav_reference::PursuitStateMachine::estimatorStatusCb, this);
     _subToppStatus = nh.subscribe("topp/status", 1, &uav_reference::PursuitStateMachine::toppStatusCb, this);
+    _subTrajectoryExecuted = nh.subscribe("topp/trajectory_executed", 1, &uav_reference::PursuitStateMachine::trajectoryExecutedCb, this);
 
     /* Takeoff done*/
     _subReadyForPursuit = nh.subscribe("ready_for_exploration", 1, &uav_reference::PursuitStateMachine::readyForPursuitCb, this);
     _pubInputTrajectory = nh.advertise<trajectory_msgs::MultiDOFJointTrajectory>("topp/input/trajectory", 1);
 
-    _pubEstimatorStart = nh.advertise<std_msgs::Bool>("sm_pursuit/start_estimator", 1);
+    _pubEstimatorStart = nh.advertise<std_msgs::Bool>("sm_pursuit/start_estimator", 1, true);
 
 
     // Setup dynamic reconfigure server
@@ -132,9 +131,6 @@ _global2Local(nh)
 
     // Initialize visual servo client caller
     _vsClienCaller = nh.serviceClient<std_srvs::SetBool::Request, std_srvs::SetBool::Response>("visual_servo");
-
-    // Initialize search trajectory caller
-    _searchTrajectoryClientCaller = nh.serviceClient<uav_ros_control::GenerateSearch>("generate_search");
 
     // Initialize search trajectory caller
     _interceptionTrajectoryClientCaller = nh.serviceClient<uav_ros_control::GenerateInterception>("generate_interception");
@@ -193,10 +189,6 @@ void ballConfidentCb(const std_msgs::Bool msg)
     // TO DO
 }
 
-void uavDistanceConfidentCb(const std_msgs::Bool msg){
-    _kf_distance_active = msg.data;
-}
-
 void hausdorffEstimatorCb(geometry_msgs::PoseStamped msg){
     _hausdorffPoint = msg;
     _hausdorffIn = true;
@@ -220,7 +212,11 @@ void estimatorStatusCb(std_msgs::Bool msg){
 }
 
 void toppStatusCb(std_msgs::Bool msg){
-    _toppStatus = msg;
+    _publishingTrajectory = msg.data;
+}
+
+void trajectoryExecutedCb(std_msgs::Bool msg){
+    _trajectoryExecuted = msg.data;
 }
 
 void readyForPursuitCb(std_msgs::Bool msg){
@@ -240,7 +236,7 @@ bool pursuitServiceCb(std_srvs::SetBool::Request& request, std_srvs::SetBool::Re
         _pursuitActivated = false;
         response.success = false;
         response.message = "Pursuit and visual servo deactivated";
-        _searchTrajectoryFlag.data = false;
+        _requestTrajectoryFlag.data = false;
         return true;
     }
 
@@ -334,6 +330,7 @@ void initializeParameters(ros::NodeHandle& nh)
     // Waiting for home position
     ros::Duration(1.0).sleep();
     ros::spinOnce();
+
     // Get GPS points from yaml
     double t_lat, t_lon, t_alt, t_hdg;
     std::string s;
@@ -373,7 +370,7 @@ void initializeParameters(ros::NodeHandle& nh)
 
     }
 
-    _toppStatus.data = false;
+    _publishingTrajectory = false;
     _inferenceEnabled.data = true;
 
 
@@ -519,39 +516,6 @@ void requestGPSPointTrajectory(){
 
 }
 
-void requestSearchTrajectory(){
-    ROS_INFO("PursuitSM::update status - requesting search trajectory.");
-    uav_ros_control::GenerateSearch srv;
-
-    if (_searchEstimated){
-        ROS_FATAL("PursuitSM::updateStatus - ESTIMATED search requested.");
-        srv.request.type = "estimated";
-    }
-    else{
-        ROS_FATAL("PursuitSM::updateStatus - SCAN search requested.");
-        srv.request.type = "scan";
-    }
-    srv.request.desired_height = _search_height;
-    srv.request.x_size = _arena_x_size;
-    srv.request.y_size = _arena_y_size;
-    srv.request.x_offset = _arena_x_offset;
-    srv.request.y_offset = _arena_y_offset;
-    srv.request.yaw_offset = _arena_yaw_offset;
-    srv.request.x_takeOff = _x_takeOff;
-    srv.request.y_takeOff = _y_takeOff;
-    srv.request.estimated_point = _currentEstimatedTargetPoint;
-
-    if(!_searchTrajectoryClientCaller.call(srv)){
-        ROS_FATAL("PursuitSM::updateStatus - search trajectory not generated.");
-        _currentState = PursuitState::OFF;
-        return;
-    }
-
-    if (srv.response.success){
-        ROS_INFO("PursuitSM::updateStatus - search trajectory successfully generated.");
-    }
-}
-
 void requestInterceptionTrajectory(geometry_msgs::PoseStamped msg){
     trajectory_msgs::MultiDOFJointTrajectory t_interception_trajectory;
 
@@ -597,17 +561,23 @@ void requestInterceptionTrajectory(geometry_msgs::PoseStamped msg){
 //     srv.request.interception_point = _hausdorffPoint;
 
 //     if(!_interceptionTrajectoryClientCaller.call(srv)){
-//         ROS_FATAL("PursuitSM::updateStatus - interception trajectory not generated.");
-//         ROS_INFO("PursuitSM::updateStatus - OFF state activated.");
+//         ROS_FATAL("PursuitSM::updateState - interception trajectory not generated.");
+//         ROS_INFO("PursuitSM::updateState - OFF state activated.");
 //         _currentState = PursuitState::OFF;
 //         return;
 //     }
 
 //     if (srv.response.success){
-//         ROS_INFO("PursuitSM::updateStatus - interception trajectory successfully generated.");
+//         ROS_INFO("PursuitSM::updateState - interception trajectory successfully generated.");
 //     }
 
 // }
+
+void clearTrajectory()
+{
+    _requestTrajectoryFlag.data = false;
+    _pubSearchTrajectoryFlag.publish(_requestTrajectoryFlag);
+}
 
 geometry_msgs::PoseStamped point2pose(geometry_msgs::PointStamped t_msg){
     geometry_msgs::PoseStamped tmp_pose;
@@ -637,7 +607,7 @@ void turnOnVisualServo(){
     ROS_INFO(" Someone requested Visual Servo turn ON.");
     if (!_vsClienCaller.call(req, resp))
     {
-        ROS_FATAL("PursuitSM::updateStatus - calling visual servo failed.");
+        ROS_FATAL("PursuitSM::updateState - calling visual servo failed.");
         _currentState = PursuitState::OFF;
         _pursuitActivated = false;
         return;
@@ -645,7 +615,7 @@ void turnOnVisualServo(){
 
     if (resp.success)
     {   // Visual servo successfully activated
-        ROS_INFO("PursuitSM::updateStatus - Visual servo pursuit is activated.");
+        ROS_INFO("PursuitSM::updateState - Visual servo pursuit is activated.");
         _pursuitActivated = true;
         return;
     }
@@ -659,13 +629,13 @@ void turnOffVisualServo()
     req.data = false;
     if (!_vsClienCaller.call(req, resp))
     {
-        ROS_FATAL("PursuitSM::updateStatus - calling visual servo failed.");
+        ROS_FATAL("PursuitSM::updateState - calling visual servo failed.");
         return;
     }
 
     if (!resp.success)
     {
-        ROS_INFO("PursuitSM::updateStatus - visual servo successfully deactivated");
+        ROS_INFO("PursuitSM::updateState - visual servo successfully deactivated");
         // Visual servo successfully deactivated
         _currentState = PursuitState::OFF;
         //_pursuitActivated = false; 
@@ -674,7 +644,7 @@ void turnOffVisualServo()
     else
     {
         // Visual servo is still active here...
-        ROS_FATAL("PursuitSM::updateStatus - Unable to deactivate visual servo.");
+        ROS_FATAL("PursuitSM::updateState - Unable to deactivate visual servo.");
     }
 }
 
@@ -684,31 +654,37 @@ void updateState()
     // If visual servo is inactive, deactivate state machine
     // Visual servo can be inactive in state OFF and SEARCH.
     if (_challengeTime > _challengeTimeout && _currentState != PursuitState::LAND && _currentState != PursuitState::END){
-        ROS_INFO("PursuitSM::updateStatus - LAND state activated. Going to LAND GPS point.");
-        _searchTrajectoryFlag.data = true;
+        ROS_INFO("PursuitSM::updateState - LAND state activated. Going to GPS landing point.");
+        _requestTrajectoryFlag.data = true;
         requestLandTrajectory();
         ros::Duration(1.0).sleep();
+
         _currentState = PursuitState::LAND;
+
         return;
     }
 
-    if (_currentState == PursuitState::LAND && !_toppStatus.data){
+    if (_currentState == PursuitState::LAND & !_publishingTrajectory & _trajectoryExecuted){
         std_srvs::SetBool::Request landRequest;
         std_srvs::SetBool::Response landResponse;
-        ros::Duration(2.0).sleep();
+
+        ros::Duration(2.0).sleep(); // yasto ovaj sleep
+
         ROS_WARN("PursuitSM::updateStatus - Calling LAND service.");
         landRequest.data = true;
-        if (!_landClient.call(landRequest, landResponse)) {
-            ROS_FATAL("MasterPickupControl::land_uav - call to LAND service failed");
-            return;
-        }
 
-        if (!landResponse.success) {
-            ROS_FATAL("MasterPickupControl::land_uav - LAND request failed.");
+        if (!_landClient.call(landRequest, landResponse)) {
+            ROS_FATAL("PursuitSM:::land_uav - call to LAND service failed");
             return;
         }
-        ROS_INFO("MasterPickupControl::land_uav - LAND request succesfful."); 
+        if (!landResponse.success) {
+            ROS_FATAL("PursuitSM:::land_uav - LAND request failed.");
+            return;
+        }
+        ROS_INFO("PursuitSM:::land_uav - LAND request succesfful.");
+
         _currentState = PursuitState::END;
+
         return;
     }
 
@@ -723,15 +699,16 @@ void updateState()
         _collectTime = 0;
         _followingStartTime = 0;
         turnOffVisualServo();
-        _searchTrajectoryFlag.data = false;
+        _requestTrajectoryFlag.data = false;
         _inferenceEnabled.data = true;
-        ROS_WARN("PursuitSM::updateStatus - OFF State activated.");
+        ROS_WARN("PursuitSM::updateState - OFF State activated.");
         return;
     }
 
-    if( _currentState == OFF && !_gpsPursuitActivated && _readyForPursuit && !_gpsPursuitFinished && !_interceptionActivated){
-        ROS_INFO("PursuitSM::updateStatus - TakeOff successful. Increase height.");
-        _searchTrajectoryFlag.data = true;
+    if( _currentState == PursuitState::OFF && !_gpsPursuitActivated && _readyForPursuit && !_gpsPursuitFinished && !_interceptionActivated)
+    {
+        ROS_INFO("PursuitSM::updateStatus- TakeOff successful. Increase height.");
+        _requestTrajectoryFlag.data = true;
         requestHeightTrajectory();
         ros::Duration(1.0).sleep();
         _gpsPursuitActivated = true;
@@ -739,57 +716,61 @@ void updateState()
 
     }
 
-    if (_currentState == PursuitState::OFF && _gpsPursuitActivated && !_toppStatus.data){
-        // Clear trajectory
-        _searchTrajectoryFlag.data = false;
-        _pubSearchTrajectoryFlag.publish(_searchTrajectoryFlag);
+    if (_currentState == PursuitState::OFF && _gpsPursuitActivated && !_publishingTrajectory)
+    {
+        clearTrajectory();
 
-        ROS_INFO("PursuitSM::updateStatus - GPS_POSITION status activated.");
-        ROS_WARN("PursuitSM::updateStatus - Going to GPS position num : %d", _gpsPointIndex + 1);
+        ROS_INFO("PursuitSM::updateState - GPS_POSITION state activated.");
 
-        _searchTrajectoryFlag.data = true;
+        _requestTrajectoryFlag.data = true;
         _currentState = PursuitState::GPS_POSITION;
         return;
     }
 
-    if (_currentState == PursuitState::GPS_POSITION && _gpsPursuitActivated){
-        ROS_WARN("PursuitSM::updateStatus - Trajectory to watching point.");
-        ROS_INFO("PursuitSM::updateStatus - COLLECT_POINTS status activated.");
-
+    if (_currentState == PursuitState::GPS_POSITION && _gpsPursuitActivated)
+    {
+        // First request trajectory and then increase GPS Point Index because array of points starts from zero.
         requestGPSPointTrajectory();
         ros::Duration(1.0).sleep();
+
         _gpsPointIndex = _gpsPointIndex + 1;
         _currentState = PursuitState::COLLECT_POINTS;
         _collectTime = 0;
+
+        ROS_WARN("PursuitSM::updateStatus - Trajectory to GPS point no.%d.", _gpsPointIndex);
         return;
     }
 
-    if(_currentState == PursuitState::COLLECT_POINTS && !_gpsPursuitFinished){
+    if(_currentState == PursuitState::COLLECT_POINTS && !_gpsPursuitFinished)
+    {
+        if (_trajectoryExecuted)
+        {
+            // Collect timeout is going to be longer than stated because we overshoot the final point of trajectory.
+            ROS_INFO_THROTTLE(2 * _collectTimeout , "PursuitSM::updateState - COLLECT_POINTS state activated.");
 
-        if (!_toppStatus.data){
             _collectTime += 1/_rate;
 
-            if (_collectTime > _collectTimeout){
-                // Prepare backup points
-                if (_gpsPointIndex == 4){
-                    _point2 = _currentEstimatedTargetPoint;
-                    _point2In = true;
-                    std::cout << _point2 << std::endl;
-                }
+            if (_collectTime > _collectTimeout)
+            {
+                if (_gpsPointIndex < _numOfGPSPoints)
+                {
+                    ROS_INFO("PursuitSM::updateStatus- I finished collecting trajectory points in %d / %d GPS point.", _gpsPointIndex, _numOfGPSPoints);
 
-                // Note: GPS Point index starts from 0
-                if (_gpsPointIndex < _numOfGPSPoints){
-                    ROS_INFO("PursuitSM::updateStatus - I finished collecting trajectory points in %d / %d GPS point.", _gpsPointIndex, _numOfGPSPoints);
-                    _currentState = PursuitState::OFF;
-                    _searchTrajectoryFlag.data = false;
+                    clearTrajectory();
+                    _requestTrajectoryFlag.data = true;
+                    _currentState = PursuitState::GPS_POSITION;
+
+                    ROS_INFO("PursuitSM::updateState - GPS_POSITION state activated.");
                 }
                 else{
-                    ROS_INFO("PursuitSM::updateStatus - Finished collecting points in last GPS point");
+                    ROS_INFO("PursuitSM::updateStatus - Finished collecting points in last GPS point.");
+
                     _currentState = PursuitState::INTERCEPTION;
                     _gpsPursuitActivated = false;
                     _gpsPursuitFinished = true;
                     _interceptionActivated = true;
-                    _searchTrajectoryFlag.data = false;
+                    _requestTrajectoryFlag.data = false;
+
                     return;
                 }
             }
@@ -804,16 +785,16 @@ void updateState()
     }
 
     if ( _currentState == PursuitState::INTERCEPTION && !_interceptionSent){
-        ROS_INFO("PursuitSM::updateStatus - INTERCEPTION state.");
-        _searchTrajectoryFlag.data = true;
-        _pubSearchTrajectoryFlag.publish(_searchTrajectoryFlag);
+        ROS_INFO("PursuitSM::updateState - INTERCEPTION state.");
+        _requestTrajectoryFlag.data = true;
+        _pubSearchTrajectoryFlag.publish(_requestTrajectoryFlag);
         if(_hausdorffStatus && _hausdorffIn){
             // Estimated lemniscate point
             ROS_WARN("PursuitSM::updateStatus - Interception at lemniscate.");
             requestInterceptionTrajectory(_hausdorffPoint);
         }
         else if (_backupIn){
-            ROS_WARN("PursuitSM::updateStatus - Interception at backup point.");
+            ROS_WARN("PursuitSM::updateState - Interception at backup point.");
             requestInterceptionTrajectory(_backupPoint);
         }
         else if (_point2In && _estimatedEverReceived){
@@ -824,7 +805,7 @@ void updateState()
             ROS_FATAL("PursuitSM::updateStatus - Never receieved point. Go to MANUAL !!!!!");
 
         }
-        ROS_INFO("PursuitSM::updateStatus - go to WAIT.");
+        ROS_INFO("PursuitSM::updateState - go to WAIT.");
         _currentState == PursuitState::WAIT;
         _interceptionSent = true;
         return;
@@ -965,8 +946,9 @@ void run()
     ros::Rate loopRate(_rate);
     double dt = 1.0 / _rate;
 
-    _searchTrajectoryFlag.data = false;
-    _pubSearchTrajectoryFlag.publish(_searchTrajectoryFlag);
+    _requestTrajectoryFlag.data = false;
+    _pubSearchTrajectoryFlag.publish(_requestTrajectoryFlag);
+
     ros::spinOnce();
     ros::Duration(1.0).sleep();
 
@@ -977,7 +959,7 @@ void run()
         if(_readyForPursuit){
             checkDetection();
             updateState();
-            _pubSearchTrajectoryFlag.publish(_searchTrajectoryFlag);
+            _pubSearchTrajectoryFlag.publish(_requestTrajectoryFlag);
             _pubInferenceEnabled.publish(_inferenceEnabled);
             // publishOffsets();
             // publishErrors();
@@ -1016,11 +998,14 @@ private:
     ros::Publisher _pubEstimatorStart;
     bool _hausdorffIn = false, _backupIn = false, _point2In = false;
     bool _interceptionSent = false, _estimatedEverReceived = false;
+    bool _trajectoryExecuted = false, _publishingTrajectory;
+
+    ros::Subscriber _subTrajectoryExecuted;
 
     /* Trajectory */
     ros::Publisher _pubSearchTrajectoryFlag;
     ros::Subscriber _subToppStatus;
-    std_msgs::Bool _searchTrajectoryFlag, _toppStatus;
+    std_msgs::Bool _requestTrajectoryFlag;
 
     /* Error publishers */
     ros::Publisher _pubXError, _pubYError, _pubZError, _pubYawError;
@@ -1038,7 +1023,6 @@ private:
 
     /* Confidence subscribers */
     ros::Subscriber _subUAVPursuitConfident, _subBALLPursuitConfident;
-    ros::Subscriber _subUAVDistanceConfident;
 
     /* Interception subscribers*/
     ros::Subscriber _subHausdorffEstimator, _subCurrentEstimatedTargetPoint, _subEstimatorStatus, _subBackupEstimator;
@@ -1057,7 +1041,7 @@ private:
 
     /* Parameters */
     double _currDistanceReference, _currHeightReference, _currYawReference;
-    bool _start_following_uav = false, _isDetectionActive = false, _kf_distance_active = false;
+    bool _start_following_uav = false, _isDetectionActive = false;
     float _uav_distance_offset, _ball_distance_offset;
     float _uav_z_offset, _yawDeadZoneThreshold;
     ros::Time _time_last_detection_msg;
