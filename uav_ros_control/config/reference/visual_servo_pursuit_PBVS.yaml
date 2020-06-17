@@ -3,18 +3,9 @@ visual_servo:
   camera_fov: 90
   compensate_roll_and_pitch: false
   yaw_added_offset: 0.0
-  filter_k: 0.05
 
   rate_limiters:
-    distance:
-      rate_limiter_R: 1.0
-      rate_limiter_F: -2.0
-      rate_limiter_T: 0.02
-
-    height:
-      rate_limiter_R: 0.5
-      rate_limiter_T: 0.02
-
+    enable: false
     yaw:
       rate_limiter_R: 0.1
       rate_limiter_T: 0.02
@@ -36,8 +27,8 @@ visual_servo:
     kp:  3.0
     ki:  0.01
     kd:  0
-    lim_low: -10.0
-    lim_high: 10.0
+    lim_low: -20.0
+    lim_high: 20.0
     deadzone_y: 0
 
   pid_z:  

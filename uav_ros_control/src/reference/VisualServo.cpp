@@ -5,7 +5,6 @@
 #include <uav_ros_control/reference/VisualServo.h>
 #include <uav_ros_control/filters/NonlinearFilters.h>
 #include <math.h>
-#include <math.h>
 
 // Define all parameter paths here
 #define VS_P_GAIN_X_PARAM          "reference/p_gain_x"
@@ -66,7 +65,6 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _pubZError = nh.advertise<std_msgs::Float32>("visual_servo/z_error", 1);
   _pubIsEnabledTopic = nh.advertise<std_msgs::Bool>("visual_servo/is_enabled", 1);
   _pubMoveLeft = nh.advertise<std_msgs::Float32>("visual_servo/move_left", 1);
-  _pubChangeYaw = nh.advertise<std_msgs::Float32>("visual_servo/change_yaw", 1);
   _pubMoveForward = nh.advertise<std_msgs::Float32>("visual_servo/move_forward", 1);
   _pubMoveUp = nh.advertise<std_msgs::Float32>("visual_servo/move_up", 1);
   
@@ -76,13 +74,13 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
 
   // DEBUG
   _pubXAdd = nh.advertise<std_msgs::Float32>("debug/x_added", 1);
-
   _pubYAdd = nh.advertise<std_msgs::Float32>("debug/y_added", 1);
 
-  // RATE LIMITER
-  _pubMoveForwardLimited = nh.advertise<std_msgs::Float32>("visual_servo/move_forward_limited", 1);
-  _pubMoveUpLimited = nh.advertise<std_msgs::Float32>("visual_servo/move_up_limited", 1);
-  _pubChangeYawLimited = nh.advertise<std_msgs::Float32>("visual_servo/change_yaw_limited", 1);
+  _pubChangeYawUnlimited = nh.advertise<std_msgs::Float32>("visual_servo/debug/yaw_unlimited", 1);
+  _pubChangeYawLimited = nh.advertise<std_msgs::Float32>("visual_servo/debug/yaw_limited", 1);
+
+  _pubPositionUnlimited = nh.advertise<geometry_msgs::Point>("visual_servo/debug/position_unlimited", 1);
+  _pubPositionLimited = nh.advertise<geometry_msgs::Point>("visual_servo/debug/position_limited", 1);
 
   // Define Subscribers
   _subOdom =
@@ -119,11 +117,6 @@ VisualServo::VisualServo(ros::NodeHandle& nh) {
   _new_point.transforms = std::vector<geometry_msgs::Transform>(1);
   _new_point.velocities = std::vector<geometry_msgs::Twist>(1);
   _new_point.accelerations = std::vector<geometry_msgs::Twist>(1);
-
-  //
-  // MoveForwardRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
-  // ROS_FATAL("Initializing rate limiter");
-
 }
 
 VisualServo::~VisualServo() {}
@@ -144,12 +137,7 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     nh.getParam("visual_servo/pid_z/deadzone_z", _deadzone_z) &&
     nh.getParam("visual_servo/pid_yaw/deadzone_yaw", _deadzone_yaw) &&
     nh.getParam("visual_servo/yaw_added_offset", _yaw_added_offset) &&
-    nh.getParam("visual_servo/filter_k", k) &&
-    nh.getParam("visual_servo/rate_limiters/distance/rate_limiter_R", _DistanceRateLimiter_R) &&
-    nh.getParam("visual_servo/rate_limiters/distance/rate_limiter_T", _DistanceRateLimiter_T) &&
-    nh.getParam("visual_servo/rate_limiters/distance/rate_limiter_F", _DistanceRateLimiter_F) &&
-    nh.getParam("visual_servo/rate_limiters/height/rate_limiter_R", _HeightRateLimiter_R) &&
-    nh.getParam("visual_servo/rate_limiters/height/rate_limiter_T", _HeightRateLimiter_T) &&
+    nh.getParam("visual_servo/rate_limiters/enable", _enableRateLimiters) &&
     nh.getParam("visual_servo/rate_limiters/yaw/rate_limiter_R", _YawRateLimiter_R) &&
     nh.getParam("visual_servo/rate_limiters/yaw/rate_limiter_T", _YawRateLimiter_T) &&
     nh.getParam("visual_servo/rate_limiters/main/rate_limiter_R", _SetpointRateLimiter_R) &&
@@ -219,11 +207,8 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
     cfg.deadzone_yaw = _deadzone_yaw;
   }
 
-  cfg.distance_R = _DistanceRateLimiter_R;
-  cfg.distance_T = _DistanceRateLimiter_T;
-  cfg.distance_F = _DistanceRateLimiter_F;
-  cfg.height_R = _HeightRateLimiter_R;
-  cfg.height_T = _HeightRateLimiter_T;
+  cfg.enable = _enableRateLimiters;
+
   cfg.yaw_R = _YawRateLimiter_R;
   cfg.yaw_T = _YawRateLimiter_T;
 
@@ -233,7 +218,6 @@ void uav_reference::VisualServo::initializeParameters(ros::NodeHandle& nh)
   cfg.camera_fov = _camera_fov;
   cfg.compensate_roll_and_pitch = _compensate_roll_and_pitch;
   cfg.yaw_added_offset = _yaw_added_offset;
-  cfg.filter_k = k;
   _VSConfigServer.updateConfig(cfg);
 }
 
@@ -261,8 +245,6 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
   }
   ROS_INFO("UAV VisualServo - First carrot reference received.");
 
-  MoveForwardRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, _DistanceRateLimiter_F, 0.0);
-  MoveUpRateLimiter.init(_DistanceRateLimiter_T, _DistanceRateLimiter_R, -_DistanceRateLimiter_R, 0.0);
   ChangeYawRateLimiter.init(_YawRateLimiter_T, _YawRateLimiter_R, -_YawRateLimiter_R, 0.0);
 
   XRateLimiter.init(_SetpointRateLimiter_T, _SetpointRateLimiter_R, -_SetpointRateLimiter_R, 0.0);
@@ -272,7 +254,7 @@ bool uav_reference::VisualServo::startVisualServoServiceCb(std_srvs::SetBool::Re
   ZRateLimiter.init(_SetpointRateLimiter_T, _SetpointRateLimiter_R, -_SetpointRateLimiter_R, 0.0);
   ZRateLimiter.initialCondition(_currCarrotReference.transforms[0].translation.z, _currCarrotReference.transforms[0].translation.z);
 
-  ROS_INFO("Initializing rate limiters");
+  ROS_INFO("UAV VisualServo - Initializing rate limiters");
 
   _x_frozen = false;
   _y_frozen = false;
@@ -346,13 +328,11 @@ void VisualServo::visualServoParamsCb(uav_ros_control::VisualServoParametersConf
   _compensate_roll_and_pitch = configMsg.compensate_roll_and_pitch;
   _camera_fov = configMsg.camera_fov * M_PI / 180.0;
   _yaw_added_offset = configMsg.yaw_added_offset;
-  k = configMsg.filter_k;
 
-  _DistanceRateLimiter_R = configMsg.distance_R;
-  _DistanceRateLimiter_T = configMsg.distance_T;
-  _DistanceRateLimiter_F - configMsg.distance_F;
-  _HeightRateLimiter_R = configMsg.height_R;
-  _HeightRateLimiter_T = configMsg.height_T;
+  _enableRateLimiters = configMsg.enable;
+  ROS_WARN_COND(_enableRateLimiters, "VisualServo - Rate Limiters enabled!");
+
+
   _YawRateLimiter_R = configMsg.yaw_R;
   _YawRateLimiter_T = configMsg.yaw_T;
 
@@ -469,14 +449,6 @@ void VisualServo::zOffsetCb(const std_msgs::Float32 &msg){
 }
 
 void VisualServo::updateRateLimiters(){
-  MoveForwardRateLimiter.setR(_DistanceRateLimiter_R);
-  MoveForwardRateLimiter.setF(_DistanceRateLimiter_F);
-  MoveForwardRateLimiter.setSampleTime(_DistanceRateLimiter_T);
-
-  MoveUpRateLimiter.setR(_HeightRateLimiter_R);
-  MoveUpRateLimiter.setF(- _HeightRateLimiter_R);
-  MoveUpRateLimiter.setSampleTime(_HeightRateLimiter_T);
-
   ChangeYawRateLimiter.setR(_YawRateLimiter_R);
   ChangeYawRateLimiter.setF(- _YawRateLimiter_R);
   ChangeYawRateLimiter.setSampleTime(_YawRateLimiter_T);
@@ -505,88 +477,81 @@ void VisualServo::updateSetpoint() {
 
   double _newXSetpoint = 0.0, _newYSetpoint = 0.0, _newZSetpoint = 0.0;
 
-  if (!_x_frozen) move_left = _x_axis_PID.compute(_offset_x, _error_x, 1 / _rate);
-  // PT1
-  // if (!_y_frozen){
-  //   move_forward  = _y_axis_PID.compute(_offset_y, _error_y, 1 / _rate);
-  //   move_forward_filtered = k * move_forward + (1 - k) * move_forward_old;
-  //   move_forward_old = move_forward_filtered;
-  // } 
-  // Rate Limiter
+  if (!_x_frozen) {
+    move_left = _x_axis_PID.compute(_offset_x, _error_x, 1 / _rate);
+  }
+
   if (!_y_frozen){
     move_forward  = _y_axis_PID.compute(_offset_y, _error_y, 1 / _rate);
-
-    // MoveForwardRateLimiter.setInput(move_forward);
-    // move_forward_limited = MoveForwardRateLimiter.getData();
   } 
-
-  // if (!_z_frozen) move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
 
   if (!_z_frozen){
     move_up = _z_axis_PID.compute(_offset_z, _error_z, 1 / _rate);
-
-    // MoveUpRateLimiter.setInput(move_up);
-    // move_up_limited = MoveUpRateLimiter.getData();
   } 
-
-  // if (!_yaw_frozen) change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
 
   if (!_yaw_frozen) {
     change_yaw = _yaw_PID.compute(0, _error_yaw, 1 / _rate);
-
-    ChangeYawRateLimiter.setInput(change_yaw);
-    change_yaw_limited = ChangeYawRateLimiter.getData();
-
   }
 
   _newXSetpoint = _uavPos[0] + move_forward * cos(_uavYaw + _yaw_added_offset) - move_left * sin(_uavYaw + _yaw_added_offset);
   _newYSetpoint = _uavPos[1] + move_forward * sin(_uavYaw + _yaw_added_offset) + move_left * cos(_uavYaw + _yaw_added_offset);
   _newZSetpoint = _uavPos[2] + move_up;
 
-  XRateLimiter.setInput(_newXSetpoint);
-  YRateLimiter.setInput(_newYSetpoint);
-  ZRateLimiter.setInput(_newZSetpoint);
+  if (_enableRateLimiters){
+    XRateLimiter.setInput(_newXSetpoint);
+    YRateLimiter.setInput(_newYSetpoint);
+    ZRateLimiter.setInput(_newZSetpoint);
+    ChangeYawRateLimiter.setInput(change_yaw);
 
-  // XRateLimiter.initialCondition(_newXSetpoint, _setpointPosition[0]);
-  // YRateLimiter.initialCondition(_newYSetpoint, _setpointPosition[1]);
-  // ZRateLimiter.initialCondition(_newZSetpoint, _setpointPosition[2]);
+    _setpointPosition[0] = XRateLimiter.getData();
+    _setpointPosition[1] = YRateLimiter.getData();
+    _setpointPosition[2] = ZRateLimiter.getData();
+    change_yaw_limited = ChangeYawRateLimiter.getData();
 
-  _setpointPosition[0] = XRateLimiter.getData();
-  _setpointPosition[1] = YRateLimiter.getData();
-  _setpointPosition[2] = ZRateLimiter.getData();
+    _setpointYaw = _uavYaw + change_yaw_limited;
 
-  // _setpointPosition[0] = _uavPos[0] + move_forward_limited * cos(_uavYaw + _yaw_added_offset);
-  // _setpointPosition[0] -= move_left * sin(_uavYaw + _yaw_added_offset);
-  // _setpointPosition[1] = _uavPos[1] + move_forward_limited * sin(_uavYaw + _yaw_added_offset);
-  // _setpointPosition[1] += move_left * cos(_uavYaw + _yaw_added_offset);
-  // _setpointPosition[2] = _uavPos[2] + move_up_limited;
+    /* Prepare msgs and publish for easier debugging */
+    // Position debug
+    _positionLimitedMsg.x = _setpointPosition[0];
+    _positionLimitedMsg.y = _setpointPosition[1];
+    _positionLimitedMsg.z = _setpointPosition[2];
 
-  _setpointYaw = _uavYaw + change_yaw_limited;
+    _pubPositionLimited.publish(_positionLimitedMsg);
 
+
+    // Yaw debug
+    _yawLimitedMsg.data = change_yaw_limited;
+
+    _pubChangeYawLimited.publish(_yawLimitedMsg);
+  }
+  else{
+    _setpointPosition[0] = _newXSetpoint;
+    _setpointPosition[1] = _newYSetpoint;
+    _setpointPosition[2] = _newZSetpoint;
+    _setpointYaw = _uavYaw + change_yaw;
+  }
+
+  // Publish msgs for unlimited setpoint
+  _positionUnlimitedMsg.x = _newXSetpoint;
+  _positionUnlimitedMsg.y = _newYSetpoint;
+  _positionUnlimitedMsg.z = _newZSetpoint;
+  _pubPositionUnlimited.publish(_positionUnlimitedMsg);
+
+  _yawUnlimitedMsg.data = change_yaw;
+  _pubChangeYawUnlimited.publish(_yawUnlimitedMsg);
   // MSGS
   _moveLeftMsg.data = move_left;
-  _changeYawMsg.data = change_yaw;
   _moveUpMsg.data = -move_up;
   _moveForwardMsg.data = move_forward;
 
-  _moveForwardLimitedMsg.data = move_forward_limited;
-  _moveUpLimitedMsg.data = -move_up_limited;
-  _changeYawLimitedMsg.data = change_yaw_limited;
-
   // PUB
   _pubMoveLeft.publish(_moveLeftMsg);
-  _pubChangeYaw.publish(_changeYawMsg);
   _pubMoveForward.publish(_moveForwardMsg);
   _pubMoveUp.publish(_moveUpMsg);
   _moveLeftMsg.data = _setpointPosition[0]- _uavPos[0];
   _pubXAdd.publish(_moveLeftMsg);
   _moveLeftMsg.data = _setpointPosition[1]- _uavPos[1];
   _pubYAdd.publish(_moveLeftMsg);
-
-  _pubMoveForwardLimited.publish(_moveForwardLimitedMsg);
-  _pubMoveUpLimited.publish(_moveUpLimitedMsg);
-  _pubChangeYawLimited.publish(_changeYawLimitedMsg);
-
 
 }
 

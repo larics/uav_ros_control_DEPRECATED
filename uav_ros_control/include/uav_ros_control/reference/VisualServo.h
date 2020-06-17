@@ -109,10 +109,6 @@ namespace uav_reference {
       bool _visualServoEnabled = false,  _compensate_roll_and_pitch = false;
       bool _x_frozen = false, _y_frozen = false, _z_frozen = false,  _yaw_frozen = false;
 
-      // Filter
-      float k = 0.0;
-      double move_forward_old = 0.0;
-
       trajectory_msgs::MultiDOFJointTrajectoryPoint _currCarrotReference;
 
       /** Publishers */
@@ -124,8 +120,16 @@ namespace uav_reference {
       std_msgs::Bool _boolMsg;
 
       // Topics for direct rotor control
-      ros::Publisher _pubMoveLeft, _pubMoveForward, _pubChangeYaw, _pubMoveUp;
-      std_msgs::Float32 _moveLeftMsg, _moveForwardMsg, _changeYawMsg, _moveUpMsg;
+      ros::Publisher _pubMoveLeft, _pubMoveForward, _pubMoveUp;
+      std_msgs::Float32 _moveLeftMsg, _moveForwardMsg, _moveUpMsg;
+
+      // Position VS (+ RL) output
+      ros::Publisher _pubPositionUnlimited, _pubPositionLimited;
+      geometry_msgs::Point _positionUnlimitedMsg, _positionLimitedMsg;
+
+      // Yaw VS (+ RL) output
+      ros::Publisher _pubChangeYawUnlimited, _pubChangeYawLimited;
+      std_msgs::Float32 _yawUnlimitedMsg, _yawLimitedMsg;
 
       // Topics for debugging
       ros::Publisher _pubChangeYawDebug, _pubYawErrorDebug, _pubXAdd, _pubYAdd;
@@ -147,24 +151,14 @@ namespace uav_reference {
       std_srvs::SetBool::Request _setBoolRequest;
       std_srvs::SetBool::Response _setBoolResponse;
 
-      // RateLimiter
-      RateLimiter MoveForwardRateLimiter;
-      float _DistanceRateLimiter_R, _DistanceRateLimiter_T, _DistanceRateLimiter_F;
-      ros::Publisher _pubMoveForwardLimited;
-
-      RateLimiter MoveUpRateLimiter;
-      float _HeightRateLimiter_R, _HeightRateLimiter_T;
-      ros::Publisher _pubMoveUpLimited;
-
+      // Rate Limiters
+      bool _enableRateLimiters;
+      
       RateLimiter ChangeYawRateLimiter;
       float _YawRateLimiter_R, _YawRateLimiter_T;
-      ros::Publisher _pubChangeYawLimited;
 
       RateLimiter XRateLimiter, YRateLimiter, ZRateLimiter;
       float _SetpointRateLimiter_T, _SetpointRateLimiter_R;
-
-      std_msgs::Float32 _moveForwardLimitedMsg, _moveUpLimitedMsg, _changeYawLimitedMsg;
-
 
       void visualServoParamsCb(
           uav_ros_control::VisualServoParametersConfig& configMsg, uint32_t level);
