@@ -9,5 +9,5 @@ int main(int argc, char** argv)
 	std::shared_ptr<uav_controller::CascadePID> carrotRefObj
 		{ new uav_controller::CascadePID(nh) };
     
-    uav_controller::runDefault(*carrotRefObj, nh);
+    uav_controller::runDefault_yawrate(*carrotRefObj, nh);
 }

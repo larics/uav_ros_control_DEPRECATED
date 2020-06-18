@@ -49,6 +49,8 @@ namespace uav_controller
 		 */
 		void resetVelocityPID();
 
+		double getYawRef();
+
 	private:
 		
 		/** 
@@ -136,7 +138,12 @@ namespace uav_controller
 	/**
 	 * Default position control program
 	 */
-	void runDefault(uav_controller::CascadePID& cc, ros::NodeHandle& nh);	
+	void runDefault(uav_controller::CascadePID& cc, ros::NodeHandle& nh);
+	
+	/**
+	 * Default position control program
+	 */
+	void runDefault_yawrate(uav_controller::CascadePID& cc, ros::NodeHandle& nh);	
 }
 
 #endif /** CASCADE_PID_H */

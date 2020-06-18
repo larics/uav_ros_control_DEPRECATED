@@ -271,6 +271,11 @@ void uav_controller::CascadePID::calculateAttThrustSp(double dt)
 	_velCurrPub.publish(vel);
 }
 
+double uav_controller::CascadePID::getYawRef()
+{
+	return _yawRef;
+}
+
 void uav_controller::runDefault(
 	uav_controller::CascadePID& cascadeObj, ros::NodeHandle& nh)
 {
@@ -284,6 +289,27 @@ void uav_controller::runDefault(
 		if (cascadeObj.activationPermission()) {
 			cascadeObj.calculateAttThrustSp(dt);
 			cascadeObj.publishAttitudeTarget(MASK_IGNORE_RPY_RATE);
+		} else {
+			ROS_FATAL_THROTTLE(2, "CascadePID::runDefault - controller inactive");
+		}
+		cascadeObj.publishEulerSp();
+		loopRate.sleep();
+	}
+}
+
+void uav_controller::runDefault_yawrate(
+	uav_controller::CascadePID& cascadeObj, ros::NodeHandle& nh)
+{
+	double rate = 50;
+	double dt = 1.0/rate;
+	ros::Rate loopRate(rate);
+	
+	while (ros::ok())
+	{
+		ros::spinOnce();
+		if (cascadeObj.activationPermission()) {
+			cascadeObj.calculateAttThrustSp(dt);
+			cascadeObj.publishAttitudeTarget(MASK_IGNORE_RP_RATE, cascadeObj.getYawRef() - cascadeObj.getCurrentYaw());
 		} else {
 			ROS_FATAL_THROTTLE(2, "CascadePID::runDefault - controller inactive");
 		}
