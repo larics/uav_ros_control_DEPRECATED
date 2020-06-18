@@ -5,7 +5,7 @@
     <arg name="config"          default="joy_control_input.config.yaml"/>
     <arg name="carrot_index"    default="5"/>
     <arg name="carrot_enable"   default="1"/>
-    <arg name="manual_takeoff"  default="false"/>
+    <arg name="manual_takeoff"  default="true"/>
 
     <group ns="$(arg namespace)">
         <!-- Load joy configuration file-->
