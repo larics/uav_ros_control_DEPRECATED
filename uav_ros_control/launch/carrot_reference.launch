@@ -33,5 +33,5 @@
     </group>
 
     <!--Include file for multirotor_transformations rc_to_joy-->
-    <!--include file="$(find multirotor_transformations)/launch/rc_to_joy.launch"/-->
+    <include file="$(find multirotor_transformations)/launch/rc_to_joy.launch"/>
 </launch>
