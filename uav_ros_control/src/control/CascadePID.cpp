@@ -309,6 +309,7 @@ void uav_controller::runDefault_yawrate(
 		ros::spinOnce();
 		if (cascadeObj.activationPermission()) {
 			cascadeObj.calculateAttThrustSp(dt);
+			cascadeObj.overrideYawTarget(0);
 			cascadeObj.publishAttitudeTarget(MASK_IGNORE_RP_RATE, cascadeObj.getYawRef() - cascadeObj.getCurrentYaw());
 		} else {
 			ROS_FATAL_THROTTLE(2, "CascadePID::runDefault - controller inactive");
