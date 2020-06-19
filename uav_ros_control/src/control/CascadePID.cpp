@@ -15,6 +15,7 @@
 #define PID_VX_PARAM "control/vel_x"
 #define PID_VY_PARAM "control/vel_y"
 #define PID_VZ_PARAM "control/vel_z"
+#define PID_YAW_RATE_PARAM "control/yaw_rate"
 
 #define FFGAIN_VEL_X_PARAM "control/ff_gain/velocity/x"
 #define FFGAIN_VEL_Y_PARAM "control/ff_gain/velocity/y"
@@ -33,7 +34,8 @@ uav_controller::CascadePID::CascadePID(ros::NodeHandle& nh) :
     _posZPID {new PID ("Position - z")},
     _velXPID {new PID ("Velocity - x")},
     _velYPID {new PID ("Velocity - y")},
-    _velZPID {new PID ("Velocity - z")}, 
+    _velZPID {new PID ("Velocity - z")},
+    _yawRatePID {new PID ("Yaw rate")},
     uav_controller::ControlBase(nh)
 {
 	// Initialize class parameters
@@ -64,6 +66,7 @@ bool uav_controller::CascadePID::intResetServiceCb(std_srvs::Empty::Request& req
 	ROS_WARN("Resetting all PID controllers");
 	resetPositionPID();
 	resetVelocityPID();
+  _yawRatePID->resetIntegrator();
 	return true;
 }
 	
@@ -91,6 +94,12 @@ void uav_controller::CascadePID::positionParamsCb(
 		uint32_t level)
 {
 	ROS_WARN("CascadePID::parametersCallback");
+
+  _yawRatePID->set_kp(configMsg.yaw_rate_p);
+  _yawRatePID->set_ki(configMsg.yaw_rate_i);
+  _yawRatePID->set_kd(configMsg.yaw_rate_d);
+  _yawRatePID->set_lim_high(configMsg.yaw_rate_lim_high);
+  _yawRatePID->set_lim_low(configMsg.yaw_rate_lim_low);
 
 	_posYPID->set_kp(configMsg.k_p_xy);
 	_posYPID->set_kd(configMsg.k_d_xy);
@@ -142,7 +151,13 @@ void uav_controller::CascadePID::positionParamsCb(
 void uav_controller::CascadePID::setPositionReconfigureParams(
 	uav_ros_control::PositionControlParametersConfig& config)
 {
-    ROS_WARN("CascadePID::setReconfigureParameters");
+  ROS_WARN("CascadePID::setReconfigureParameters");
+
+  config.yaw_rate_p = _yawRatePID->get_kp();
+  config.yaw_rate_i = _yawRatePID->get_ki();
+  config.yaw_rate_d = _yawRatePID->get_kd();
+  config.yaw_rate_lim_high = _yawRatePID->get_lim_high();
+  config.yaw_rate_lim_low = _yawRatePID->get_lim_low();
 
 	config.k_p_xy = _posYPID->get_kp();
 	config.k_i_xy = _posYPID->get_ki();
@@ -188,6 +203,7 @@ void uav_controller::CascadePID::initializeParameters(ros::NodeHandle& nh)
 	_velXPID->initializeParameters(nh, PID_VX_PARAM);
 	_posZPID->initializeParameters(nh, PID_Z_PARAM);
 	_velZPID->initializeParameters(nh, PID_VZ_PARAM);
+  _yawRatePID->initializeParameters(nh, PID_YAW_RATE_PARAM);
 
 	bool initialized = nh.getParam(HOVER_PARAM, _hoverThrust)
 		&& nh.getParam(FFGAIN_VEL_X_PARAM, _ffGainVelocityX)
@@ -276,6 +292,21 @@ double uav_controller::CascadePID::getYawRef()
 	return _yawRef;
 }
 
+double uav_controller::CascadePID::calculateYawRateSetpoint(double dt)
+{
+  auto yawRef = _yawRef;
+  auto yawMv = getCurrentYaw();
+  static constexpr auto tol = M_PI;
+
+  // Compensate for wrapping to [-PI, PI]
+  if (yawRef - yawMv > tol) {
+    yawRef -= 2 * M_PI;
+  } else if (yawRef - yawMv < -tol) {
+		yawRef += 2 * M_PI;
+	}
+  return _yawRatePID->compute(yawRef, getCurrentYaw(), dt);
+}
+
 void uav_controller::runDefault(
 	uav_controller::CascadePID& cascadeObj, ros::NodeHandle& nh)
 {
@@ -310,7 +341,8 @@ void uav_controller::runDefault_yawrate(
 		if (cascadeObj.activationPermission()) {
 			cascadeObj.calculateAttThrustSp(dt);
 			cascadeObj.overrideYawTarget(0);
-			cascadeObj.publishAttitudeTarget(MASK_IGNORE_RP_RATE, cascadeObj.getYawRef() - cascadeObj.getCurrentYaw());
+      const auto yawRateSetpoint = cascadeObj.calculateYawRateSetpoint(dt);
+			cascadeObj.publishAttitudeTarget(MASK_IGNORE_RP_RATE, yawRateSetpoint);
 		} else {
 			ROS_FATAL_THROTTLE(2, "CascadePID::runDefault - controller inactive");
 		}

@@ -49,7 +49,15 @@ namespace uav_controller
 		 */
 		void resetVelocityPID();
 
+		/**
+		 * Get yaw reference.
+		 */
 		double getYawRef();
+
+		/**
+		 * Calculate yaw rate setpoint.
+		 */
+		double calculateYawRateSetpoint(double dt);
 
 	private:
 		
@@ -100,6 +108,9 @@ namespace uav_controller
 
 		/** PID controller for velocity along the y-axis */
 		std::unique_ptr<PID> _velZPID;
+
+		/** PID Controller for yaw-rate */
+		std::unique_ptr<PID> _yawRatePID;
 
 		/** Value from 0 to 1, hover thrust */
 		double _hoverThrust = 0;
