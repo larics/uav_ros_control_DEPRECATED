@@ -44,7 +44,7 @@ control:
   pos_z:
     kp: 4
     ki: 0.1
-    kd: 1.25
+    kd: 0.0
     lim_low: -15.0
     lim_high: 15.0
 
