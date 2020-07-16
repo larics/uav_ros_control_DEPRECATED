@@ -47,7 +47,7 @@ class reconstructXYZ():
         self.camera_info.K = [674.0643310546875, 0.0, 655.4468994140625, 0.0, 674.0643310546875, 368.7719421386719, 0.0, 0.0, 1.0]
 
         # Create subscribers
-        rospy.Subscriber('/uav_object_tracking/uav/depth_kf', Float32, self.distance_callback)
+        # rospy.Subscriber('/uav_object_tracking/uav/depth_kf', Float32, self.distance_callback)
         rospy.Subscriber('/YOLODetection/tracked_detection', object, self.detection_callback)
         rospy.Subscriber('/yellow/mavros/global_position/local', Odometry, self.odometry_callback)
         rospy.Subscriber('/yellow/camera/color/camera_info', CameraInfo, self.camera_info_callback)
@@ -75,14 +75,14 @@ class reconstructXYZ():
 
     def camera_info_callback(self, data):
         self.camera_info = data
-
-    def distance_callback(self, data):
-        self.new_depth_data = True
-        self.depth_data = data
         
     def detection_callback(self, data):
         self.new_detection_data = True
         self.detection_data = data
+
+        self.depth_data.data = data.depth
+        if (np.isfinite(self.depth_data.data) and not math.isnan(self.depth_data.data)):
+            self.new_depth_data = True
 
     def odometry_callback(self, data):
         self.new_odometry_data = True
@@ -200,7 +200,7 @@ class reconstructXYZ():
 
         # Publish target position in UAV CS
         self.target_uav_cs = PointStamped()
-        self.target_uav_cs.header.frame_id = "bebop/base_link"
+        self.target_uav_cs.header.frame_id = "yellow/base_link"
         self.target_uav_cs.header.stamp = rospy.Time.now()
         self.target_uav_cs.point.x = Tuav_uav1[0,3]
         self.target_uav_cs.point.y = Tuav_uav1[1,3]
@@ -289,9 +289,6 @@ class reconstructXYZ():
 
         while not rospy.is_shutdown():
 
-            if self.new_target_pose and self.new_gimbal_data:
-                self.getTrueDepth()
-
             if self.new_depth_data and self.new_detection_data and self.new_odometry_data:
                 """
                 x = (u - cx) * depth / fx
@@ -309,10 +306,13 @@ class reconstructXYZ():
                 self.new_detection_data = False
                 self.new_odometry_data = False
 
+            if self.new_target_pose and self.new_gimbal_data:
+                self.getTrueDepth()
+
             r.sleep()
 
 if __name__ == '__main__':
     rospy.init_node('reconstructXYZ')
 
     reconstructor = reconstructXYZ()
-    reconstructor.run(50)
+    reconstructor.run(100)
