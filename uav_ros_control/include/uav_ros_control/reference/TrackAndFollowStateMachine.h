@@ -77,6 +77,7 @@ PursuitStateMachine(ros::NodeHandle& nh)
     _pubStateName = nh.advertise<std_msgs::String>("sm_pursuit/state", 1);
     _pubStateNameNum = nh.advertise<std_msgs::Int32>("sm_pursuit/state_num", 1);
     _pubSearchTrajectoryFlag = nh.advertise<std_msgs::Bool>("topp/trajectory_flag", 1);
+    _pubNumOfFollowingStateActivations = nh.advertise<std_msgs::Int32>("sm_pursuit/evaluation/following_state_activations", 1);
     /* Detection activation/deactivation */
     _pubInferenceEnabled = nh.advertise<std_msgs::Bool>("/sm_pursuit/inference_enabled", 1);
     _pubEstimatorStart = nh.advertise<std_msgs::Bool>("sm_pursuit/start_estimator", 1, true);
@@ -306,6 +307,7 @@ void initializeParameters(ros::NodeHandle& nh)
 
     _toppStatus.data = false;
     _inferenceEnabled.data = true;
+    _numOfFollowingStateActivations.data = 0;
 
 
     ROS_INFO("Node rate: %.2f", _rate);
@@ -379,6 +381,7 @@ void turnOnVisualServo()
     if (resp.success)
     {   // Visual servo successfully activated
         ROS_INFO("PursuitSM::updateStatus - Visual servo pursuit is activated.");
+        _numOfFollowingStateActivations.data += 1;
         _pursuitActivated = true;
         return;
     }
@@ -479,11 +482,11 @@ void updateState()
 
         if (isRelativeDistanceNan()){
             _currDistanceReference = _maxDistanceReference;
-            ROS_WARN("PursuitSM::updateStatus - UAV distance is Nan.");
+            ROS_WARN("PursuitSM::updateStatus - UAV distance is Nan. Declare MAX value.");
         }
         else if (!isRelativeDistancePositive()) {
             // pass
-            ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative.");
+            ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative. Declare setpoint value.");
             _currDistanceReference = _uav_distance_offset;
         }
 
@@ -585,11 +588,11 @@ void updateState()
 
         if (isRelativeDistanceNan()){
             _currDistanceReference = _maxDistanceReference;
-            ROS_WARN("PursuitSM::updateStatus - UAV distance is Nan.");
+            ROS_WARN("PursuitSM::updateStatus - UAV distance is Nan. Declare MAX value.");
         }
         else if (!isRelativeDistancePositive()) {
             // pass
-            ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative. %f", _relativeUAVDistance);
+            ROS_FATAL("PursuitSM::updateStatus - UAV distance is negative. Declare setpoint value. %f", _relativeUAVDistance);
             _currDistanceReference = _uav_distance_offset;
         }
 
@@ -753,6 +756,7 @@ void publishErrors()
 
 void publishIndicators()
 {
+    _pubNumOfFollowingStateActivations.publish(_numOfFollowingStateActivations);
     _pubSearchTrajectoryFlag.publish(_searchTrajectoryFlag);
     _pubInferenceEnabled.publish(_inferenceEnabled);
 
@@ -811,6 +815,10 @@ private:
 
     /* Error publishers */
     ros::Publisher _pubXError, _pubYError, _pubZError, _pubYawError;
+
+    /* Evaluation publishers */
+    ros::Publisher _pubNumOfFollowingStateActivations;
+    std_msgs::Int32 _numOfFollowingStateActivations;
 
     /* CNN inference flag publisher. */
     ros::Publisher _pubInferenceEnabled;
