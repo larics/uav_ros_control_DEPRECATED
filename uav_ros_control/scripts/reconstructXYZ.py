@@ -57,10 +57,10 @@ class reconstructXYZ():
 
         # Create subscribers
         rospy.Subscriber('/YOLODetection/tracked_detection', object, self.detection_callback)
-        rospy.Subscriber('/yellow/mavros/global_position/local', Odometry, self.odometry_callback)
-        rospy.Subscriber('/yellow/camera/color/camera_info', CameraInfo, self.camera_info_callback)
+        rospy.Subscriber('mavros/global_position/local', Odometry, self.odometry_callback)
+        rospy.Subscriber('camera/color/camera_info', CameraInfo, self.camera_info_callback)
         rospy.Subscriber('/uav/velocity_relative', TwistStamped, self.target_vel_pose_gt_callback)
-        rospy.Subscriber('/yellow/velocity_relative', TwistStamped, self.follower_vel_pose_gt_callback)
+        rospy.Subscriber('velocity_relative', TwistStamped, self.follower_vel_pose_gt_callback)
         #rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
 
         # Msgs filters

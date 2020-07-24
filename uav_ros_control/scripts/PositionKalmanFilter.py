@@ -14,16 +14,16 @@ class PositionKalmanFilter():
         self.maxpredictTime = 2.0
 
         # Create subscribers.
-        rospy.Subscriber('/yellow/reconstructXYZ/parameter_updates', Config, self.parametersCb, queue_size=1)
+        rospy.Subscriber('reconstructXYZ/parameter_updates', Config, self.parametersCb, queue_size=1)
 
     def parametersCb(self, data):
         """  Dynamic reconfigure callback for parameters update.  """
         rospy.loginfo("GlobalPositionKalmanFilter - Parameters callback.")
 
         if(self.kalmanInitialized):
-            self.setPositionNoise(rospy.get_param("/yellow/reconstructXYZ/GKFpositionNoise"))
-            self.setVelocityNoise(rospy.get_param("/yellow/reconstructXYZ/GKFvelocityNoise"))
-            self.setMeasurementNoise(rospy.get_param("/yellow/reconstructXYZ/GKFmeasurementNoise"))
+            self.setPositionNoise(rospy.get_param("reconstructXYZ/GKFpositionNoise"))
+            self.setVelocityNoise(rospy.get_param("reconstructXYZ/GKFvelocityNoise"))
+            self.setMeasurementNoise(rospy.get_param("reconstructXYZ/GKFmeasurementNoise"))
 
     def init(self, timeStep, initialState):
         """
@@ -150,7 +150,6 @@ class PositionKalmanFilter():
         self.predictTime = 0.0
 
     def setMeasurementNoise(self, noise):
-        print noise
         self.R[0,0] = noise
         self.R[1,1] = noise
         self.R[2,2] = noise
