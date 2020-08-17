@@ -250,17 +250,7 @@ class reconstructXYZ():
         self.target_uavr_position_mv_pub.publish(self.target_uavr_pos_mv)
 
         """ Publish relative values for Visual-servoing """
-        depth_r_msg = Float32()
-        depth_r_msg.data = Tpos_uav[0,3]
-        self.depth_relative_pub.publish(depth_r_msg)
-
-        height_r_msg = Float32()
-        height_r_msg.data = -1 * Tpos_uav[2,3]
-        self.height_relative_pub.publish(height_r_msg)
-
-        yaw_r_msg = Float32()
-        yaw_r_msg.data = atan2(Tpos_uav[1,3], Tpos_uav[0,3])
-        self.yaw_relative_pub.publish(yaw_r_msg)
+        #self.publishRelativeValues(Tpos_uav)
 
         # Tranform from uav_relative c.s. to gazebo c.s.
         quaternion = [self.gimbal_pose.pose.orientation.w, self.gimbal_pose.pose.orientation.x, self.gimbal_pose.pose.orientation.y, self.gimbal_pose.pose.orientation.z]
@@ -428,6 +418,9 @@ class reconstructXYZ():
 
         Tpoint_uav = np.dot(np.linalg.inv(Tuav_gazebo), Tpos_gazebo)
 
+        """ Publish relative values for Visual-servoing """
+        self.publishRelativeValues(Tpoint_uav)
+
         gkf_msg = PointStamped()
         gkf_msg.header.stamp = rospy.Time.now()
         gkf_msg.point.x = Tpoint_uav[0,3]
@@ -446,6 +439,19 @@ class reconstructXYZ():
             self.velocity_global_kf_pub.publish(self.position_global_kf.getVelocity())
 
             self.gkf2uavRelative(self.position_global_kf.getPosition())
+
+    def publishRelativeValues(self, target_position_uavr):
+        depth_r_msg = Float32()
+        depth_r_msg.data = target_position_uavr[0,3]
+        self.depth_relative_pub.publish(depth_r_msg)
+
+        height_r_msg = Float32()
+        height_r_msg.data = -1 * target_position_uavr[2,3]
+        self.height_relative_pub.publish(height_r_msg)
+
+        yaw_r_msg = Float32()
+        yaw_r_msg.data = atan2(target_position_uavr[1,3], target_position_uavr[0,3])
+        self.yaw_relative_pub.publish(yaw_r_msg)
 
     def run(self, rate):
         r = rospy.Rate(rate)
