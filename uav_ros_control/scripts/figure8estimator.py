@@ -24,14 +24,14 @@ from uav_ros_control.srv import GetLocalConstraints
 class Tfm_Aprox():
     def __init__(self):
         self.camera_info = CameraInfo()
-        self.new_distance_data = False
+        self.new_depth_data = False
         self.list_size = 50
-        self.distance_data = PointStamped()
         self.detection_data_list = []
         self.odometry_data_list = []
         self.Tuav_cam = np.zeros((4, 4))
         self.new_detection_data = False
         self.new_odometry_data = False
+        self.depth_header = Header()
 
         self.start_estimator = False
 
@@ -136,10 +136,6 @@ class Tfm_Aprox():
                     wn -= 1
 
         return wn > 0
-
-    def distance_callback(self, data):
-        self.new_distance_data = True
-        self.distance_data = data
         
     def detection_callback(self, data):
         self.new_detection_data = True
@@ -148,6 +144,11 @@ class Tfm_Aprox():
         else:
             self.detection_data_list.append(data)
             self.detection_data_list.pop(0)
+
+        # TO DO: add an exception for data out of sensor range
+        self.new_depth_data = True
+        self.depth_data = data.depth
+        self.depth_header = data.header
 
     def camera_info_callback(self, data):
         self.camera_info = data
@@ -379,24 +380,23 @@ class Tfm_Aprox():
                 global_position = PointStamped()
                 detection_data = object()
                 odometry_data = Odometry()
-                if self.new_distance_data and self.new_detection_data and self.new_odometry_data:
+                if self.new_depth_data and self.new_detection_data and self.new_odometry_data:
 
-
-                    detection_data = self.find_min_time_diff_data(self.detection_data_list, self.distance_data.header.stamp.to_sec())
-                    odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.distance_data.header.stamp.to_sec())
+                    detection_data = self.find_min_time_diff_data(self.detection_data_list, self.depth_header.stamp.to_sec())
+                    odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.depth_header.stamp.to_sec())
 
                     # Uncomment in case of distance instead depth
                     # x = (detection_data.x - self.camera_info.K[2]) / self.camera_info.K[0]
                     # y = (detection_data.y - self.camera_info.K[5]) / self.camera_info.K[4]
 
-                    # z_m = self.distance_data.point.x / (math.sqrt(1 + x*x + y*y))
+                    # z_m = self.depth_data.point.x / (math.sqrt(1 + x*x + y*y))
 
                     # x_m = x * z_m
                     # y_m = y * z_m
 
-                    x_m = (detection_data.x - self.camera_info.K[2]) * self.distance_data.point.x / self.camera_info.K[0]
-                    y_m = (detection_data.y - self.camera_info.K[5]) * self.distance_data.point.x / self.camera_info.K[4]
-                    z_m = self.distance_data.point.x
+                    x_m = (detection_data.x - self.camera_info.K[2]) * self.depth_data / self.camera_info.K[0]
+                    y_m = (detection_data.y - self.camera_info.K[5]) * self.depth_data / self.camera_info.K[4]
+                    z_m = self.depth_data
 
                     Tcam_uav1 = np.zeros((4, 4))
                     Tcam_uav1[0, 0] = 1.0
@@ -418,7 +418,7 @@ class Tfm_Aprox():
                     Tworld_uav1 = np.dot(Tworld_uav, Tuav_uav1)
 
                     uav_position = PointStamped()
-                    uav_position.header = self.distance_data.header
+                    uav_position.header = self.depth_header
                     uav_position.header.frame_id = "map"
                     uav_position.point.x = Tworld_uav1[0,3]
                     uav_position.point.y = Tworld_uav1[1,3]
@@ -512,7 +512,7 @@ class Tfm_Aprox():
 
                     self.uav_position_publisher.publish(uav_position)
 
-                    self.new_distance_data = False
+                    self.new_depth_data = False
 
                 self.uav_setpoint_publisher.publish(self.goal_setpoint)
 
@@ -771,7 +771,6 @@ if __name__ == '__main__':
 
     figure8 = Tfm_Aprox()
 
-    rospy.Subscriber('/YOLODetection/depth_header', PointStamped, figure8.distance_callback)
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
     #rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
     rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
