@@ -18,6 +18,7 @@ import thread
 
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.spatial.distance import directed_hausdorff
 
 from uav_ros_control.srv import GetLocalConstraints
 
@@ -146,7 +147,8 @@ class Tfm_Aprox():
             self.detection_data_list.pop(0)
 
         # TO DO: add an exception for data out of sensor range
-        self.new_depth_data = True
+        if (np.isfinite(data.depth)):
+            self.new_depth_data = True
         self.depth_data = data.depth
         self.depth_header = data.header
 
@@ -438,8 +440,15 @@ class Tfm_Aprox():
 
                     if (self.hausdorff_counter > self.num_of_pts_hausdorff):
                         p_reconstructed = np.asarray(self.p_reconstructed)#, dtype=None, order=None)
+                        # Prepare (self.num_of_estimated_pts, 3) shape for built-in function
+                        p_reconstructed_2dim = p_reconstructed.reshape(len(p_reconstructed),-1)
                         p = np.asarray(self.p)
-                        self.hausdorff = self.get_hausdorff_distance(p, p_reconstructed)
+
+                        # Custom hausdorff function
+                        #self.hausdorff = self.get_hausdorff_distance(p, p_reconstructed)
+
+                        # General symmetric Hausdorff
+                        self.hausdorff = max(directed_hausdorff(p, p_reconstructed_2dim), directed_hausdorff(p_reconstructed_2dim, p))[0]
                         self.hausdorff_counter = 0
                         #print(self.hausdorff, self.hausdorff/self.a, 'hausdorff')
 
