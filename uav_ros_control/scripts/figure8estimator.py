@@ -110,6 +110,8 @@ class Tfm_Aprox():
 
         # tightening lemniscate
         self.x_shift = [0, 0, 0]
+        # Lock the orientation of the lemniscate
+        self.is_x_direction_stationary = False
 
         # Get the corners of the arena in local frame
         self.local_corners = None
@@ -300,6 +302,14 @@ class Tfm_Aprox():
 
         return quaternion
 
+    def cosine_similarity(self, x, y):
+        dot_product = np.dot(x,y)
+
+        norm_x = np.linalg.norm(x)
+        norm_y = np.linalg.norm(y)
+
+        return dot_product / (norm_x * norm_y)
+
     def get_transform(self,X):
         # Find the average of points (centroid) along the columns
         C = np.average(X, axis=0)
@@ -311,6 +321,7 @@ class Tfm_Aprox():
         # smallest eigenvalues (singular values).
         T = np.zeros((4, 4))
         T[0:3, 0:3] = np.transpose(V)
+
         z = T[0:3, 2]
         z2 = -z
         if np.dot(z, np.array([0,0,1]))<np.dot(z2, np.array([0,0,1])):
@@ -318,14 +329,27 @@ class Tfm_Aprox():
             T[1, 2] = z2[1]
             T[2, 2] = z2[2]
             z = z2
+
         x = T[0:3, 0]
         x2 = -x
-        if np.dot(x, np.array([1,0,0]))<np.dot(x2, np.array([1,0,0])):
-            T[0, 0] = x2[0]
-            T[1, 0] = x2[1]
-            T[2, 0] = x2[2]
-            x = x2
+        if (not self.is_x_direction_stationary):
+            if np.dot(x, np.array([1,0,0]))<np.dot(x2, np.array([1,0,0])):
+                T[0, 0] = x2[0]
+                T[1, 0] = x2[1]
+                T[2, 0] = x2[2]
+                x = x2
+        else:
+            x1_cos_sim = 1 + self.cosine_similarity(x, self.X_rot)
+            x2_cos_sim = 1 + self.cosine_similarity(x2, self.X_rot)
+
+            if (x2_cos_sim > x1_cos_sim):
+                T[0, 0] = x2[0]
+                T[1, 0] = x2[1]
+                T[2, 0] = x2[2]
+                x = x2
+
         y = np.cross(z, x)
+
         T[0, 1] = y[0]
         T[1, 1] = y[1]
         T[2, 1] = y[2]
@@ -333,6 +357,7 @@ class Tfm_Aprox():
         T[1, 3] = C[1]
         T[2, 3] = C[2]
         T[3, 3] = 1.0
+
         return T
 
     def plot(self):
@@ -761,6 +786,13 @@ class Tfm_Aprox():
                 estimator_state_msg = Bool()
                 estimator_state_msg.data = self.estimator_state
                 self.estimator_state_publisher.publish(estimator_state_msg)
+
+                # Check if x direction can be stated stationary
+                if (self.a > self.min_a and not self.is_x_direction_stationary):
+                    self.is_x_direction_stationary = True
+                    self.X_rot = T[0:3,0]
+                    rospy.logwarn("Figure-8-estimator - Declaring x direction stationary.")
+
 
                 # plot publish
                 self.path_g = Path()
