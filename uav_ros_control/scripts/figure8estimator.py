@@ -118,26 +118,7 @@ class Tfm_Aprox():
 
         rospy.loginfo('Geofencing is {}'.format("OFF" if self.disable_boundary_check else "ON"))
 
-    def check_inside_2d(self, point):
-        if self.local_corners is None:
-            rospy.logwarn_once("I don't have arena corners. Assuming all points are valid.")
-            return True
-
-        def is_left(P0, P1, P2):
-            return (P1.x - P0.x) * (P2.y - P0.y) - (P2.x -  P0.x) * (P1.y - P0.y)
-
-        wn = 0
-        for i in range(len(self.local_corners) - 1):
-            if self.local_corners[i].y <= point.y:
-                if self.local_corners[i + 1].y > point.y:
-                    if is_left(self.local_corners[i], self.local_corners[i + 1], point) > 0:
-                        wn += 1
-            elif self.local_corners[i + 1].y <= point.y:
-                if is_left(self.local_corners[i], self.local_corners[i + 1], point) < 0:
-                    wn -= 1
-
-        return wn > 0
-        
+    # Callbacks
     def detection_callback(self, data):
         self.new_detection_data = True
         if (len(self.detection_data_list) < self.list_size):
@@ -166,6 +147,7 @@ class Tfm_Aprox():
     def start_estimator_callback(self, data):
         self.start_estimator  = data
 
+    #Publishers
     def set_uav_position_publisher(self, publisher):
         self.uav_position_publisher = publisher
 
@@ -187,6 +169,27 @@ class Tfm_Aprox():
     def set_num_of_points_publisher(self, publisher):
         self.num_of_received_points_publisher = publisher
 
+    #Geofencing
+    def check_inside_2d(self, point):
+        if self.local_corners is None:
+            rospy.logwarn_once("I don't have arena corners. Assuming all points are valid.")
+            return True
+
+        def is_left(P0, P1, P2):
+            return (P1.x - P0.x) * (P2.y - P0.y) - (P2.x -  P0.x) * (P1.y - P0.y)
+
+        wn = 0
+        for i in range(len(self.local_corners) - 1):
+            if self.local_corners[i].y <= point.y:
+                if self.local_corners[i + 1].y > point.y:
+                    if is_left(self.local_corners[i], self.local_corners[i + 1], point) > 0:
+                        wn += 1
+            elif self.local_corners[i + 1].y <= point.y:
+                if is_left(self.local_corners[i], self.local_corners[i + 1], point) < 0:
+                    wn -= 1
+
+        return wn > 0
+        
     def find_min_time_diff_data(self, data, time_s):
         min_value = 0.0
         return_data = data[0]
@@ -201,18 +204,6 @@ class Tfm_Aprox():
                     min_value = diff
                     return_data = data[i]
         return return_data
-
-    def quaternion2euler(self, quaternion):
-
-        euler = [0.0, 0.0, 0.0]
-
-        euler[0] = math.atan2(2 * (quaternion[0] * quaternion[1] + quaternion[2] * quaternion[3]), 1 - 2 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
-
-        euler[1] = math.asin(2 * (quaternion[0] * quaternion[2] - quaternion[3] * quaternion[1]))
-
-        euler[2] = math.atan2(2 * (quaternion[0]*quaternion[3] + quaternion[1]*quaternion[2]), 1 - 2 * (quaternion[2]*quaternion[2] + quaternion[3] * quaternion[3]))
-
-        return euler
 
     def getRotationTranslationMatrix(self, orientationEuler, position):
 
@@ -267,6 +258,18 @@ class Tfm_Aprox():
 
         return rotationTranslationMatrix
 
+    def quaternion2euler(self, quaternion):
+
+        euler = [0.0, 0.0, 0.0]
+
+        euler[0] = math.atan2(2 * (quaternion[0] * quaternion[1] + quaternion[2] * quaternion[3]), 1 - 2 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
+
+        euler[1] = math.asin(2 * (quaternion[0] * quaternion[2] - quaternion[3] * quaternion[1]))
+
+        euler[2] = math.atan2(2 * (quaternion[0]*quaternion[3] + quaternion[1]*quaternion[2]), 1 - 2 * (quaternion[2]*quaternion[2] + quaternion[3] * quaternion[3]))
+
+        return euler
+
     def euler2quaternion(self, euler):
         quaternion = [1.0, 0.0, 0.0, 0.0]
 
@@ -284,7 +287,113 @@ class Tfm_Aprox():
 
         return quaternion
 
-    def estimateSetpoint2(self, real_data, estimated_data, time_vector):
+    def get_transform(self,X):
+        # Find the average of points (centroid) along the columns
+        C = np.average(X, axis=0)
+        # Create CX vector (centroid to point) matrix
+        CX = X - C
+        # Singular value decomposition
+        U, S, V = np.linalg.svd(CX)
+        # The last row of V matrix indicate the eigenvectors of
+        # smallest eigenvalues (singular values).
+        T = np.zeros((4, 4))
+        T[0:3, 0:3] = np.transpose(V)
+        z = T[0:3, 2]
+        z2 = -z
+        if np.dot(z, np.array([0,0,1]))<np.dot(z2, np.array([0,0,1])):
+            T[0, 2] = z2[0]
+            T[1, 2] = z2[1]
+            T[2, 2] = z2[2]
+            z = z2
+        x = T[0:3, 0]
+        x2 = -x
+        if np.dot(x, np.array([1,0,0]))<np.dot(x2, np.array([1,0,0])):
+            T[0, 0] = x2[0]
+            T[1, 0] = x2[1]
+            T[2, 0] = x2[2]
+            x = x2
+        y = np.cross(z, x)
+        T[0, 1] = y[0]
+        T[1, 1] = y[1]
+        T[2, 1] = y[2]
+        T[0, 3] = C[0]
+        T[1, 3] = C[1]
+        T[2, 3] = C[2]
+        T[3, 3] = 1.0
+        return T
+
+    def plot(self):
+
+        fig = plt.figure()
+        plt3d = plt.subplot(111, projection='3d')
+        #plt.axis('equal')
+
+        plt3d.scatter(self.x, self.y, self.z, color='b', marker="o") #2d
+        plt3d.scatter(self.x_l, self.y_l, self.z_l, color='r', marker="_") #2d estimirano
+        plt3d.scatter(self.x_g, self.y_g, self.z_g, color='g', marker="_") #3d estimirano
+        plt3d.scatter(self.xcoord, self.ycoord, self.zcoord, color='r', marker="_") #3d stvarno
+        plt3d.scatter(self.goal_x_g, self.goal_y_g, self.goal_z_g, color='c', marker="+", s=1000) #3d stvarno
+        plt3d.scatter(self.target_x_g, self.target_y_g, self.target_z_g, color='r', marker="+", s=1000) #3d stvarno
+        plt3d.scatter(self.goal_point.pose.position.x, self.goal_point.pose.position.y, self.goal_point.pose.position.z, color='b', marker="+", s=1000) #3d stvarno
+
+        plt.show()
+
+    def euclidean_distance(self, array_x, array_y):
+        n = array_x.shape[0]
+        ret = 0.
+        for i in range(n):
+            ret += (array_x[i]-array_y[i])**2
+        return sqrt(ret)
+
+    def get_hausdorff_distance(self, XA, XB):
+        nA = XA.shape[0]
+        nB = XB.shape[0]
+        cmax_a = 0.
+        for i in range(nA):
+            cmin = np.inf
+            for j in range(nB):
+                d = self.euclidean_distance(XA[i,:], XB[j,:])
+                if d<cmin:
+                    cmin = d
+
+                if cmin<cmax_a:
+                    break
+            if cmin>cmax_a and np.inf>cmin:
+                cmax_a = cmin
+
+        return cmax_a
+
+    def reset_estimator_callback(self, req):
+        self.a = 0.0
+        self.d = 0.0
+        self.p = []
+        self.p_reconstructed = []
+
+        self.x = []
+        self.y = []
+        self.z = []
+
+        self.x_l = []
+        self.y_l = []
+        self.z_l = []
+
+        self.x_g = []
+        self.y_g = []
+        self.z_g = []
+
+        self.xcoord = []
+        self.ycoord = []
+        self.zcoord = []
+
+        self.hausdorff_counter = 0
+
+        self.hausdorff = -1.0
+
+    def plot_callback(self, req):
+        self.plot()
+
+    # Estimation functions
+    def estimateBackupSetpoint(self, real_data, estimated_data, time_vector):
         found_flag = False
         index = 0
 
@@ -326,7 +435,6 @@ class Tfm_Aprox():
             self.goal_point.pose.orientation.z = quaternion[3]
             self.goal_point.pose.orientation.w = quaternion[0]
 
-
             self.uav_backup_setpoint_publisher.publish(self.goal_point)
 
     def estimateDirection(self, real_data, estimated_data, time_vector):
@@ -339,8 +447,9 @@ class Tfm_Aprox():
             counter = 0
 
             for j in range(self.direction_estimation_data_size):
+                # Looking for subsequent measurements
                 diff = math.fabs(time_vector[i+j]-time_vector[i+j+1])
-
+                # Check if we have found enough subsequent measurements
                 if (diff < self.direction_estimation_min_time_diff):
                     counter = counter + 1
 
@@ -362,16 +471,101 @@ class Tfm_Aprox():
                 if (min_distance > distance):
                     min_distance = distance
                     min_distance_index = j
+            # List of indices of corresponding estimated data
             index_list.append(min_distance_index)
 
-
+        # Compare first and last element
         if (index_list[0]-index_list[-1] < 0.0):
-            sign = -1
+            sign = -1 # Ascending list (we assumed correctly)
         else:
-            sign = 1
+            sign = 1 # Descending list
 
         return sign
 
+    def estimatefigure8(self, data): #data je pointstamped
+
+        row = [data.point.x, data.point.y, data.point.z]
+
+        self.p.append(row)
+        self.time_vector.append(data.header.stamp.to_sec())
+
+        # Number of measurements of the target's position
+        num_of_pts = len(self.p)
+
+        self.xcoord = [0] * num_of_pts
+        self.ycoord = [0] * num_of_pts
+        self.zcoord = [0] * num_of_pts
+
+        for i in range (len(self.p)):
+            self.xcoord[i]=self.p[i][0]
+            self.ycoord[i]=self.p[i][1]
+            self.zcoord[i]=self.p[i][2]
+
+        # Convert list to array of shape (num_of_pts, 3)
+        pp = np.asarray(self.p)
+
+        T = self.get_transform(pp)
+        T_inv = np.linalg.inv(T)
+
+        self.x = [0] * num_of_pts
+        self.y = [0] * num_of_pts
+        self.z = [0] * num_of_pts
+
+        for i in range(num_of_pts):
+            p_in = np.asarray([[self.xcoord[i]], [self.ycoord[i]], [self.zcoord[i]], [1]])
+            p_out = np.dot(T_inv, p_in)
+            self.x[i] = p_out[0]
+            self.y[i] = p_out[1]
+            self.z[i] = p_out[2]
+
+        data_x = np.asarray(self.x).flatten()
+        data_y = np.asarray(self.y).flatten()
+        x0 = np.mean(data_x)
+        y0 = np.mean(data_y)
+
+        # racunanje a i d kao sredine najudaljenijih tocaka
+        r = np.zeros(len(data_x))
+        for i in range(len(data_x)):
+            if data_x[i] >= 0:
+                r[i] = sqrt(pow(data_x[i] - x0, 2) + pow(data_y[i] - y0, 2))
+            else:
+                r[i] = -sqrt(pow(data_x[i] - x0, 2) + pow(data_y[i] - y0, 2))
+
+        self.d = (np.max(r)-np.min(r))/2.0
+        self.a = self.d / sqrt(2)
+        #print("a = ", self.a)
+        #print "\n"
+
+        #shift po x osi
+
+        x00 = (np.max(r)+np.min(r))/2.0
+        #print("pomak centra", x00)
+        xshift = [0] * len(self.x)
+        for i in range (len(self.x)-1):
+            xshift[i]=self.x[i]-x00
+
+        #generiranje tocnih tocki lemniskate u 2D
+
+        t_points = np.linspace(0, 2 * pi, self.num_of_estimated_pts)
+        self.x_l=[]
+        self.y_l=[]
+        for t in t_points:
+            self.x_l.append(self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1))
+            self.y_l.append(self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1))
+        self.z_l=[0]*len(t_points)
+
+        self.x_g = [0] * len(t_points)
+        self.y_g = [0] * len(t_points)
+        self.z_g = [0] * len(t_points)
+        self.p_reconstructed = []
+        for i in range(len(self.x_l)):
+            p_in = np.asarray([[self.x_l[i]], [self.y_l[i]], [self.z_l[i]], [1]])
+            p_out = np.dot(T, p_in)
+            self.x_g[i] = p_out[0]
+            self.y_g[i] = p_out[1]
+            self.z_g[i] = p_out[2]
+            row = [p_out[0], p_out[1], p_out[2]]
+            self.p_reconstructed.append(row)
 
     def run(self, rate):
         r = rospy.Rate(rate)
@@ -454,7 +648,7 @@ class Tfm_Aprox():
 
                         #gledamo s 1/4 pi prema 3/4 pi
                         direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
-                        self.estimateSetpoint2(p, p_reconstructed, self.time_vector)
+                        self.estimateBackupSetpoint(p, p_reconstructed, self.time_vector)
 
                         self.goal_x_l = 0.0
                         self.goal_y_l = 0.0
@@ -572,208 +766,6 @@ class Tfm_Aprox():
                 self.path_coord_publisher.publish(self.path_coord)
 
             r.sleep()
-
-    def get_line(self, B, x):
-        return B[0]*x + B[1]
-
-    def get_transform(self,X):
-        # Find the average of points (centroid) along the columns
-        C = np.average(X, axis=0)
-        # Create CX vector (centroid to point) matrix
-        CX = X - C
-        # Singular value decomposition
-        U, S, V = np.linalg.svd(CX)
-        # The last row of V matrix indicate the eigenvectors of
-        # smallest eigenvalues (singular values).
-        T = np.zeros((4, 4))
-        T[0:3, 0:3] = np.transpose(V)
-        z = T[0:3, 2]
-        z2 = -z
-        if np.dot(z, np.array([0,0,1]))<np.dot(z2, np.array([0,0,1])):
-            T[0, 2] = z2[0]
-            T[1, 2] = z2[1]
-            T[2, 2] = z2[2]
-            z = z2
-        x = T[0:3, 0]
-        x2 = -x
-        if np.dot(x, np.array([1,0,0]))<np.dot(x2, np.array([1,0,0])):
-            T[0, 0] = x2[0]
-            T[1, 0] = x2[1]
-            T[2, 0] = x2[2]
-            x = x2
-        y = np.cross(z, x)
-        T[0, 1] = y[0]
-        T[1, 1] = y[1]
-        T[2, 1] = y[2]
-        T[0, 3] = C[0]
-        T[1, 3] = C[1]
-        T[2, 3] = C[2]
-        T[3, 3] = 1.0
-        return T
-
-    def equations(self, p, *data): 
-        w=p
-        a, x0, y0, t, xl, yl, angl = data
-        #print(a, x0, y0, t, xl, yl, angl)
-        #f1 = a * sqrt(2) * cos(2*pi*self.w_atm*self.t) / (sin(2*pi*self.w_atm*self.t) * sin(2*pi*self.w_atm*self.t) + 1)
-        f1 = (a * sqrt(2) * cos(2*pi*w*t) / (sin(2*pi*w*t) * sin(2*pi*w*t) + 1) * cos(angl) - a * sqrt(2) * cos(2*pi*w*t) * sin(2*pi*w*t) / (
-                        sin(2*pi*w*t) * sin(2*pi*w*t) + 1) * sin(angl) +x0 - xl)
-        return f1
-
-    def plot(self):
-
-        fig = plt.figure()
-        plt3d = plt.subplot(111, projection='3d')
-        #plt.axis('equal')
-
-
-        plt3d.scatter(self.x, self.y, self.z, color='b', marker="o") #2d
-        plt3d.scatter(self.x_l, self.y_l, self.z_l, color='r', marker="_") #2d estimirano
-        plt3d.scatter(self.x_g, self.y_g, self.z_g, color='g', marker="_") #3d estimirano
-        plt3d.scatter(self.xcoord, self.ycoord, self.zcoord, color='r', marker="_") #3d stvarno
-        plt3d.scatter(self.goal_x_g, self.goal_y_g, self.goal_z_g, color='c', marker="+", s=1000) #3d stvarno
-        plt3d.scatter(self.target_x_g, self.target_y_g, self.target_z_g, color='r', marker="+", s=1000) #3d stvarno
-        plt3d.scatter(self.goal_point.pose.position.x, self.goal_point.pose.position.y, self.goal_point.pose.position.z, color='b', marker="+", s=1000) #3d stvarno
-
-        plt.show()
-
-    def euclidean_distance(self, array_x, array_y):
-        n = array_x.shape[0]
-        ret = 0.
-        for i in range(n):
-            ret += (array_x[i]-array_y[i])**2
-        return sqrt(ret)
-
-    def get_hausdorff_distance(self, XA, XB):
-        nA = XA.shape[0]
-        nB = XB.shape[0]
-        cmax_a = 0.
-        for i in range(nA):
-            cmin = np.inf
-            for j in range(nB):
-                d = self.euclidean_distance(XA[i,:], XB[j,:])
-                if d<cmin:
-                    cmin = d
-
-                if cmin<cmax_a:
-                    break
-            if cmin>cmax_a and np.inf>cmin:
-                cmax_a = cmin
-
-        return cmax_a
-
-    def reset_estimator_callback(self, req):
-        self.a = 0.0
-        self.d = 0.0
-        self.p = []
-        self.p_reconstructed = []
-
-        self.x = []
-        self.y = []
-        self.z = []
-
-        self.x_l = []
-        self.y_l = []
-        self.z_l = []
-
-        self.x_g = []
-        self.y_g = []
-        self.z_g = []
-
-        self.xcoord = []
-        self.ycoord = []
-        self.zcoord = []
-
-        self.hausdorff_counter = 0
-
-        self.hausdorff = -1.0
-
-    def plot_callback(self, req):
-        self.plot()
-
-
-    def estimatefigure8(self, data): #data je pointstamped
-
-        row = [data.point.x, data.point.y, data.point.z]
-
-        self.p.append(row)
-        self.time_vector.append(data.header.stamp.to_sec())
-
-        num_of_pts = len(self.p)
-
-        self.xcoord = [0] * num_of_pts
-        self.ycoord = [0] * num_of_pts
-        self.zcoord = [0] * num_of_pts
-
-        for i in range (len(self.p)):
-            self.xcoord[i]=self.p[i][0]
-            self.ycoord[i]=self.p[i][1]
-            self.zcoord[i]=self.p[i][2]
-
-        pp = np.asarray(self.p)
-
-        T = self.get_transform(pp)
-        T_inv = np.linalg.inv(T)
-
-        self.x = [0] * num_of_pts
-        self.y = [0] * num_of_pts
-        self.z = [0] * num_of_pts
-
-        for i in range(num_of_pts):
-            p_in = np.asarray([[self.xcoord[i]], [self.ycoord[i]], [self.zcoord[i]], [1]])
-            p_out = np.dot(T_inv, p_in)
-            self.x[i] = p_out[0]
-            self.y[i] = p_out[1]
-            self.z[i] = p_out[2]
-
-        data_x = np.asarray(self.x).flatten()
-        data_y = np.asarray(self.y).flatten()
-        x0 = np.mean(data_x)
-        y0 = np.mean(data_y)
-
-        # racunanje a i d kao sredine najudaljenijih tocaka
-        r = np.zeros(len(data_x))
-        for i in range(len(data_x)):
-            if data_x[i] >= 0:
-                r[i] = sqrt(pow(data_x[i] - x0, 2) + pow(data_y[i] - y0, 2))
-            else:
-                r[i] = -sqrt(pow(data_x[i] - x0, 2) + pow(data_y[i] - y0, 2))
-
-        self.d = (np.max(r)-np.min(r))/2.0
-        self.a = self.d / sqrt(2)
-        #print("a = ", self.a)
-        #print "\n"
-
-        #shift po x osi
-
-        x00 = (np.max(r)+np.min(r))/2.0
-        #print("pomak centra", x00)
-        xshift = [0] * len(self.x)
-        for i in range (len(self.x)-1):
-            xshift[i]=self.x[i]-x00
-
-        #generiranje tocnih tocki lemniskate u 2D
-
-        t_points = np.linspace(0, 2 * pi, self.num_of_estimated_pts)
-        self.x_l=[]
-        self.y_l=[]
-        for t in t_points:
-            self.x_l.append(self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1))
-            self.y_l.append(self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1))
-        self.z_l=[0]*len(t_points)
-
-        self.x_g = [0] * len(t_points)
-        self.y_g = [0] * len(t_points)
-        self.z_g = [0] * len(t_points)
-        self.p_reconstructed = []
-        for i in range(len(self.x_l)):
-            p_in = np.asarray([[self.x_l[i]], [self.y_l[i]], [self.z_l[i]], [1]])
-            p_out = np.dot(T, p_in)
-            self.x_g[i] = p_out[0]
-            self.y_g[i] = p_out[1]
-            self.z_g[i] = p_out[2]
-            row = [p_out[0], p_out[1], p_out[2]]
-            self.p_reconstructed.append(row)
 
 if __name__ == '__main__':
     rospy.init_node('figure8estimator')
