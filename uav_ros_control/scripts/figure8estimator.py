@@ -578,6 +578,7 @@ class Tfm_Aprox():
                 odometry_data = Odometry()
                 if self.new_depth_data and self.new_detection_data and self.new_odometry_data:
 
+                    # TO DO: detection and depth data are already synced in YOLODetection
                     detection_data = self.find_min_time_diff_data(self.detection_data_list, self.depth_header.stamp.to_sec())
                     odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.depth_header.stamp.to_sec())
 
@@ -603,15 +604,25 @@ class Tfm_Aprox():
                     Tcam_uav1[2, 3] = z_m
                     Tcam_uav1[3, 3] = 1.0
 
+                    # Transform from camera c.s. to uav_relative c.s.
+                    Tuav_uav1 = np.dot(self.Tuav_cam, Tcam_uav1)
+
                     quaternion = [odometry_data.pose.pose.orientation.w, odometry_data.pose.pose.orientation.x, odometry_data.pose.pose.orientation.y, odometry_data.pose.pose.orientation.z]
                     euler = self.quaternion2euler(quaternion)
                     position = [odometry_data.pose.pose.position.x, odometry_data.pose.pose.position.y, odometry_data.pose.pose.position.z]
 
                     Tworld_uav = self.getRotationTranslationMatrix(euler, position)
 
-                    Tuav_uav1 = np.dot(self.Tuav_cam, Tcam_uav1)
-
+                    # Tranform from uav_relative c.s. to gazebo c.s.
                     Tworld_uav1 = np.dot(Tworld_uav, Tuav_uav1)
+
+                    # Tranform from gazebo c.s. to world(mavros) c.s.
+                    # Comment out this part if you use odometry from mavros
+                    euler = [0.0, 0.0, 1.5707963268]
+                    position = [0.0 , 0.0, 0.0]
+
+                    Tworld_gazebo = self.getRotationTranslationMatrix(euler, position)
+                    Tworld_uav1 = np.dot(Tworld_gazebo, Tworld_uav1)
 
                     uav_position = PointStamped()
                     uav_position.header = self.depth_header
@@ -776,7 +787,9 @@ if __name__ == '__main__':
     #rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
     rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
 
-    rospy.Subscriber('mavros/global_position/local', Odometry, figure8.odometry_callback)
+    #rospy.Subscriber('mavros/global_position/local', Odometry, figure8.odometry_callback)
+    rospy.Subscriber('/gimbal/odometry', Odometry, figure8.odometry_callback)
+
 
     rospy.Subscriber('sm_pursuit/start_estimator', Bool, figure8.start_estimator_callback)
 
