@@ -87,10 +87,10 @@ class Tfm_Aprox():
 
         self.num_of_estimated_pts = 1000
 
-        self.z_offset = -2.0
+        self.z_offset = 0.0
         self.estimator_state = False
         self.goal_setpoint = PoseStamped()
-        self.goal_point = PoseStamped()
+        self.backup_point = PoseStamped()
 
         self.goal_x_l = 0.0
         self.goal_y_l = 0.0
@@ -107,6 +107,9 @@ class Tfm_Aprox():
         self.target_x_g = 0.0
         self.target_y_g = 0.0
         self.target_z_g = 0.0
+
+        # tightening lemniscate
+        self.x_shift = [0, 0, 0]
 
         # Get the corners of the arena in local frame
         self.local_corners = None
@@ -344,7 +347,7 @@ class Tfm_Aprox():
         plt3d.scatter(self.xcoord, self.ycoord, self.zcoord, color='r', marker="_") #3d stvarno
         plt3d.scatter(self.goal_x_g, self.goal_y_g, self.goal_z_g, color='c', marker="+", s=1000) #3d stvarno
         plt3d.scatter(self.target_x_g, self.target_y_g, self.target_z_g, color='r', marker="+", s=1000) #3d stvarno
-        plt3d.scatter(self.goal_point.pose.position.x, self.goal_point.pose.position.y, self.goal_point.pose.position.z, color='b', marker="+", s=1000) #3d stvarno
+        plt3d.scatter(self.backup_point.pose.position.x, self.backup_point.pose.position.y, self.backup_point.pose.position.z, color='b', marker="+", s=1000) #3d stvarno
 
         plt.show()
 
@@ -442,12 +445,12 @@ class Tfm_Aprox():
             pt1 = real_data[index]
             pt2 = real_data[index+self.direction_estimation_data_size - 1]
 
-            self.goal_point = PoseStamped()
-            self.goal_point.header.stamp = rospy.get_rostime()
-            self.goal_point.header.frame_id = "map"
-            self.goal_point.pose.position.x = pt2[0]
-            self.goal_point.pose.position.y = pt2[1]
-            self.goal_point.pose.position.z = pt2[2] + self.z_offset
+            self.backup_point = PoseStamped()
+            self.backup_point.header.stamp = rospy.get_rostime()
+            self.backup_point.header.frame_id = "map"
+            self.backup_point.pose.position.x = pt2[0]
+            self.backup_point.pose.position.y = pt2[1]
+            self.backup_point.pose.position.z = pt2[2] + self.z_offset
 
             dx = pt1[0] - pt2[0]
             dy = pt1[1] - pt2[1]
@@ -456,12 +459,12 @@ class Tfm_Aprox():
             euler = [0.0, 0.0, yaw]
             quaternion = self.euler2quaternion(euler)
 
-            self.goal_point.pose.orientation.x = quaternion[1]
-            self.goal_point.pose.orientation.y = quaternion[2]
-            self.goal_point.pose.orientation.z = quaternion[3]
-            self.goal_point.pose.orientation.w = quaternion[0]
+            self.backup_point.pose.orientation.x = quaternion[1]
+            self.backup_point.pose.orientation.y = quaternion[2]
+            self.backup_point.pose.orientation.z = quaternion[3]
+            self.backup_point.pose.orientation.w = quaternion[0]
 
-            self.uav_backup_setpoint_publisher.publish(self.goal_point)
+            self.uav_backup_setpoint_publisher.publish(self.backup_point)
 
     def estimateDirection(self, real_data, estimated_data, time_vector):
         index = 0
@@ -483,7 +486,6 @@ class Tfm_Aprox():
                 index = i
                 found_flag = True
                 break
-
 
         for i in range(self.direction_estimation_data_size):
             min_distance_index = 0
@@ -561,19 +563,13 @@ class Tfm_Aprox():
 
         self.d = (np.max(r)-np.min(r))/2.0
         self.a = self.d / sqrt(2)
-        #print("a = ", self.a)
-        #print "\n"
 
-        #shift po x osi
-
+        # Tightening lemniscate 
         x00 = (np.max(r)+np.min(r))/2.0
-        #print("pomak centra", x00)
-        xshift = [0] * len(self.x)
-        for i in range (len(self.x)-1):
-            xshift[i]=self.x[i]-x00
+        self.x_shift = np.dot(T[:3,:3], [x00, 0, 0])
+        #print(" x shift", self.x_shift)
 
         #generiranje tocnih tocki lemniskate u 2D
-
         t_points = np.linspace(0, 2 * pi, self.num_of_estimated_pts)
         self.x_l=[]
         self.y_l=[]
@@ -589,10 +585,11 @@ class Tfm_Aprox():
         for i in range(len(self.x_l)):
             p_in = np.asarray([[self.x_l[i]], [self.y_l[i]], [self.z_l[i]], [1]])
             p_out = np.dot(T, p_in)
-            self.x_g[i] = p_out[0]
-            self.y_g[i] = p_out[1]
-            self.z_g[i] = p_out[2]
-            row = [p_out[0], p_out[1], p_out[2]]
+            self.x_g[i] = p_out[0] + self.x_shift[0]
+            self.y_g[i] = p_out[1] + self.x_shift[1]
+            self.z_g[i] = p_out[2] + self.x_shift[2]
+
+            row = [p_out[0] + self.x_shift[0], p_out[1] + self.x_shift[1], p_out[2] + self.x_shift[2]]
             self.p_reconstructed.append(row)
 
     def run(self, rate):
@@ -718,15 +715,15 @@ class Tfm_Aprox():
 
                         p_in = np.asarray([[self.goal_x_l], [self.goal_y_l], [self.goal_z_l], [1]])
                         p_out = np.dot(T, p_in)
-                        self.goal_x_g = p_out[0]
-                        self.goal_y_g = p_out[1]
-                        self.goal_z_g = p_out[2]
+                        self.goal_x_g = p_out[0] + self.x_shift[0]
+                        self.goal_y_g = p_out[1] + self.x_shift[1]
+                        self.goal_z_g = p_out[2] + self.x_shift[2]
 
                         p_in = np.asarray([[self.target_x_l], [self.target_y_l], [self.target_z_l], [1]])
                         p_out = np.dot(T, p_in)
-                        self.target_x_g = p_out[0]
-                        self.target_y_g = p_out[1]
-                        self.target_z_g = p_out[2]
+                        self.target_x_g = p_out[0] + self.x_shift[0]
+                        self.target_y_g = p_out[1] + self.x_shift[1]
+                        self.target_z_g = p_out[2] + self.x_shift[2]
 
                         self.goal_setpoint.header.stamp = rospy.get_rostime()
                         self.goal_setpoint.header.frame_id = "map"
@@ -745,7 +742,6 @@ class Tfm_Aprox():
                         self.goal_setpoint.pose.orientation.y = quaternion[2]
                         self.goal_setpoint.pose.orientation.z = quaternion[3]
                         self.goal_setpoint.pose.orientation.w = quaternion[0]
-
 
                         if (self.a < self.max_a and self.a > self.min_a and self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.estimator_state):
                             self.estimator_state = True
