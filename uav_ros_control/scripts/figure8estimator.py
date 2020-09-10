@@ -2,7 +2,7 @@
 
 import rospy
 
-from geometry_msgs.msg import PointStamped, PoseStamped, PoseArray, Pose
+from geometry_msgs.msg import PointStamped, PoseStamped, PoseArray, Pose, TransformStamped
 from uav_object_tracking_msgs.msg import object
 from sensor_msgs.msg import CameraInfo
 from std_msgs.msg import Header, Bool, Float32
@@ -15,6 +15,9 @@ from std_srvs.srv import Empty
 import Queue
 import threading
 import thread
+
+import tf2_ros
+import tf
 
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -117,6 +120,13 @@ class Tfm_Aprox():
         self.disable_boundary_check = rospy.get_param('disable_boundary_check', False)
 
         rospy.loginfo('Geofencing is {}'.format("OFF" if self.disable_boundary_check else "ON"))
+
+        # Tf broadcaster
+        self.br = tf2_ros.TransformBroadcaster()
+
+        self.tf_lemniscate = TransformStamped()
+        self.tf_lemniscate.header.frame_id = "map"
+        self.tf_lemniscate.child_frame_id = "lemniscate"
 
     # Callbacks
     def detection_callback(self, data):
@@ -392,6 +402,22 @@ class Tfm_Aprox():
     def plot_callback(self, req):
         self.plot()
 
+    def publishLemniscateTf(self, T):
+
+        self.tf_lemniscate.header.stamp = rospy.Time.now()
+        self.tf_lemniscate.transform.translation.x = T[0,3]
+        self.tf_lemniscate.transform.translation.y = T[1,3]
+        self.tf_lemniscate.transform.translation.z = T[2,3]
+
+        q = tf.transformations.quaternion_from_matrix(T)
+
+        self.tf_lemniscate.transform.rotation.x = q[0]
+        self.tf_lemniscate.transform.rotation.y = q[1]
+        self.tf_lemniscate.transform.rotation.z = q[2]
+        self.tf_lemniscate.transform.rotation.w = q[3]
+
+        self.br.sendTransform(self.tf_lemniscate)
+
     # Estimation functions
     def estimateBackupSetpoint(self, real_data, estimated_data, time_vector):
         found_flag = False
@@ -506,6 +532,8 @@ class Tfm_Aprox():
 
         T = self.get_transform(pp)
         T_inv = np.linalg.inv(T)
+
+        self.publishLemniscateTf(T)
 
         self.x = [0] * num_of_pts
         self.y = [0] * num_of_pts
