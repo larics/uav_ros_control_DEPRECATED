@@ -10,7 +10,8 @@ from nav_msgs.msg import Odometry, Path
 import math
 import numpy as np
 from numpy.linalg import inv
-from math import sqrt, sin, cos, pi, atan, floor
+from scipy.spatial import distance
+from math import sqrt, sin, cos, pi, atan, floor, asin
 from std_srvs.srv import Empty
 import Queue
 import threading
@@ -78,10 +79,11 @@ class Tfm_Aprox():
         self.hausdorff = -1.0
         self.num_of_pts_hausdorff = 50
 
-        self.hausdorff_threshold = 0.1
+        self.hausdorff_threshold = 0.01
         self.max_a = 30.0
         self.min_a = 15.0
- 
+
+        self.direction = -1
         self.direction_estimation_data_size = 5
         self.direction_estimation_min_time_diff = 1.0
 
@@ -132,6 +134,9 @@ class Tfm_Aprox():
         self.tf_lemniscate = TransformStamped()
         self.tf_lemniscate.header.frame_id = "map"
         self.tf_lemniscate.child_frame_id = "lemniscate"
+
+        # Publishers
+        self.lemniscate_t_pub = rospy.Publisher('figure8/lemniscate/t', Float32, queue_size=1)
 
     # Callbacks
     def detection_callback(self, data):
@@ -401,6 +406,22 @@ class Tfm_Aprox():
 
         return cmax_a
 
+    def calculateT(self, X, Y):
+
+        if ( X > 0 and Y > 0):
+            t = asin(Y/X)
+        elif( X > 0 and Y < 0):
+            t = 2 * pi + asin(Y/X)
+        elif( X < 0 and Y > 0):
+            t = pi - asin(Y/X)
+        else:
+            t = pi - asin(Y/X)
+
+        if (self.direction == 1):
+            return 2*pi - t
+        else:
+            return t   
+
     def reset_estimator_callback(self, req):
         self.a = 0.0
         self.d = 0.0
@@ -607,6 +628,7 @@ class Tfm_Aprox():
         self.y_g = [0] * len(t_points)
         self.z_g = [0] * len(t_points)
         self.p_reconstructed = []
+        e_distance = []
         for i in range(len(self.x_l)):
             p_in = np.asarray([[self.x_l[i]], [self.y_l[i]], [self.z_l[i]], [1]])
             p_out = np.dot(T, p_in)
@@ -616,6 +638,18 @@ class Tfm_Aprox():
 
             row = [p_out[0] + self.x_shift[0], p_out[1] + self.x_shift[1], p_out[2] + self.x_shift[2]]
             self.p_reconstructed.append(row)
+
+            # Calculate which point from the estimated lemniscate is closest to the obtained measurement
+            a = np.array((data.point.x, data.point.y, data.point.z))
+            b = np.array((self.x_g[i], self.y_g[i], self.z_g[i]))
+
+            e_distance.append(distance.euclidean(a,b))
+
+        # Calculate and publish t
+        idx = e_distance.index(min(e_distance))
+        t_msg = Float32()
+        t_msg.data = self.calculateT(self.x_l[idx], self.y_l[idx])
+        self.lemniscate_t_pub.publish(t_msg)
 
     def run(self, rate):
         r = rospy.Rate(rate)
@@ -708,7 +742,7 @@ class Tfm_Aprox():
                         #print(self.hausdorff, self.hausdorff/self.a, 'hausdorff')
 
                         #gledamo s 1/4 pi prema 3/4 pi
-                        direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
+                        self.direction = self.estimateDirection(p, p_reconstructed, self.time_vector)
                         self.estimateBackupSetpoint(p, p_reconstructed, self.time_vector)
 
                         self.goal_x_l = 0.0
@@ -719,7 +753,7 @@ class Tfm_Aprox():
                         self.target_y_l = 0.0
                         self.target_z_l = 0.0
 
-                        if (direction < 0.0):
+                        if (self.direction < 0.0):
                             t = 1.0 * pi / 4.0
                         else:
                             t = 3.0 * pi / 4.0
@@ -727,7 +761,7 @@ class Tfm_Aprox():
                         self.goal_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
                         self.goal_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
 
-                        if (direction < 0.0):
+                        if (self.direction < 0.0):
                             t = 3.0 * pi / 4.0
                         else:
                             t = 1.0 * pi / 4.0
