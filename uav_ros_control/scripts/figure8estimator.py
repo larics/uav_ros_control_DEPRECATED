@@ -546,19 +546,17 @@ class figure_8_estimator():
                 found_flag = True
                 break
 
+        # Find indices of closest points in the estimated lemniscate
         for i in range(self.direction_estimation_data_size):
-            min_distance_index = 0
-            min_distance = 0.0
-            for j in range(len(estimated_data)):
-                distance = self.euclidean_distance(estimated_data[j], real_data[index+i])
-                if (j == 0):
-                    min_distance_index = j
-                    min_distance = distance
+            a = np.array(real_data[index + i])
 
-                if (min_distance > distance):
-                    min_distance = distance
-                    min_distance_index = j
-            # List of indices of corresponding estimated data
+            b = np.asarray(estimated_data)
+            b2 = b.reshape(len(b),-1)
+
+            euclidean_tmp = np.linalg.norm(a - b2, axis=1)
+
+            min_distance_index = np.argmin(euclidean_tmp)
+
             index_list.append(min_distance_index)
 
         # Compare first and last element
