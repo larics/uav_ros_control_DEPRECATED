@@ -2,23 +2,23 @@
 
 import rospy
 
+import math
+import numpy as np
+import Queue
+import threading
+import thread
+import tf2_ros
+import tf
+from math import sqrt, sin, cos, pi, atan, floor, asin
+from numpy.linalg import inv
+from scipy.spatial import distance
+from std_srvs.srv import Empty
+
 from geometry_msgs.msg import PointStamped, PoseStamped, PoseArray, Pose, TransformStamped
 from uav_object_tracking_msgs.msg import object
 from sensor_msgs.msg import CameraInfo
 from std_msgs.msg import Header, Bool, Float32
 from nav_msgs.msg import Odometry, Path
-import math
-import numpy as np
-from numpy.linalg import inv
-from scipy.spatial import distance
-from math import sqrt, sin, cos, pi, atan, floor, asin
-from std_srvs.srv import Empty
-import Queue
-import threading
-import thread
-
-import tf2_ros
-import tf
 
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -26,31 +26,46 @@ from scipy.spatial.distance import directed_hausdorff
 
 from uav_ros_control.srv import GetLocalConstraints
 
-class Tfm_Aprox():
+class figure_8_estimator():
     def __init__(self):
-        self.camera_info = CameraInfo()
-        self.new_depth_data = False
         self.list_size = 50
         self.detection_data_list = []
         self.odometry_data_list = []
-        self.Tuav_cam = np.zeros((4, 4))
+
         self.new_detection_data = False
         self.new_odometry_data = False
+        self.new_depth_data = False
+
         self.depth_header = Header()
 
-        self.start_estimator = False
+        self.interception_point = PoseStamped()
+        self.backup_interception_point = PoseStamped()
 
+        self.start_estimator = False
+        self.estimator_state = False
+
+        # Camera coordinates to UAV coordinates
+        self.Tuav_cam = np.zeros((4, 4))
         self.Tuav_cam[0, 2] = 1.0
         self.Tuav_cam[1, 0] = -1.0
         self.Tuav_cam[2, 1] = -1.0
         self.Tuav_cam[3, 3] = 1.0
 
+        self.camera_info = CameraInfo()
         self.camera_info.K = [674.0643310546875, 0.0, 655.4468994140625, 0.0, 674.0643310546875, 368.7719421386719, 0.0, 0.0, 1.0]
 
+        # Lemniscate parameters
         self.a = 0.0
         self.d = 0.0
+        self.num_of_estimated_pts = rospy.get_param("/figure8estimator/lemniscate_points", 1000)
+        self.max_a = rospy.get_param("/figure8estimator/max_a", 30.0)
+        self.min_a = rospy.get_param("/figure8estimator/min_a", 15.0)
+
+        # List of receieved measurements of position of the target
         self.p = []
+        # List of estimated lemniscate points
         self.p_reconstructed = []
+
         self.time_vector = []
 
         self.x = []
@@ -74,25 +89,23 @@ class Tfm_Aprox():
         self.path_coord = Path()
 
         self.hausdorff_counter = 0
-        self.num_of_received_points = 0
-
-        self.hausdorff = -1.0
         self.num_of_pts_hausdorff = 50
 
-        self.hausdorff_threshold = 0.01
-        self.max_a = 30.0
-        self.min_a = 15.0
+        # Hausdorff distance
+        self.hausdorff = -1.0
+
+        # Threshold for hausdorff / a
+        self.hausdorff_threshold = rospy.get_param("/figure8estimator/hausdorff_threshold", 0.1)
+
+        # Offset along z axis for interception point
+        self.z_offset = rospy.get_param("figure8estimator/interception_z_offset", 0.0)
+
+        # Total number of receieved measurements
+        self.num_of_received_points = 0
 
         self.direction = -1
         self.direction_estimation_data_size = 5
         self.direction_estimation_min_time_diff = 1.0
-
-        self.num_of_estimated_pts = 1000
-
-        self.z_offset = 0.0
-        self.estimator_state = False
-        self.goal_setpoint = PoseStamped()
-        self.backup_point = PoseStamped()
 
         self.goal_x_l = 0.0
         self.goal_y_l = 0.0
@@ -377,7 +390,7 @@ class Tfm_Aprox():
         plt3d.scatter(self.xcoord, self.ycoord, self.zcoord, color='r', marker="_") #3d stvarno
         plt3d.scatter(self.goal_x_g, self.goal_y_g, self.goal_z_g, color='c', marker="+", s=1000) #3d stvarno
         plt3d.scatter(self.target_x_g, self.target_y_g, self.target_z_g, color='r', marker="+", s=1000) #3d stvarno
-        plt3d.scatter(self.backup_point.pose.position.x, self.backup_point.pose.position.y, self.backup_point.pose.position.z, color='b', marker="+", s=1000) #3d stvarno
+        plt3d.scatter(self.backup_interception_point.pose.position.x, self.backup_interception_point.pose.position.y, self.backup_interception_point.pose.position.z, color='b', marker="+", s=1000) #3d stvarno
 
         plt.show()
 
@@ -491,12 +504,12 @@ class Tfm_Aprox():
             pt1 = real_data[index]
             pt2 = real_data[index+self.direction_estimation_data_size - 1]
 
-            self.backup_point = PoseStamped()
-            self.backup_point.header.stamp = rospy.get_rostime()
-            self.backup_point.header.frame_id = "map"
-            self.backup_point.pose.position.x = pt2[0]
-            self.backup_point.pose.position.y = pt2[1]
-            self.backup_point.pose.position.z = pt2[2] + self.z_offset
+            self.backup_interception_point = PoseStamped()
+            self.backup_interception_point.header.stamp = rospy.get_rostime()
+            self.backup_interception_point.header.frame_id = "map"
+            self.backup_interception_point.pose.position.x = pt2[0]
+            self.backup_interception_point.pose.position.y = pt2[1]
+            self.backup_interception_point.pose.position.z = pt2[2] + self.z_offset
 
             dx = pt1[0] - pt2[0]
             dy = pt1[1] - pt2[1]
@@ -505,12 +518,12 @@ class Tfm_Aprox():
             euler = [0.0, 0.0, yaw]
             quaternion = self.euler2quaternion(euler)
 
-            self.backup_point.pose.orientation.x = quaternion[1]
-            self.backup_point.pose.orientation.y = quaternion[2]
-            self.backup_point.pose.orientation.z = quaternion[3]
-            self.backup_point.pose.orientation.w = quaternion[0]
+            self.backup_interception_point.pose.orientation.x = quaternion[1]
+            self.backup_interception_point.pose.orientation.y = quaternion[2]
+            self.backup_interception_point.pose.orientation.z = quaternion[3]
+            self.backup_interception_point.pose.orientation.w = quaternion[0]
 
-            self.uav_backup_setpoint_publisher.publish(self.backup_point)
+            self.uav_backup_setpoint_publisher.publish(self.backup_interception_point)
 
     def estimateDirection(self, real_data, estimated_data, time_vector):
         index = 0
@@ -549,7 +562,7 @@ class Tfm_Aprox():
             index_list.append(min_distance_index)
 
         # Compare first and last element
-        if (index_list[0]-index_list[-1] < 0.0):
+        if (index_list[0] - index_list[-1] < 0.0):
             sign = -1 # Ascending list (we assumed correctly)
         else:
             sign = 1 # Descending list
@@ -657,9 +670,11 @@ class Tfm_Aprox():
         while not rospy.is_shutdown():
             if (self.start_estimator):
                 rospy.loginfo_once('Figure-8-estimator started.')
+
                 global_position = PointStamped()
                 detection_data = object()
                 odometry_data = Odometry()
+
                 if self.new_depth_data and self.new_detection_data and self.new_odometry_data:
 
                     # TO DO: detection and depth data are already synced in YOLODetection
@@ -784,11 +799,11 @@ class Tfm_Aprox():
                         self.target_y_g = p_out[1] + self.x_shift[1]
                         self.target_z_g = p_out[2] + self.x_shift[2]
 
-                        self.goal_setpoint.header.stamp = rospy.get_rostime()
-                        self.goal_setpoint.header.frame_id = "map"
-                        self.goal_setpoint.pose.position.x = self.goal_x_g
-                        self.goal_setpoint.pose.position.y = self.goal_y_g
-                        self.goal_setpoint.pose.position.z = self.goal_z_g + self.z_offset
+                        self.interception_point.header.stamp = rospy.get_rostime()
+                        self.interception_point.header.frame_id = "map"
+                        self.interception_point.pose.position.x = self.goal_x_g
+                        self.interception_point.pose.position.y = self.goal_y_g
+                        self.interception_point.pose.position.z = self.goal_z_g + self.z_offset
 
                         dx = self.target_x_g - self.goal_x_g
                         dy = self.target_y_g - self.goal_y_g
@@ -797,10 +812,10 @@ class Tfm_Aprox():
                         euler = [0.0, 0.0, yaw]
                         quaternion = self.euler2quaternion(euler)
 
-                        self.goal_setpoint.pose.orientation.x = quaternion[1]
-                        self.goal_setpoint.pose.orientation.y = quaternion[2]
-                        self.goal_setpoint.pose.orientation.z = quaternion[3]
-                        self.goal_setpoint.pose.orientation.w = quaternion[0]
+                        self.interception_point.pose.orientation.x = quaternion[1]
+                        self.interception_point.pose.orientation.y = quaternion[2]
+                        self.interception_point.pose.orientation.z = quaternion[3]
+                        self.interception_point.pose.orientation.w = quaternion[0]
 
                         if (self.a < self.max_a and self.a > self.min_a and self.hausdorff/self.a >= 0.0 and self.hausdorff/self.a < self.hausdorff_threshold and not self.estimator_state):
                             self.estimator_state = True
@@ -811,7 +826,7 @@ class Tfm_Aprox():
 
                     self.new_depth_data = False
 
-                self.uav_setpoint_publisher.publish(self.goal_setpoint)
+                self.uav_setpoint_publisher.publish(self.interception_point)
 
                 if self.estimator_state: rospy.logwarn_once("Figure-8-estimator has found interception setpoint.")
                 if self.num_of_received_points > 1 :
@@ -871,7 +886,7 @@ class Tfm_Aprox():
 if __name__ == '__main__':
     rospy.init_node('figure8estimator')
 
-    figure8 = Tfm_Aprox()
+    figure8 = figure_8_estimator()
 
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
     #rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
@@ -880,9 +895,7 @@ if __name__ == '__main__':
     #rospy.Subscriber('mavros/global_position/local', Odometry, figure8.odometry_callback)
     rospy.Subscriber('/gimbal/odometry', Odometry, figure8.odometry_callback)
 
-
     rospy.Subscriber('sm_pursuit/start_estimator', Bool, figure8.start_estimator_callback)
-
 
     rospy.Service('reset_figure8_estimator', Empty, figure8.reset_estimator_callback)
     rospy.Service('plot', Empty, figure8.plot_callback)

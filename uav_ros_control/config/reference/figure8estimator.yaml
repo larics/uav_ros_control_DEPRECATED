@@ -1,0 +1,11 @@
+figure8estimator:
+  
+  min_a: 15.0
+  max_a: 30.0
+
+  hausdorff_threshold: 0.1
+
+  lemniscate_points: 1000
+
+  interception_z_offset: 0.0
+
