@@ -639,10 +639,12 @@ class figure_8_estimator():
         self.y_g = [0] * len(t_points)
         self.z_g = [0] * len(t_points)
         self.p_reconstructed = []
-        e_distance = []
+
+        extra = [1]*len(t_points)
+        p_in = np.column_stack((self.x_l, self.y_l, self.z_l, extra))
+
         for i in range(len(self.x_l)):
-            p_in = np.asarray([[self.x_l[i]], [self.y_l[i]], [self.z_l[i]], [1]])
-            p_out = np.dot(T, p_in)
+            p_out = np.dot(T, p_in[i])
             self.x_g[i] = p_out[0] + self.x_shift[0]
             self.y_g[i] = p_out[1] + self.x_shift[1]
             self.z_g[i] = p_out[2] + self.x_shift[2]
@@ -650,14 +652,14 @@ class figure_8_estimator():
             row = [p_out[0] + self.x_shift[0], p_out[1] + self.x_shift[1], p_out[2] + self.x_shift[2]]
             self.p_reconstructed.append(row)
 
-            # Calculate which point from the estimated lemniscate is closest to the obtained measurement
-            a = np.array((data.point.x, data.point.y, data.point.z))
-            b = np.array((self.x_g[i], self.y_g[i], self.z_g[i]))
+        # Calculate which point from the estimated lemniscate is closest to the obtained measurement
+        a = np.array((data.point.x, data.point.y, data.point.z))
+        b = np.column_stack((self.x_g, self.y_g, self.z_g))
 
-            e_distance.append(distance.euclidean(a,b))
+        euclidean_tmp = np.linalg.norm(a - b, axis=1)
 
         # Calculate and publish t
-        idx = e_distance.index(min(e_distance))
+        idx = np.argmin(euclidean_tmp)
         t_msg = Float32()
         t_msg.data = self.calculateT(self.x_l[idx], self.y_l[idx])
         self.lemniscate_t_pub.publish(t_msg)
