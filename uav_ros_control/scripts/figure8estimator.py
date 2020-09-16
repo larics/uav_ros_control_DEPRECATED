@@ -29,8 +29,9 @@ from uav_ros_control.srv import GetLocalConstraints
 class figure_8_estimator():
     def __init__(self):
         self.list_size = 50
-        self.detection_data_list = []
         self.odometry_data_list = []
+
+        self.detection_data = object()
 
         self.new_detection_data = False
         self.new_odometry_data = False
@@ -154,17 +155,12 @@ class figure_8_estimator():
     # Callbacks
     def detection_callback(self, data):
         self.new_detection_data = True
-        if (len(self.detection_data_list) < self.list_size):
-            self.detection_data_list.append(data)
-        else:
-            self.detection_data_list.append(data)
-            self.detection_data_list.pop(0)
+        self.detection_data = data
 
-        # TO DO: add an exception for data out of sensor range
+        self.depth_data = data.depth
+        self.depth_header = data.header 
         if (np.isfinite(data.depth)):
             self.new_depth_data = True
-        self.depth_data = data.depth
-        self.depth_header = data.header
 
     def camera_info_callback(self, data):
         self.camera_info = data
@@ -672,13 +668,10 @@ class figure_8_estimator():
                 rospy.loginfo_once('Figure-8-estimator started.')
 
                 global_position = PointStamped()
-                detection_data = object()
                 odometry_data = Odometry()
 
                 if self.new_depth_data and self.new_detection_data and self.new_odometry_data:
 
-                    # TO DO: detection and depth data are already synced in YOLODetection
-                    detection_data = self.find_min_time_diff_data(self.detection_data_list, self.depth_header.stamp.to_sec())
                     odometry_data = self.find_min_time_diff_data(self.odometry_data_list, self.depth_header.stamp.to_sec())
 
                     # Uncomment in case of distance instead depth
@@ -690,8 +683,8 @@ class figure_8_estimator():
                     # x_m = x * z_m
                     # y_m = y * z_m
 
-                    x_m = (detection_data.x - self.camera_info.K[2]) * self.depth_data / self.camera_info.K[0]
-                    y_m = (detection_data.y - self.camera_info.K[5]) * self.depth_data / self.camera_info.K[4]
+                    x_m = (self.detection_data.x - self.camera_info.K[2]) * self.depth_data / self.camera_info.K[0]
+                    y_m = (self.detection_data.y - self.camera_info.K[5]) * self.depth_data / self.camera_info.K[4]
                     z_m = self.depth_data
 
                     Tcam_uav1 = np.zeros((4, 4))
