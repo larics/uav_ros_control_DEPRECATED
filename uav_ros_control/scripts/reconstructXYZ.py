@@ -12,7 +12,7 @@ from math import sqrt, sin, cos, pi, atan, floor, atan2
 
 import message_filters
 
-from PositionKalmanFilter import PositionKalmanFilter
+from PositionKalmanFilterCV import PositionKalmanFilter
 from LocalPositionKalmanFilter import LocalPositionKalmanFilter
 
 from dynamic_reconfigure.server import Server
@@ -118,8 +118,21 @@ class reconstructXYZ():
         self.detection_data = data
 
         self.depth_data.data = data.depth
-        if (np.isfinite(self.depth_data.data) and not math.isnan(self.depth_data.data)):
-            self.new_depth_data = True
+        self.new_depth_data = True
+        if (math.isnan(self.depth_data.data) or not np.isfinite(self.depth_data.data)):
+            if (data.normalized_size < 0.001): #0.0005):
+                # Declare max value
+                self.depth_data.data = 15.0
+                rospy.loginfo("ReconstructXYZ - Declaring MAX depth value.")
+            elif (data.normalized_size > 0.03):
+                # Declare min value
+                self.depth_data.data = 2.0
+                rospy.loginfo("ReconstructXYZ - Declaring MIN depth value.")
+            else:
+                self.new_depth_data = False
+
+        # if (np.isfinite(self.depth_data.data) and not math.isnan(self.depth_data.data)):
+        #     self.new_depth_data = True
 
     def odometry_callback(self, data):
         self.new_odometry_data = True
@@ -496,4 +509,4 @@ if __name__ == '__main__':
     rospy.init_node('reconstructXYZ')
 
     reconstructor = reconstructXYZ()
-    reconstructor.run(50)
+    reconstructor.run(15)
