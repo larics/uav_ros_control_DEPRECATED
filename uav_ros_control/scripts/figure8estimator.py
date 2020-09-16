@@ -89,7 +89,7 @@ class figure_8_estimator():
         self.path_coord = Path()
 
         self.hausdorff_counter = 0
-        self.num_of_pts_hausdorff = 50
+        self.num_of_pts_hausdorff = 5
 
         # Hausdorff distance
         self.hausdorff = -1.0
@@ -721,14 +721,14 @@ class figure_8_estimator():
                     position = [0.0 , 0.0, 0.0]
 
                     Tworld_gazebo = self.getRotationTranslationMatrix(euler, position)
-                    Tworld_uav1 = np.dot(Tworld_gazebo, Tworld_uav1)
+                    Tworld_uav2 = np.dot(Tworld_gazebo, Tworld_uav1)
 
                     uav_position = PointStamped()
                     uav_position.header = self.depth_header
                     uav_position.header.frame_id = "map"
-                    uav_position.point.x = Tworld_uav1[0,3]
-                    uav_position.point.y = Tworld_uav1[1,3]
-                    uav_position.point.z = Tworld_uav1[2,3]
+                    uav_position.point.x = Tworld_uav2[0,3]
+                    uav_position.point.y = Tworld_uav2[1,3]
+                    uav_position.point.z = Tworld_uav2[2,3]
 
                     if self.check_inside_2d(uav_position.point) or self.disable_boundary_check:
                         self.hausdorff_counter = self.hausdorff_counter + 1
@@ -821,6 +821,12 @@ class figure_8_estimator():
                             self.estimator_state = True
                             
                             #self.plot()
+                        # Check if x direction can be stated stationary
+                        if (self.a > self.min_a and not self.is_x_direction_stationary):
+                            print(self.a)
+                            self.is_x_direction_stationary = True
+                            self.X_rot = T[0:3,0]
+                            rospy.logwarn("Figure-8-estimator - Declaring x direction stationary.")
 
                     self.uav_position_publisher.publish(uav_position)
 
@@ -835,13 +841,6 @@ class figure_8_estimator():
                 estimator_state_msg = Bool()
                 estimator_state_msg.data = self.estimator_state
                 self.estimator_state_publisher.publish(estimator_state_msg)
-
-                # Check if x direction can be stated stationary
-                if (self.a > self.min_a and not self.is_x_direction_stationary):
-                    self.is_x_direction_stationary = True
-                    self.X_rot = T[0:3,0]
-                    rospy.logwarn("Figure-8-estimator - Declaring x direction stationary.")
-
 
                 # plot publish
                 self.path_g = Path()
@@ -889,8 +888,8 @@ if __name__ == '__main__':
     figure8 = figure_8_estimator()
 
     rospy.Subscriber('/YOLODetection/tracked_detection', object, figure8.detection_callback)
-    #rospy.Subscriber('/camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
-    rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
+    rospy.Subscriber('camera/color/camera_info', CameraInfo, figure8.camera_info_callback)
+    # rospy.Subscriber('/zedm/zed_node/left/camera_info', CameraInfo, figure8.camera_info_callback)
 
     #rospy.Subscriber('mavros/global_position/local', Odometry, figure8.odometry_callback)
     rospy.Subscriber('/gimbal/odometry', Odometry, figure8.odometry_callback)
