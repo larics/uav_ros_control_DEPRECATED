@@ -761,7 +761,7 @@ class figure_8_estimator():
                         self.target_y_l = 0.0
                         self.target_z_l = 0.0
 
-                        if (self.direction < 0.0):
+                        if (self.direction > 0.0):
                             t = 1.0 * pi / 4.0
                         else:
                             t = 3.0 * pi / 4.0
@@ -769,7 +769,7 @@ class figure_8_estimator():
                         self.goal_x_l = self.a * sqrt(2) * cos(t) / (sin(t) * sin(t) + 1)
                         self.goal_y_l = self.a * sqrt(2) * cos(t) * sin(t) / (sin(t) * sin(t) + 1)
 
-                        if (self.direction < 0.0):
+                        if (self.direction > 0.0):
                             t = 3.0 * pi / 4.0
                         else:
                             t = 1.0 * pi / 4.0
