@@ -46,6 +46,8 @@ class reconstructXYZ():
         self.target_uavr_pos_mv = PointStamped()
         self.target_world_pos_mv = PointStamped()
 
+        self.out_of_range_counter = 0
+
         # Camera coordinates to UAV coordinates
         self.Tuav_cam = np.zeros((4, 4))
         self.Tuav_cam[0, 2] = 1.0
@@ -100,7 +102,7 @@ class reconstructXYZ():
         self.srv = Server(PositionKalmanFilterParametersConfig, self.parametersCb)
 
         # Kalman filters
-        self.position_local_kf = LocalPositionKalmanFilter()
+        #self.position_local_kf = LocalPositionKalmanFilter()
         self.position_global_kf = PositionKalmanFilter()
 
     """ Callbacks """
@@ -123,10 +125,12 @@ class reconstructXYZ():
             if (data.normalized_size < 0.001): #0.0005):
                 # Declare max value
                 self.depth_data.data = 15.0
+                self.out_of_range_counter = self.out_of_range_counter + 1
                 rospy.loginfo("ReconstructXYZ - Declaring MAX depth value.")
             elif (data.normalized_size > 0.03):
                 # Declare min value
                 self.depth_data.data = 2.0
+                self.out_of_range_counter = self.out_of_range_counter + 1
                 rospy.loginfo("ReconstructXYZ - Declaring MIN depth value.")
             else:
                 self.new_depth_data = False
@@ -144,6 +148,9 @@ class reconstructXYZ():
 
         self.new_gimbal_data = True
         self.new_target_pose = True
+
+        # If gimbal odometry is used
+        self.new_odometry_data = True
 
     def target_vel_pose_gt_callback(self, data):
         self.target_vel_gt_data = data
@@ -443,9 +450,9 @@ class reconstructXYZ():
         self.position_gkf2uavr_pub.publish(gkf_msg)
 
     def publishKalman(self):
-        if (self.position_local_kf.isFilterInitialized()):
-            self.position_local_kf_pub.publish(self.position_local_kf.getPosition())
-            self.velocity_local_kf_pub.publish(self.position_local_kf.getVelocity())
+        # if (self.position_local_kf.isFilterInitialized()):
+        #     self.position_local_kf_pub.publish(self.position_local_kf.getPosition())
+        #     self.velocity_local_kf_pub.publish(self.position_local_kf.getVelocity())
 
         if (self.position_global_kf.isFilterInitialized()):
             self.position_global_kf_pub.publish(self.position_global_kf.getPosition())
@@ -489,7 +496,7 @@ class reconstructXYZ():
 
                 self.transformMeasurements(x_3d, y_3d, z_3d)
 
-                self.position_local_kf.filter(1.0 / rate, self.target_uavr_pos_mv, True, self.follower_vel_gt_data)
+                #self.position_local_kf.filter(1.0 / rate, self.target_uavr_pos_mv, True, self.follower_vel_gt_data)
                 self.position_global_kf.filter(1.0 / rate, self.target_world_pos_mv, True)
 
                 # Reset conditions
@@ -498,10 +505,11 @@ class reconstructXYZ():
                 self.new_odometry_data = False
 
             else:
-                self.position_local_kf.filter(1.0 / rate, self.target_uavr_pos_mv, False, self.follower_vel_gt_data)
+                #self.position_local_kf.filter(1.0 / rate, self.target_uavr_pos_mv, False, self.follower_vel_gt_data)
                 self.position_global_kf.filter(1.0 / rate, self.target_world_pos_mv, False)
 
             self.publishKalman()
+            # print("Out of range measurements: ", self.out_of_range_counter)
 
             r.sleep()
 
@@ -509,4 +517,4 @@ if __name__ == '__main__':
     rospy.init_node('reconstructXYZ')
 
     reconstructor = reconstructXYZ()
-    reconstructor.run(15)
+    reconstructor.run(50)
