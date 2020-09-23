@@ -151,6 +151,9 @@ class figure_8_estimator():
 
         # Publishers
         self.lemniscate_t_pub = rospy.Publisher('figure8/lemniscate/t', Float32, queue_size=1)
+        self.lemniscate_a_pub = rospy.Publisher('figure8/lemniscate/a', Float32, queue_size = 1)
+        self.hausdorff_pub = rospy.Publisher('figure8/hausdorff', Float32, queue_size = 1)
+
 
     # Callbacks
     def detection_callback(self, data):
@@ -835,6 +838,16 @@ class figure_8_estimator():
                 estimator_state_msg.data = self.estimator_state
                 self.estimator_state_publisher.publish(estimator_state_msg)
 
+                # Publish parameter a
+                a_msg = Float32()
+                a_msg.data = self.a
+                self.lemniscate_a_pub.publish(a_msg)
+                
+                # Publish value of Hausdorff distance
+                hausdorff_msg = Float32()
+                hausdorff_msg.data = self.hausdorff
+                self.hausdorff_pub.publish(hausdorff_msg)
+
                 # plot publish
                 self.path_g = Path()
                 for i in range(len(self.x_g)):
@@ -910,4 +923,4 @@ if __name__ == '__main__':
     figure8.set_num_of_points_publisher(num_of_received_points_pub)
 
 
-    figure8.run(50)
+    figure8.run(10)
