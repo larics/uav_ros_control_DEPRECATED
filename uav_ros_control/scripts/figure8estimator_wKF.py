@@ -633,9 +633,6 @@ class figure_8_estimator():
             max_r = np.max(r)
             min_r = np.min(r)
 
-        max_r = np.max(r)
-        min_r = np.min(r)
-
 
 
         # self.d = (np.max(r)-np.min(r))/2.0
