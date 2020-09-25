@@ -591,6 +591,7 @@ class figure_8_estimator():
             self.ycoord[i]=self.p[i][1]
             self.zcoord[i]=self.p[i][2]
 
+
         # Convert list to array of shape (num_of_pts, 3)
         pp = np.asarray(self.p)
 
@@ -611,6 +612,7 @@ class figure_8_estimator():
             self.z[i] = p_out[2]
 
         data_x = np.asarray(self.x).flatten()
+
         data_y = np.asarray(self.y).flatten()
         x0 = np.mean(data_x)
         y0 = np.mean(data_y)
@@ -623,11 +625,26 @@ class figure_8_estimator():
             else:
                 r[i] = -sqrt(pow(data_x[i] - x0, 2) + pow(data_y[i] - y0, 2))
 
-        self.d = (np.max(r)-np.min(r))/2.0
+        r_sorted = np.sort(r)
+        if len(data_x) > 20:
+            max_r = r_sorted[-5]
+            min_r = r_sorted[5]
+        else:
+            max_r = np.max(r)
+            min_r = np.min(r)
+
+        max_r = np.max(r)
+        min_r = np.min(r)
+
+
+
+        # self.d = (np.max(r)-np.min(r))/2.0
+        self.d = (max_r - min_r )/ 2.0
         self.a = self.d / sqrt(2)
 
         # Tightening lemniscate 
-        x00 = (np.max(r)+np.min(r))/2.0
+        # x00 = (np.max(r)+np.min(r))/2.0
+        x00 = (max_r + min_r) / 2.0
         self.x_shift = np.dot(T[:3,:3], [x00, 0, 0])
         #print(" x shift", self.x_shift)
 
