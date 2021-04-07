@@ -1,0 +1,3 @@
+<map id="uav_controller::CascadePID::calculateYawRateSetpoint" name="uav_controller::CascadePID::calculateYawRateSetpoint">
+<area shape="rect" id="node2" href="$classuav__controller_1_1_control_base.html#ab02955d2294b7e0b99a57277d09d1e21" title="uav_controller::ControlBase\l::getCurrentYaw" alt="" coords="249,5,448,47"/>
+</map>

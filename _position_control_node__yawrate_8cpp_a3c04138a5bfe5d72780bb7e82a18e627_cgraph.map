@@ -1,0 +1,15 @@
+<map id="main" name="main">
+<area shape="rect" id="node2" href="$namespaceuav__controller.html#a5692d0c80fc8ff8a5e8a3d32d84b9e9a" title="Default position control program for Ardupilot firmware Uses roll, pitch, yawrate, thrust Attitude Commands Roll and pitch are expressed in UAV body frame. " alt="" coords="108,300,295,341"/>
+<area shape="rect" id="node3" href="$classuav__controller_1_1_cascade_p_i_d.html#a75961f661dff2e26648c26b192035a33" title="uav_controller::CascadePID\l::activationPermission" alt="" coords="344,136,540,177"/>
+<area shape="rect" id="node4" href="$classuav__controller_1_1_cascade_p_i_d.html#abb4760998eb87ab5d88d99c440cd6c22" title="uav_controller::CascadePID\l::calculateAttThrustSp" alt="" coords="344,201,540,243"/>
+<area shape="rect" id="node11" href="$classuav__controller_1_1_control_base.html#aef014cad3044bf86f59fbf3d88e67fcd" title="uav_controller::ControlBase\l::overrideYawTarget" alt="" coords="343,267,541,308"/>
+<area shape="rect" id="node12" href="$classuav__controller_1_1_cascade_p_i_d.html#aaab14a0ac9875fcdae0aab1573e5ab9a" title="uav_controller::CascadePID\l::calculateYawRateSetpoint" alt="" coords="344,332,540,373"/>
+<area shape="rect" id="node13" href="$classuav__controller_1_1_control_base.html#a72484170fec3a072e0d05ffe6f017949" title="uav_controller::ControlBase\l::publishAttitudeTarget" alt="" coords="343,397,541,439"/>
+<area shape="rect" id="node14" href="$classuav__controller_1_1_control_base.html#aea5c57b630a13f272ea82d3ed9ec8ca0" title="uav_controller::ControlBase\l::publishEulerSp" alt="" coords="343,463,541,504"/>
+<area shape="rect" id="node5" href="$classuav__controller_1_1_control_base.html#a91fa53fb412f7ddd1661b0b5b6663a02" title="uav_controller::ControlBase\l::getCurrentReference" alt="" coords="589,5,788,47"/>
+<area shape="rect" id="node6" href="$classuav__controller_1_1_control_base.html#ac03952ec1921969610d32d2de1fc51c5" title="uav_controller::ControlBase\l::getCurrPosition" alt="" coords="589,71,788,112"/>
+<area shape="rect" id="node7" href="$classuav__controller_1_1_control_base.html#a6b69fa374e92595702b69d67b0a80f72" title="uav_controller::ControlBase\l::getCurrVelocity" alt="" coords="589,136,788,177"/>
+<area shape="rect" id="node8" href="$classuav__controller_1_1_control_base.html#abe21009b0bc6cbdeee6758b828bf362e" title="uav_controller::ControlBase\l::setAttitudeSp" alt="" coords="589,201,788,243"/>
+<area shape="rect" id="node9" href="$classuav__controller_1_1_control_base.html#ab02955d2294b7e0b99a57277d09d1e21" title="uav_controller::ControlBase\l::getCurrentYaw" alt="" coords="589,332,788,373"/>
+<area shape="rect" id="node10" href="$classuav__controller_1_1_control_base.html#aa08044af78599ced6a69e7b540008404" title="uav_controller::ControlBase\l::setThrustSp" alt="" coords="589,267,788,308"/>
+</map>

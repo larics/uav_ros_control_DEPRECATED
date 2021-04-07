@@ -1,0 +1,9 @@
+<map id="dist_control::DistanceControl::detectStateChange" name="dist_control::DistanceControl::detectStateChange">
+<area shape="rect" id="node2" href="$classdist__control_1_1_distance_control.html#ae57c0f251634345f7fca293e0ee0f85d" title="dist_control::DistanceControl\l::deactivateInspection" alt="" coords="260,21,467,63"/>
+<area shape="rect" id="node5" href="$classdist__control_1_1_distance_control.html#ac91cf53b9ba05a90001f4716e410045d" title="dist_control::DistanceControl\l::inspectionFailed" alt="" coords="260,87,467,128"/>
+<area shape="rect" id="node6" href="$classdist__control_1_1_distance_control.html#a91c78921a0e14dbb575662d63943cbd0" title="dist_control::DistanceControl\l::inspectionRequested" alt="" coords="260,152,467,193"/>
+<area shape="rect" id="node8" href="$classdist__control_1_1_distance_control.html#ad8c6c6d80b84b9e7bd9c7f1f497eb6d8" title="dist_control::DistanceControl\l::manualRequested" alt="" coords="260,217,467,259"/>
+<area shape="rect" id="node3" href="$classuav__controller_1_1_cascade_p_i_d.html#a034df012ff824a7ca9fe8974a08806f2" title="uav_controller::CascadePID\l::resetPositionPID" alt="" coords="520,5,716,47"/>
+<area shape="rect" id="node4" href="$classuav__controller_1_1_cascade_p_i_d.html#a1855c8d8f190ed4a99aba4017bb8a0c8" title="uav_controller::CascadePID\l::resetVelocityPID" alt="" coords="520,71,716,112"/>
+<area shape="rect" id="node7" href="$classdist__control_1_1_distance_control.html#aede23ebe516a77d83df92e042de25f7c" title="dist_control::DistanceControl\l::inspectionEnabled" alt="" coords="515,168,721,209"/>
+</map>

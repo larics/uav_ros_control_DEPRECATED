@@ -1,0 +1,4 @@
+<map id="uav_reference::JoyControlInput" name="uav_reference::JoyControlInput">
+<area shape="rect" id="node5" href="$structjoy__struct_1_1_scale_weights.html" title="joy_struct::ScaleWeights" alt="" coords="254,111,430,137"/>
+<area shape="rect" id="node8" href="$structjoy__struct_1_1_control_indices.html" title="joy_struct::ControlIndices" alt="" coords="251,187,433,213"/>
+</map>

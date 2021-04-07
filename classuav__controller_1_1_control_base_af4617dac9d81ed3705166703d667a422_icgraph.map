@@ -1,0 +1,6 @@
+<map id="uav_controller::ControlBase::overridePitchTarget" name="uav_controller::ControlBase::overridePitchTarget">
+<area shape="rect" id="node2" href="$classdist__control_1_1_distance_control.html#a8ad6da0669b6bbe9e51af54cfa7aa688" title="dist_control::DistanceControl\l::doDistanceControl" alt="" coords="252,5,459,47"/>
+<area shape="rect" id="node3" href="$classdist__control_1_1_distance_control.html#ad03175549a737dd08550a0ac0fa8e004" title="dist_control::DistanceControl\l::calculateInspectionSetpoint" alt="" coords="507,5,713,47"/>
+<area shape="rect" id="node4" href="$namespacedist__control.html#ac7948d361ec76fb50caa0e8abc6d343c" title="dist_control::runDefault" alt="" coords="761,13,932,39"/>
+<area shape="rect" id="node5" href="$_distance_control_node_8cpp.html#a3c04138a5bfe5d72780bb7e82a18e627" title="main" alt="" coords="980,13,1035,39"/>
+</map>

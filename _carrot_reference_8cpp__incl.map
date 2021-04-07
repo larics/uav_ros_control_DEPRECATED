@@ -1,0 +1,7 @@
+<map id="uav_ros_control/src/reference/CarrotReference.cpp" name="uav_ros_control/src/reference/CarrotReference.cpp">
+<area shape="rect" id="node2" href="$_nonlinear_filters_8hpp.html" title="uav_ros_control/filters\l/NonlinearFilters.hpp" alt="" coords="659,95,822,136"/>
+<area shape="rect" id="node3" href="$_carrot_reference_8hpp.html" title="uav_ros_control/reference\l/CarrotReference.hpp" alt="" coords="847,95,1035,136"/>
+<area shape="rect" id="node4" href="$_joy_control_input_8hpp.html" title="uav_ros_control/reference\l/JoyControlInput.hpp" alt="" coords="99,184,287,225"/>
+<area shape="rect" id="node16" href="$_util_8hpp.html" title="uav_ros_control/filters\l/Util.hpp" alt="" coords="1411,184,1574,225"/>
+<area shape="rect" id="node5" href="$_joy_structure_8hpp.html" title="uav_ros_control/reference\l/JoyStructure.hpp" alt="" coords="5,273,193,315"/>
+</map>

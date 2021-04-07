@@ -1,0 +1,6 @@
+<map id="uav_reference::traj_gen::toTrajectoryPointMsg" name="uav_reference::traj_gen::toTrajectoryPointMsg">
+<area shape="rect" id="node2" href="$namespaceuav__reference_1_1traj__gen.html#a1844491196c089cb3f5267a3ca51c2a7" title="uav_reference::traj\l_gen::generateCircleTrajectory_topp" alt="" coords="249,5,499,47"/>
+<area shape="rect" id="node3" href="$namespaceuav__reference_1_1traj__gen.html#a39779affd3fb11bf8410424b499361ef" title="uav_reference::traj\l_gen::generateCircleTrajectory\lAroundPoint" alt="" coords="267,70,481,126"/>
+<area shape="rect" id="node4" href="$namespaceuav__reference_1_1traj__gen.html#ab8a3fafbaf40cd42a2d9028676b02ab4" title="uav_reference::traj\l_gen::generateLinearTrajctory" alt="" coords="269,149,479,191"/>
+<area shape="rect" id="node5" href="$namespaceuav__reference_1_1traj__gen.html#ac9b047c89af4a313fb88c71ae0cc26f2" title="uav_reference::traj\l_gen::generateLinearTrajectory_topp" alt="" coords="247,215,501,256"/>
+</map>

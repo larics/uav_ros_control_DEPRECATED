@@ -1,0 +1,6 @@
+<map id="uav_controller::CascadePID::activationPermission" name="uav_controller::CascadePID::activationPermission">
+<area shape="rect" id="node2" href="$namespaceuav__controller.html#af4fcc54eeff10c81782a7ed079acff08" title="Default position control program for Ardupilot firmware Uses roll, pitch, yaw, thrust Attitude Comman..." alt="" coords="249,5,436,32"/>
+<area shape="rect" id="node4" href="$namespaceuav__controller.html#a5692d0c80fc8ff8a5e8a3d32d84b9e9a" title="Default position control program for Ardupilot firmware Uses roll, pitch, yawrate, thrust Attitude Commands Roll and pitch are expressed in UAV body frame. " alt="" coords="249,57,436,98"/>
+<area shape="rect" id="node3" href="$_position_control_node_8cpp.html#a3c04138a5bfe5d72780bb7e82a18e627" title="main" alt="" coords="484,5,539,32"/>
+<area shape="rect" id="node5" href="$_position_control_node__yawrate_8cpp.html#a3c04138a5bfe5d72780bb7e82a18e627" title="main" alt="" coords="484,64,539,91"/>
+</map>

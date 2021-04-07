@@ -1,0 +1,4 @@
+<map id="uav_reference::CarrotReference::updateCarrotXY" name="uav_reference::CarrotReference::updateCarrotXY">
+<area shape="rect" id="node2" href="$classuav__reference_1_1_joy_control_input.html#ae4d7ceec899fc0ecbdf178b35cc83474" title="uav_reference::JoyControl\lInput::getXOffsetManual" alt="" coords="277,5,463,47"/>
+<area shape="rect" id="node3" href="$classuav__reference_1_1_joy_control_input.html#ac713def1454177e2242106f7f5286292" title="uav_reference::JoyControl\lInput::getYOffsetManual" alt="" coords="277,71,463,112"/>
+</map>

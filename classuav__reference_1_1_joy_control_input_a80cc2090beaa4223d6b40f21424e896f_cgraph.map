@@ -1,0 +1,4 @@
+<map id="uav_reference::JoyControlInput::JoyControlInput" name="uav_reference::JoyControlInput::JoyControlInput">
+<area shape="rect" id="node2" href="$classuav__reference_1_1_joy_control_input.html#a4cd5c6c564156aefc6d7ad0e395bd0da" title="uav_reference::JoyControl\lInput::initializeParameters" alt="" coords="239,5,425,47"/>
+<area shape="rect" id="node3" href="$classuav__reference_1_1_joy_control_input.html#a06c65db89ab5aeaaf83016cacca94da7" title="uav_reference::JoyControl\lInput::joyCb" alt="" coords="239,71,425,112"/>
+</map>

@@ -1,0 +1,10 @@
+<map id="uav_ros_control/include/uav_ros_control/reference/JoyStructure.hpp" name="uav_ros_control/include/uav_ros_control/reference/JoyStructure.hpp">
+<area shape="rect" id="node2" href="$_distance_controller_8hpp.html" title="uav_ros_control/include\l/uav_ros_control/control\l/DistanceController.hpp" alt="" coords="289,109,463,165"/>
+<area shape="rect" id="node5" href="$_joy_control_input_8hpp.html" title="uav_ros_control/include\l/uav_ros_control/reference\l/JoyControlInput.hpp" alt="" coords="509,109,701,165"/>
+<area shape="rect" id="node3" href="$_distance_control_node_8cpp.html" title="uav_ros_control/nodes\l/control/DistanceControlNode.cpp" alt="" coords="5,221,243,262"/>
+<area shape="rect" id="node4" href="$_distance_controller_8cpp.html" title="uav_ros_control/src\l/control/DistanceController.cpp" alt="" coords="267,221,485,262"/>
+<area shape="rect" id="node6" href="$_carrot_reference_8hpp.html" title="uav_ros_control/include\l/uav_ros_control/reference\l/CarrotReference.hpp" alt="" coords="509,213,701,269"/>
+<area shape="rect" id="node9" href="$_joy_control_input_8cpp.html" title="uav_ros_control/src\l/reference/JoyControlInput.cpp" alt="" coords="726,221,941,262"/>
+<area shape="rect" id="node7" href="$_carrot_reference_node_8cpp.html" title="uav_ros_control/nodes\l/reference/CarrotReferenceNode.cpp" alt="" coords="346,317,601,359"/>
+<area shape="rect" id="node8" href="$_carrot_reference_8cpp.html" title="uav_ros_control/src\l/reference/CarrotReference.cpp" alt="" coords="625,317,847,359"/>
+</map>

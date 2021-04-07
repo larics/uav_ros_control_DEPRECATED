@@ -1,0 +1,5 @@
+<map id="calcDistance" name="calcDistance">
+<area shape="rect" id="node2" href="$classuav__reference_1_1_geo_fence.html#af84caead8ebdbe1be40421e80808c29d" title="uav_reference::GeoFence\l::findClosestPoint" alt="" coords="156,5,340,47"/>
+<area shape="rect" id="node3" href="$classuav__reference_1_1_geo_fence.html#af250026db2ec061ea06c15694eaeee97" title="uav_reference::GeoFence\l::referenceCb" alt="" coords="388,5,572,47"/>
+<area shape="rect" id="node4" href="$classuav__reference_1_1_geo_fence.html#a76a9f42e64403b3a9b60faf2e4dd5c9a" title="uav_reference::GeoFence\l::GeoFence" alt="" coords="620,5,804,47"/>
+</map>

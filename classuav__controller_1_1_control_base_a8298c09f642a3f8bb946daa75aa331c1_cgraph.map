@@ -1,0 +1,6 @@
+<map id="uav_controller::ControlBase::ControlBase" name="uav_controller::ControlBase::ControlBase">
+<area shape="rect" id="node2" href="$classuav__controller_1_1_control_base.html#a3b0a2e2a277d6e3c23d214bc96db3fe3" title="uav_controller::ControlBase\l::msfOdomCb" alt="" coords="252,5,451,47"/>
+<area shape="rect" id="node4" href="$classuav__controller_1_1_control_base.html#a029e55a786972bb7cde78391d2e8aebe" title="uav_controller::ControlBase\l::odomCb" alt="" coords="252,71,451,112"/>
+<area shape="rect" id="node5" href="$classuav__controller_1_1_control_base.html#ac746168aea49ff71f07d824b008a0271" title="uav_controller::ControlBase\l::trajPointCb" alt="" coords="252,136,451,177"/>
+<area shape="rect" id="node3" href="$namespaceutil.html#ac7b929a2362c653e1af22f9537d6926f" title="util::calculateYaw" alt="" coords="499,46,627,73"/>
+</map>

@@ -1,0 +1,30 @@
+<map id="main" name="main">
+<area shape="rect" id="node2" href="$namespacedist__control.html#ac7948d361ec76fb50caa0e8abc6d343c" title="dist_control::runDefault" alt="" coords="108,515,279,542"/>
+<area shape="rect" id="node3" href="$classdist__control_1_1_distance_control.html#ae32050a0e420109105acfc0f3d1d772f" title="dist_control::DistanceControl\l::detectStateChange" alt="" coords="327,136,533,177"/>
+<area shape="rect" id="node11" href="$classdist__control_1_1_distance_control.html#ab7b83042f98bedcc9bee31d44d643a55" title="dist_control::DistanceControl\l::inInspectionState" alt="" coords="836,291,1043,332"/>
+<area shape="rect" id="node12" href="$classdist__control_1_1_distance_control.html#ad03175549a737dd08550a0ac0fa8e004" title="dist_control::DistanceControl\l::calculateInspectionSetpoint" alt="" coords="327,567,533,608"/>
+<area shape="rect" id="node14" href="$classuav__controller_1_1_cascade_p_i_d.html#abb4760998eb87ab5d88d99c440cd6c22" title="uav_controller::CascadePID\l::calculateAttThrustSp" alt="" coords="841,493,1037,535"/>
+<area shape="rect" id="node24" href="$classuav__controller_1_1_control_base.html#a72484170fec3a072e0d05ffe6f017949" title="uav_controller::ControlBase\l::publishAttitudeTarget" alt="" coords="331,632,529,673"/>
+<area shape="rect" id="node25" href="$classdist__control_1_1_distance_control.html#aefa25512e9f4273320e1ec354746d7dc" title="dist_control::DistanceControl\l::publishDistanceInfo" alt="" coords="327,416,533,457"/>
+<area shape="rect" id="node29" href="$classuav__controller_1_1_control_base.html#aea5c57b630a13f272ea82d3ed9ec8ca0" title="uav_controller::ControlBase\l::publishEulerSp" alt="" coords="331,697,529,739"/>
+<area shape="rect" id="node4" href="$classdist__control_1_1_distance_control.html#ac91cf53b9ba05a90001f4716e410045d" title="dist_control::DistanceControl\l::inspectionFailed" alt="" coords="581,5,788,47"/>
+<area shape="rect" id="node5" href="$classdist__control_1_1_distance_control.html#ae57c0f251634345f7fca293e0ee0f85d" title="dist_control::DistanceControl\l::deactivateInspection" alt="" coords="581,71,788,112"/>
+<area shape="rect" id="node8" href="$classdist__control_1_1_distance_control.html#a91c78921a0e14dbb575662d63943cbd0" title="dist_control::DistanceControl\l::inspectionRequested" alt="" coords="581,136,788,177"/>
+<area shape="rect" id="node10" href="$classdist__control_1_1_distance_control.html#ad8c6c6d80b84b9e7bd9c7f1f497eb6d8" title="dist_control::DistanceControl\l::manualRequested" alt="" coords="581,201,788,243"/>
+<area shape="rect" id="node6" href="$classuav__controller_1_1_cascade_p_i_d.html#a034df012ff824a7ca9fe8974a08806f2" title="uav_controller::CascadePID\l::resetPositionPID" alt="" coords="841,37,1037,79"/>
+<area shape="rect" id="node7" href="$classuav__controller_1_1_cascade_p_i_d.html#a1855c8d8f190ed4a99aba4017bb8a0c8" title="uav_controller::CascadePID\l::resetVelocityPID" alt="" coords="841,103,1037,144"/>
+<area shape="rect" id="node9" href="$classdist__control_1_1_distance_control.html#aede23ebe516a77d83df92e042de25f7c" title="dist_control::DistanceControl\l::inspectionEnabled" alt="" coords="836,199,1043,240"/>
+<area shape="rect" id="node13" href="$classdist__control_1_1_distance_control.html#a8ad6da0669b6bbe9e51af54cfa7aa688" title="dist_control::DistanceControl\l::doDistanceControl" alt="" coords="581,596,788,637"/>
+<area shape="rect" id="node19" href="$classuav__controller_1_1_control_base.html#ab02955d2294b7e0b99a57277d09d1e21" title="uav_controller::ControlBase\l::getCurrentYaw" alt="" coords="1091,624,1289,665"/>
+<area shape="rect" id="node21" href="$namespacenonlinear__filters.html#adf3110b00a0409a4694a4fe6b6ec77e6" title="nonlinear_filters::\ldeadzone" alt="" coords="874,611,1005,652"/>
+<area shape="rect" id="node22" href="$classuav__controller_1_1_control_base.html#af4617dac9d81ed3705166703d667a422" title="uav_controller::ControlBase\l::overridePitchTarget" alt="" coords="840,676,1039,717"/>
+<area shape="rect" id="node23" href="$classuav__controller_1_1_control_base.html#aef014cad3044bf86f59fbf3d88e67fcd" title="uav_controller::ControlBase\l::overrideYawTarget" alt="" coords="840,741,1039,783"/>
+<area shape="rect" id="node15" href="$classuav__controller_1_1_control_base.html#a91fa53fb412f7ddd1661b0b5b6663a02" title="uav_controller::ControlBase\l::getCurrentReference" alt="" coords="1091,297,1289,339"/>
+<area shape="rect" id="node16" href="$classuav__controller_1_1_control_base.html#ac03952ec1921969610d32d2de1fc51c5" title="uav_controller::ControlBase\l::getCurrPosition" alt="" coords="1091,363,1289,404"/>
+<area shape="rect" id="node17" href="$classuav__controller_1_1_control_base.html#a6b69fa374e92595702b69d67b0a80f72" title="uav_controller::ControlBase\l::getCurrVelocity" alt="" coords="1091,428,1289,469"/>
+<area shape="rect" id="node18" href="$classuav__controller_1_1_control_base.html#abe21009b0bc6cbdeee6758b828bf362e" title="uav_controller::ControlBase\l::setAttitudeSp" alt="" coords="1091,493,1289,535"/>
+<area shape="rect" id="node20" href="$classuav__controller_1_1_control_base.html#aa08044af78599ced6a69e7b540008404" title="uav_controller::ControlBase\l::setThrustSp" alt="" coords="1091,559,1289,600"/>
+<area shape="rect" id="node26" href="$classdist__control_1_1_distance_control.html#a9d73f849f5775cdf45874722cb082421" title="dist_control::DistanceControl\l::publishState" alt="" coords="581,319,788,360"/>
+<area shape="rect" id="node27" href="$classdist__control_1_1_distance_control.html#a4ad22fb10c932007f8dfc97e049f9d8c" title="dist_control::DistanceControl\l::publishDistSp" alt="" coords="581,384,788,425"/>
+<area shape="rect" id="node28" href="$classdist__control_1_1_distance_control.html#a46679f0ca735c90f0d2c1491770d6a83" title="dist_control::DistanceControl\l::publishDistVelSp" alt="" coords="581,449,788,491"/>
+</map>

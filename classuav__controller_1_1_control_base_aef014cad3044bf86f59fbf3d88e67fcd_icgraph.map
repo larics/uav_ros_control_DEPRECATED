@@ -1,0 +1,8 @@
+<map id="uav_controller::ControlBase::overrideYawTarget" name="uav_controller::ControlBase::overrideYawTarget">
+<area shape="rect" id="node2" href="$classdist__control_1_1_distance_control.html#a8ad6da0669b6bbe9e51af54cfa7aa688" title="dist_control::DistanceControl\l::doDistanceControl" alt="" coords="252,5,459,47"/>
+<area shape="rect" id="node6" href="$namespaceuav__controller.html#a5692d0c80fc8ff8a5e8a3d32d84b9e9a" title="Default position control program for Ardupilot firmware Uses roll, pitch, yawrate, thrust Attitude Commands Roll and pitch are expressed in UAV body frame. " alt="" coords="262,71,449,112"/>
+<area shape="rect" id="node3" href="$classdist__control_1_1_distance_control.html#ad03175549a737dd08550a0ac0fa8e004" title="dist_control::DistanceControl\l::calculateInspectionSetpoint" alt="" coords="507,5,713,47"/>
+<area shape="rect" id="node4" href="$namespacedist__control.html#ac7948d361ec76fb50caa0e8abc6d343c" title="dist_control::runDefault" alt="" coords="761,13,932,39"/>
+<area shape="rect" id="node5" href="$_distance_control_node_8cpp.html#a3c04138a5bfe5d72780bb7e82a18e627" title="main" alt="" coords="980,13,1035,39"/>
+<area shape="rect" id="node7" href="$_position_control_node__yawrate_8cpp.html#a3c04138a5bfe5d72780bb7e82a18e627" title="main" alt="" coords="583,78,637,105"/>
+</map>

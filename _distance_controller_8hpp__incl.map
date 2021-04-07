@@ -1,0 +1,6 @@
+<map id="uav_ros_control/include/uav_ros_control/control/DistanceController.hpp" name="uav_ros_control/include/uav_ros_control/control/DistanceController.hpp">
+<area shape="rect" id="node2" href="$_cascade_p_i_d_8hpp.html" title="uav_ros_control/control\l/CascadePID.hpp" alt="" coords="680,109,851,151"/>
+<area shape="rect" id="node18" href="$_joy_structure_8hpp.html" title="uav_ros_control/reference\l/JoyStructure.hpp" alt="" coords="1433,109,1621,151"/>
+<area shape="rect" id="node3" href="$_control_base_8hpp.html" title="uav_ros_control/control\l/ControlBase.hpp" alt="" coords="493,199,664,240"/>
+<area shape="rect" id="node9" href="$_p_i_d_8hpp.html" title="uav_ros_control/control\l/PID.hpp" alt="" coords="1403,199,1573,240"/>
+</map>

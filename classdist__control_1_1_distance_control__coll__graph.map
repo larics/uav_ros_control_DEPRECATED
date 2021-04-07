@@ -1,0 +1,7 @@
+<map id="dist_control::DistanceControl" name="dist_control::DistanceControl">
+<area shape="rect" id="node2" href="$classuav__controller_1_1_cascade_p_i_d.html" title="uav_controller::CascadePID" alt="" coords="1277,480,1473,507"/>
+<area shape="rect" id="node3" href="$classuav__controller_1_1_control_base.html" title="uav_controller::ControlBase" alt="" coords="808,379,1007,405"/>
+<area shape="rect" id="node13" href="$class_p_i_d.html" title="PID" alt="" coords="470,128,513,155"/>
+<area shape="rect" id="node14" title="STL class. " alt="" coords="192,119,279,145"/>
+<area shape="rect" id="node15" title="STL class. " alt="" coords="5,111,143,153"/>
+</map>

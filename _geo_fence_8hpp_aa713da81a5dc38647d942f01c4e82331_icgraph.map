@@ -1,0 +1,6 @@
+<map id="isPointOnLine" name="isPointOnLine">
+<area shape="rect" id="node2" href="$_geo_fence_8hpp.html#a0983fec2bf0f5d9c7a1bfaf8ff7b5346" title="isPointOnLineSegment" alt="" coords="161,13,328,39"/>
+<area shape="rect" id="node3" href="$classuav__reference_1_1_geo_fence.html#af84caead8ebdbe1be40421e80808c29d" title="uav_reference::GeoFence\l::findClosestPoint" alt="" coords="376,5,560,47"/>
+<area shape="rect" id="node4" href="$classuav__reference_1_1_geo_fence.html#af250026db2ec061ea06c15694eaeee97" title="uav_reference::GeoFence\l::referenceCb" alt="" coords="608,5,792,47"/>
+<area shape="rect" id="node5" href="$classuav__reference_1_1_geo_fence.html#a76a9f42e64403b3a9b60faf2e4dd5c9a" title="uav_reference::GeoFence\l::GeoFence" alt="" coords="840,5,1024,47"/>
+</map>

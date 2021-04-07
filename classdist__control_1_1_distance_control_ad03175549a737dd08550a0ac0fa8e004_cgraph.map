@@ -1,0 +1,13 @@
+<map id="dist_control::DistanceControl::calculateInspectionSetpoint" name="dist_control::DistanceControl::calculateInspectionSetpoint">
+<area shape="rect" id="node2" href="$classdist__control_1_1_distance_control.html#a8ad6da0669b6bbe9e51af54cfa7aa688" title="dist_control::DistanceControl\l::doDistanceControl" alt="" coords="260,355,467,396"/>
+<area shape="rect" id="node3" href="$classuav__controller_1_1_cascade_p_i_d.html#abb4760998eb87ab5d88d99c440cd6c22" title="uav_controller::CascadePID\l::calculateAttThrustSp" alt="" coords="516,201,712,243"/>
+<area shape="rect" id="node8" href="$classuav__controller_1_1_control_base.html#ab02955d2294b7e0b99a57277d09d1e21" title="uav_controller::ControlBase\l::getCurrentYaw" alt="" coords="761,332,960,373"/>
+<area shape="rect" id="node10" href="$namespacenonlinear__filters.html#adf3110b00a0409a4694a4fe6b6ec77e6" title="nonlinear_filters::\ldeadzone" alt="" coords="549,355,679,396"/>
+<area shape="rect" id="node11" href="$classuav__controller_1_1_control_base.html#af4617dac9d81ed3705166703d667a422" title="uav_controller::ControlBase\l::overridePitchTarget" alt="" coords="515,420,713,461"/>
+<area shape="rect" id="node12" href="$classuav__controller_1_1_control_base.html#aef014cad3044bf86f59fbf3d88e67fcd" title="uav_controller::ControlBase\l::overrideYawTarget" alt="" coords="515,485,713,527"/>
+<area shape="rect" id="node4" href="$classuav__controller_1_1_control_base.html#a91fa53fb412f7ddd1661b0b5b6663a02" title="uav_controller::ControlBase\l::getCurrentReference" alt="" coords="761,5,960,47"/>
+<area shape="rect" id="node5" href="$classuav__controller_1_1_control_base.html#ac03952ec1921969610d32d2de1fc51c5" title="uav_controller::ControlBase\l::getCurrPosition" alt="" coords="761,71,960,112"/>
+<area shape="rect" id="node6" href="$classuav__controller_1_1_control_base.html#a6b69fa374e92595702b69d67b0a80f72" title="uav_controller::ControlBase\l::getCurrVelocity" alt="" coords="761,136,960,177"/>
+<area shape="rect" id="node7" href="$classuav__controller_1_1_control_base.html#abe21009b0bc6cbdeee6758b828bf362e" title="uav_controller::ControlBase\l::setAttitudeSp" alt="" coords="761,201,960,243"/>
+<area shape="rect" id="node9" href="$classuav__controller_1_1_control_base.html#aa08044af78599ced6a69e7b540008404" title="uav_controller::ControlBase\l::setThrustSp" alt="" coords="761,267,960,308"/>
+</map>

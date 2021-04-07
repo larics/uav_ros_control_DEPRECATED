@@ -1,0 +1,12 @@
+<map id="uav_controller::runDefault_yawrate_px4" name="uav_controller::runDefault_yawrate_px4">
+<area shape="rect" id="node2" href="$classuav__controller_1_1_cascade_p_i_d.html#abb4760998eb87ab5d88d99c440cd6c22" title="uav_controller::CascadePID\l::calculateAttThrustSp" alt="" coords="241,201,437,243"/>
+<area shape="rect" id="node9" href="$classuav__controller_1_1_cascade_p_i_d.html#aaab14a0ac9875fcdae0aab1573e5ab9a" title="uav_controller::CascadePID\l::calculateYawRateSetpoint" alt="" coords="241,299,437,340"/>
+<area shape="rect" id="node10" href="$classuav__controller_1_1_control_base.html#a72484170fec3a072e0d05ffe6f017949" title="uav_controller::ControlBase\l::publishAttitudeTarget" alt="" coords="240,364,439,405"/>
+<area shape="rect" id="node11" href="$classuav__controller_1_1_control_base.html#aea5c57b630a13f272ea82d3ed9ec8ca0" title="uav_controller::ControlBase\l::publishEulerSp" alt="" coords="240,429,439,471"/>
+<area shape="rect" id="node3" href="$classuav__controller_1_1_control_base.html#a91fa53fb412f7ddd1661b0b5b6663a02" title="uav_controller::ControlBase\l::getCurrentReference" alt="" coords="487,5,685,47"/>
+<area shape="rect" id="node4" href="$classuav__controller_1_1_control_base.html#ac03952ec1921969610d32d2de1fc51c5" title="uav_controller::ControlBase\l::getCurrPosition" alt="" coords="487,71,685,112"/>
+<area shape="rect" id="node5" href="$classuav__controller_1_1_control_base.html#a6b69fa374e92595702b69d67b0a80f72" title="uav_controller::ControlBase\l::getCurrVelocity" alt="" coords="487,136,685,177"/>
+<area shape="rect" id="node6" href="$classuav__controller_1_1_control_base.html#abe21009b0bc6cbdeee6758b828bf362e" title="uav_controller::ControlBase\l::setAttitudeSp" alt="" coords="487,201,685,243"/>
+<area shape="rect" id="node7" href="$classuav__controller_1_1_control_base.html#ab02955d2294b7e0b99a57277d09d1e21" title="uav_controller::ControlBase\l::getCurrentYaw" alt="" coords="487,332,685,373"/>
+<area shape="rect" id="node8" href="$classuav__controller_1_1_control_base.html#aa08044af78599ced6a69e7b540008404" title="uav_controller::ControlBase\l::setThrustSp" alt="" coords="487,267,685,308"/>
+</map>

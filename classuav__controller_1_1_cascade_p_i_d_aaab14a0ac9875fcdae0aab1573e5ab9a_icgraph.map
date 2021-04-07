@@ -1,0 +1,6 @@
+<map id="uav_controller::CascadePID::calculateYawRateSetpoint" name="uav_controller::CascadePID::calculateYawRateSetpoint">
+<area shape="rect" id="node2" href="$namespaceuav__controller.html#a5692d0c80fc8ff8a5e8a3d32d84b9e9a" title="Default position control program for Ardupilot firmware Uses roll, pitch, yawrate, thrust Attitude Commands Roll and pitch are expressed in UAV body frame. " alt="" coords="249,5,436,47"/>
+<area shape="rect" id="node4" href="$namespaceuav__controller.html#a76f6c70b3f8b7efc3372daa20748977b" title="Default position control program for PX4 firmware Uses roll, pitch, yawrate, thrust Attitude Commands..." alt="" coords="249,71,436,112"/>
+<area shape="rect" id="node3" href="$_position_control_node__yawrate_8cpp.html#a3c04138a5bfe5d72780bb7e82a18e627" title="main" alt="" coords="484,13,539,39"/>
+<area shape="rect" id="node5" href="$_position_control_node__px4__yawrate_8cpp.html#a3c04138a5bfe5d72780bb7e82a18e627" title="main" alt="" coords="484,78,539,105"/>
+</map>

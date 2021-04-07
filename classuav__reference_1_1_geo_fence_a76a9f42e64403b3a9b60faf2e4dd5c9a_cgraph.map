@@ -1,0 +1,12 @@
+<map id="uav_reference::GeoFence::GeoFence" name="uav_reference::GeoFence::GeoFence">
+<area shape="rect" id="node2" href="$classuav__reference_1_1_geo_fence.html#af250026db2ec061ea06c15694eaeee97" title="uav_reference::GeoFence\l::referenceCb" alt="" coords="237,64,421,105"/>
+<area shape="rect" id="node11" href="$class_global2_local.html#aa36539eb9267b6cbcc8832bf8465461f" title="Global2Local::toLocal" alt="" coords="251,130,408,157"/>
+<area shape="rect" id="node3" href="$classuav__reference_1_1_geo_fence.html#acc73cd989ba50a95ce96fa7fb5a2f26c" title="uav_reference::GeoFence\l::checkInside2D" alt="" coords="469,5,653,47"/>
+<area shape="rect" id="node5" href="$_geo_fence_8hpp.html#a5b1186ade41f0bbc66da2aacea7b3123" title="limitValue" alt="" coords="519,71,603,98"/>
+<area shape="rect" id="node6" href="$classuav__reference_1_1_geo_fence.html#af84caead8ebdbe1be40421e80808c29d" title="uav_reference::GeoFence\l::findClosestPoint" alt="" coords="469,123,653,164"/>
+<area shape="rect" id="node4" href="$classuav__reference_1_1_geo_fence.html#a380c76e3ef340dd5d80d637bd39e910f" title="uav_reference::GeoFence\l::isLeft" alt="" coords="701,5,885,47"/>
+<area shape="rect" id="node7" href="$_geo_fence_8hpp.html#a0fbd1d4ff8dc5371cbddc16c03792101" title="lineIntersection" alt="" coords="734,79,853,106"/>
+<area shape="rect" id="node8" href="$_geo_fence_8hpp.html#a0983fec2bf0f5d9c7a1bfaf8ff7b5346" title="isPointOnLineSegment" alt="" coords="710,130,877,157"/>
+<area shape="rect" id="node10" href="$_geo_fence_8hpp.html#a3fe536b0cf2f624e474257519fb0ebfb" title="calcDistance" alt="" coords="742,181,845,207"/>
+<area shape="rect" id="node9" href="$_geo_fence_8hpp.html#aa713da81a5dc38647d942f01c4e82331" title="isPointOnLine" alt="" coords="933,130,1041,157"/>
+</map>

@@ -1,0 +1,8 @@
+<map id="uav_reference::CarrotReference" name="uav_reference::CarrotReference">
+<area shape="rect" id="node2" href="$classuav__reference_1_1_joy_control_input.html" title="uav_reference::JoyControl\lInput" alt="" coords="1023,233,1208,274"/>
+<area shape="rect" id="node16" href="$classros__util_1_1_topic_handler.html" title="ros_util::TopicHandler\l\&lt; mavros_msgs::State \&gt;" alt="" coords="1023,715,1208,757"/>
+<area shape="rect" id="node6" href="$structjoy__struct_1_1_scale_weights.html" title="joy_struct::ScaleWeights" alt="" coords="254,340,430,367"/>
+<area shape="rect" id="node9" href="$structjoy__struct_1_1_control_indices.html" title="joy_struct::ControlIndices" alt="" coords="251,99,433,125"/>
+<area shape="rect" id="node19" title="STL class. " alt="" coords="699,795,786,821"/>
+<area shape="rect" id="node20" title="STL class. " alt="" coords="273,787,411,829"/>
+</map>
